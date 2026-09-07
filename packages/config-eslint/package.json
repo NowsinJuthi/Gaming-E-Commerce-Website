@@ -1,0 +1,15 @@
+{
+  "name": "@uniqbd/config-eslint",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@eslint/js": "^9.11.0",
+    "@next/eslint-plugin-next": "^16.2.10",
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript-eslint": "^8.8.0"
+  }
+}

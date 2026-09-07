@@ -1,0 +1,54 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Build and test output
+.next/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Runtime data
+logs/
+*.log
+*.pid
+
+# Local and production environment files
+.env
+.env.*
+**/.env
+**/.env.*
+*.production.env
+*.local.env
+
+# Keep redacted templates
+!.env.example
+!**/.env.example
+!**/.env.*.example
+!**/*.env.example
+!**/*.env.*.example
+
+# Amarpin vendor secret (real values — never commit)
+apps/api/src/modules/license/license.vendor-config.ts
+
+# User uploads (product images, logos)
+uploads/
+
+# Archives and local scratch files
+*.tar.gz
+*.zip
+Redmi.txt
+web-ts-errors*.txt
+deploy-manifest.json
+
+# Cursor local state
+.cursor/
+
+# Upload archives and local OS/editor files
+*.zip
+*.tar.gz
+.DS_Store
+Thumbs.db
+.vscode/
+!.vscode/settings.json

@@ -1,0 +1,81 @@
+export const PERMISSION_GROUPS = [
+  {
+    key: "admin_panel",
+    label: "ADMIN PANEL",
+    permissions: [
+      { key: "admin_panel_access", label: "Admin panel access" },
+      { key: "dashboard_analytics", label: "Dashboard & analytics" },
+    ],
+  },
+  {
+    key: "catalog",
+    label: "CATALOG",
+    permissions: [
+      { key: "view_products", label: "View products" },
+      { key: "create_edit_products", label: "Create & edit products" },
+      { key: "delete_deactivate_products", label: "Delete / deactivate products" },
+      { key: "submit_product_drafts", label: "Submit product drafts" },
+      { key: "gift_card_inventory", label: "Gift card inventory" },
+    ],
+  },
+  {
+    key: "blog",
+    label: "BLOG",
+    permissions: [
+      { key: "view_blog_overview", label: "Blog overview" },
+      { key: "view_blog_posts", label: "View blog posts" },
+      { key: "create_edit_blog_posts", label: "Create & edit blog posts" },
+      { key: "publish_blog_posts", label: "Publish & approve blog posts" },
+      { key: "delete_blog_posts", label: "Delete blog posts" },
+      { key: "manage_blog_categories", label: "Manage blog categories" },
+    ],
+  },
+  {
+    key: "sales",
+    label: "SALES",
+    permissions: [
+      { key: "view_all_orders", label: "View all orders" },
+      { key: "update_order_status", label: "Update order status" },
+    ],
+  },
+  {
+    key: "customers",
+    label: "CUSTOMERS",
+    permissions: [
+      { key: "view_customers", label: "View customers" },
+      { key: "edit_customers_wallet", label: "Edit customers & wallet" },
+      { key: "auto_delivery", label: "Manual Delivery" },
+    ],
+  },
+  {
+    key: "security",
+    label: "SECURITY",
+    permissions: [
+      { key: "manage_security_settings", label: "Security settings" },
+      { key: "manage_roles_permissions", label: "Roles & permissions" },
+      { key: "view_audit_logs", label: "View audit logs" },
+    ],
+  },
+  {
+    key: "settings",
+    label: "SETTINGS",
+    permissions: [
+      { key: "manage_appearance_theme", label: "Appearance & theme" },
+      { key: "manage_email_settings", label: "Email settings" },
+      { key: "manage_general_settings", label: "General site settings" },
+    ],
+  },
+] as const;
+
+export const BLOG_PERMISSION_KEYS = PERMISSION_GROUPS.find(
+  (group) => group.key === "blog",
+)!.permissions.map((permission) => permission.key);
+
+export type PermissionKey =
+  (typeof PERMISSION_GROUPS)[number]["permissions"][number]["key"];
+
+export function hasFullBlogPermissions(
+  can: (key: PermissionKey) => boolean,
+): boolean {
+  return BLOG_PERMISSION_KEYS.every((key) => can(key));
+}

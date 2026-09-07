@@ -1,0 +1,56 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { getUnreadCount, type NotificationAudience } from "@/lib/api";
+
+export const NOTIFICATION_CHANGE_EVENT = "notification-change";
+
+export function notifyUnreadCountChanged() {
+  window.dispatchEvent(new Event(NOTIFICATION_CHANGE_EVENT));
+}
+
+export function useUnreadNotifications(
+  enabled = true,
+  audience: NotificationAudience = "customer",
+  chatOnly = false,
+  excludeChat = false,
+) {
+  const [unread, setUnread] = useState(0);
+
+  const refresh = useCallback(() => {
+    if (!enabled || !localStorage.getItem("accessToken")) {
+      setUnread(0);
+      return;
+    }
+    getUnreadCount(audience, chatOnly, excludeChat)
+      .then((r) => setUnread(r.count))
+      .catch(() => setUnread(0));
+  }, [audience, chatOnly, excludeChat, enabled]);
+
+  useEffect(() => {
+    refresh();
+    window.addEventListener("auth-change", refresh);
+    window.addEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      refresh();
+    }, 30_000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("auth-change", refresh);
+      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [refresh]);
+
+  return unread;
+}

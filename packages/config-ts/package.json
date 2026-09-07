@@ -1,0 +1,6 @@
+{
+  "name": "@uniqbd/config-ts",
+  "version": "0.1.0",
+  "private": true,
+  "files": ["base.json", "nestjs.json", "nextjs.json"]
+}
