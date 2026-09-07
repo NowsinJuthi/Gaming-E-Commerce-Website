@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>UniQbd</strong><br/>
+  <strong>Gaming-E-Commerce-Website</strong><br/>
   Bangladesh-focused digital goods marketplace — game top-ups, gift cards, vouchers &amp; instant delivery
 </p>
 
@@ -16,7 +16,7 @@
 
 ## Overview
 
-**UniQbd** is a full-stack monorepo for selling digital products in Bangladesh. Customers can browse products, pay via **bKash / Nagad / Rocket / Upay / UddoktaPay**, receive codes instantly, and manage orders from a customer dashboard. Admins get a 40+ route control panel for catalog, payments, KYC, affiliates, resellers, live chat, SEO, and more.
+**Gaming-E-Commerce-Website** is a full-stack monorepo for selling digital products in Bangladesh. Customers can browse products, pay via **bKash / Nagad / Rocket / Upay / UddoktaPay**, receive codes instantly, and manage orders from a customer dashboard. Admins get a 40+ route control panel for catalog, payments, KYC, affiliates, resellers, live chat, SEO, and more.
 
 | | |
 |---|---|
@@ -79,8 +79,8 @@ Next.js 15  (port 3000)  ──REST──▶  NestJS 11 API  (port 4000/api)
 ### 1. Clone & install
 
 ```bash
-git clone <your-repo-url> uniqbd
-cd uniqbd
+git clone <your-repo-url> gaming-e-commerce-website
+cd gaming-e-commerce-website
 corepack enable
 corepack prepare pnpm@9.12.0 --activate
 pnpm install
@@ -105,7 +105,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 INTERNAL_API_URL=http://127.0.0.1:4000/api
 ```
 
-**API essentials:** `MONGODB_URI`, `UPLOADS_DIR` (absolute path, e.g. `D:/uniqbd.com/uploads`), JWT secrets.
+**API essentials:** `MONGODB_URI`, `UPLOADS_DIR` (absolute path, e.g. `D:/gaming-e-commerce-website/uploads`), JWT secrets.
 
 ### 3. Redis (optional in dev)
 
@@ -122,7 +122,7 @@ pnpm db:setup:full     # indexes + sample catalog
 pnpm seed:users        # default admin account
 ```
 
-Default admin: `admin@uniqbd.com` / `Admin1234!`
+Default admin: `admin@example.com` / `Admin1234!`
 
 ### 5. Run
 
@@ -159,10 +159,10 @@ Detailed deploy docs: [`deploy/deploy/aapanel/README.md`](deploy/deploy/aapanel/
 
 | Service | Domain | Internal port | PM2 name |
 |---------|--------|---------------|----------|
-| Next.js (website) | `https://uniqbd.com` | `3000` | `uniqbd-web` |
-| NestJS (API) | `https://api.uniqbd.com` | `4000` | `uniqbd-api` |
+| Next.js (website) | `https://yourdomain.com` | `3000` | `gaming-web` |
+| NestJS (API) | `https://api.yourdomain.com` | `4000` | `gaming-api` |
 
-**Install path:** `/www/wwwroot/uniqbd.com`
+**Install path:** `/www/wwwroot/gaming-e-commerce-website`
 
 ### Step-by-step
 
@@ -190,7 +190,7 @@ Cloudflare: SSL mode **Full (strict)**.
 Upload **only source** — never `node_modules`, `.next`, `dist`, `.turbo`, or `.env`.
 
 ```bash
-cd /www/wwwroot/uniqbd.com
+cd /www/wwwroot/gaming-e-commerce-website
 bash deploy/deploy/aapanel/post-upload.sh
 ```
 
@@ -217,21 +217,21 @@ chown -R www:www uploads
 
 | Variable | Example |
 |----------|---------|
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017/uniqbd` or Atlas URI |
+| `MONGODB_URI` | `mongodb://127.0.0.1:27017/gaming_ecommerce` or Atlas URI |
 | `REDIS_HOST` | `127.0.0.1` |
-| `UPLOADS_DIR` | `/www/wwwroot/uniqbd.com/uploads` |
+| `UPLOADS_DIR` | `/www/wwwroot/gaming-e-commerce-website/uploads` |
 | `JWT_ACCESS_SECRET` | random 48+ chars |
 | `JWT_REFRESH_SECRET` | random 48+ chars |
 | `DATA_ENCRYPTION_KEY` | 32-byte base64 |
-| `API_PUBLIC_URL` | `https://api.uniqbd.com/api` |
-| `APP_PUBLIC_URL` | `https://uniqbd.com` |
+| `API_PUBLIC_URL` | `https://api.yourdomain.com/api` |
+| `APP_PUBLIC_URL` | `https://yourdomain.com` |
 
 **`apps/web/.env.production.local`:**
 
 ```env
-NEXT_PUBLIC_API_URL=https://api.uniqbd.com/api
-NEXT_PUBLIC_WS_URL=https://api.uniqbd.com
-NEXT_PUBLIC_SITE_URL=https://uniqbd.com
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
+NEXT_PUBLIC_WS_URL=https://api.yourdomain.com
+NEXT_PUBLIC_SITE_URL=https://yourdomain.com
 INTERNAL_API_URL=http://127.0.0.1:4000/api
 ```
 
@@ -271,27 +271,27 @@ Verify:
 ```bash
 curl -I http://127.0.0.1:3000
 curl -s http://127.0.0.1:4000/api/health
-curl -s https://uniqbd.com/api/deploy-info
+curl -s https://yourdomain.com/api/deploy-info
 ```
 
 #### 7. Nginx (aaPanel)
 
-**uniqbd.com**
+**yourdomain.com**
 
-1. Website → Add site → `uniqbd.com` + `www.uniqbd.com`
+1. Website → Add site → `yourdomain.com` + `www.yourdomain.com`
 2. SSL → Let's Encrypt
-3. Config → paste `deploy/deploy/aapanel/nginx/uniqbd.com.aapanel-full.conf`
+3. Config → paste `deploy/deploy/aapanel/nginx/uniqbd.com.aapanel-full.conf` (adapt domain)
 
-**api.uniqbd.com**
+**api.yourdomain.com**
 
-1. Website → Add site → `api.uniqbd.com`
+1. Website → Add site → `api.yourdomain.com`
 2. SSL → Let's Encrypt
-3. Config → paste `deploy/deploy/aapanel/nginx/api.uniqbd.com.aapanel-full.conf`
+3. Config → paste `deploy/deploy/aapanel/nginx/api.uniqbd.com.aapanel-full.conf` (adapt domain)
 
 Health checks:
 
-- `https://api.uniqbd.com/api/health`
-- `https://api.uniqbd.com/api/health/ready`
+- `https://api.yourdomain.com/api/health`
+- `https://api.yourdomain.com/api/health/ready`
 
 #### 8. First admin user
 
@@ -306,14 +306,14 @@ Then open **Admin → Settings → License key** and activate your Amarpin licen
 **Always use the redeploy script** — not `pm2 restart` alone:
 
 ```bash
-cd /www/wwwroot/uniqbd.com
+cd /www/wwwroot/gaming-e-commerce-website
 bash deploy/deploy/aapanel/redeploy.sh
 ```
 
 Confirm live build:
 
 ```bash
-curl -s https://uniqbd.com/api/deploy-info
+curl -s https://yourdomain.com/api/deploy-info
 # buildId must match: cat apps/web/.next/BUILD_ID
 ```
 
@@ -324,11 +324,11 @@ curl -s https://uniqbd.com/api/deploy-info
 ### কী কী লাগবে
 
 - VPS (aaPanel সহ) · Node 20+ · MongoDB · Redis · PM2 · Nginx
-- ডোমেইন: `uniqbd.com` (ওয়েব) + `api.uniqbd.com` (API)
+- ডোমেইন: `yourdomain.com` (ওয়েব) + `api.yourdomain.com` (API)
 
 ### দ্রুত ধাপ
 
-1. কোড আপলোড করুন `/www/wwwroot/uniqbd.com`-এ (`node_modules` বাদ)
+1. কোড আপলোড করুন `/www/wwwroot/gaming-e-commerce-website`-এ (`node_modules` বাদ)
 2. `.env` ও `apps/web/.env.production.local` সেট করুন
 3. `license.vendor-config.ts`-এ site secret দিন (একবার)
 4. `bash deploy/deploy/aapanel/redeploy.sh` চালান
@@ -466,7 +466,7 @@ pnpm redis:up         # Start Redis (Docker)
 deploy/deploy/aapanel/
 ├── .env.production.example       → copy to repo root .env
 ├── web.env.production.example    → apps/web/.env.production.local
-├── ecosystem.config.cjs          → PM2 (uniqbd-api + uniqbd-web)
+├── ecosystem.config.cjs          → PM2 (gaming-api + gaming-web)
 ├── redeploy.sh                   → full clean build + verify (use after every upload)
 ├── verify-live.sh                → read-only diagnostics
 ├── post-upload.sh                → install + redeploy
@@ -477,5 +477,5 @@ deploy/deploy/aapanel/
 ---
 
 <p align="center">
-  <sub>UniQbd · Digital goods marketplace for Bangladesh · BDT · Built with Next.js &amp; NestJS</sub>
+  <sub>Gaming-E-Commerce-Website · Digital goods marketplace for Bangladesh · BDT · Built with Next.js &amp; NestJS</sub>
 </p>
