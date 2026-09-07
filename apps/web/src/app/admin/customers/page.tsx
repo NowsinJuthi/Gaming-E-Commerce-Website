@@ -21,6 +21,7 @@ import {
 import { getCustomerDisplayName, getPrimaryRoleLabel } from "@/lib/admin-order-view";
 import { ProductFormOrderCard } from "@/components/admin/product-form-section";
 import {
+  adminBulkDeleteCustomers,
   adminCreateCustomer,
   adminCreditCustomer,
   adminDeleteCustomer,
@@ -131,6 +132,8 @@ export default function AdminCustomersPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailSubject, setEmailSubject] = useState("Message from UniQbd support");
   const [emailMessage, setEmailMessage] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     const role = searchParams.get("role");
@@ -195,6 +198,54 @@ export default function AdminCustomersPage() {
       window.clearTimeout(timer);
     };
   }, [q, statusFilter, roleFilter, balanceFilter, page]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [q, statusFilter, roleFilter, balanceFilter, page]);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    const pageIds = customers.map((c) => c.id);
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allSelected) {
+        for (const id of pageIds) next.delete(id);
+      } else {
+        for (const id of pageIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function removeCustomersFromList(ids: Iterable<string>) {
+    const removed = new Set(ids);
+    if (removed.size === 0) return;
+    setCustomers((current) => current.filter((c) => !removed.has(c.id)));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of removed) next.delete(id);
+      return next;
+    });
+    setListTotal((total) => {
+      const next = Math.max(0, total - removed.size);
+      const maxPage = Math.max(1, Math.ceil(next / CUSTOMERS_PAGE_SIZE));
+      if (page > maxPage) {
+        setPage(maxPage);
+      }
+      return next;
+    });
+    reloadOverview();
+  }
 
   function reloadOverview() {
     getAdminCustomerOverview()
@@ -450,20 +501,62 @@ export default function AdminCustomersPage() {
           ? "Customer soft-deleted (has orders)."
           : "Customer permanently deleted.", true);
       if (selected?.id === row.id) closePanel();
-      setCustomers((current) => current.filter((c) => c.id !== row.id));
-      setListTotal((total) => {
-        const next = Math.max(0, total - 1);
-        const maxPage = Math.max(1, Math.ceil(next / CUSTOMERS_PAGE_SIZE));
-        if (page > maxPage) {
-          setPage(maxPage);
-        }
-        return next;
-      });
-      reloadOverview();
+      removeCustomersFromList([row.id]);
     } catch (err) {
       adminToast(err instanceof Error ? err.message : "Delete failed", false);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onBulkDelete() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Delete ${ids.length} selected customer${ids.length === 1 ? "" : "s"}?\n\nAccounts with orders will be soft-banned instead of permanently removed.`,
+      )
+    ) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    hideAdminToast();
+    try {
+      const res = await adminBulkDeleteCustomers(ids);
+      const removedIds = ids.filter(
+        (id) => !res.errors.some((row) => row.id === id),
+      );
+      if (selected && removedIds.includes(selected.id)) closePanel();
+      removeCustomersFromList(removedIds);
+
+      const parts: string[] = [];
+      if (res.hardDeleted > 0) {
+        parts.push(`${res.hardDeleted} permanently deleted`);
+      }
+      if (res.softDeleted > 0) {
+        parts.push(`${res.softDeleted} soft-deleted (has orders)`);
+      }
+      if (res.failed > 0) {
+        parts.push(`${res.failed} failed`);
+      }
+
+      adminToast(
+        parts.length > 0 ? parts.join(" · ") : "No customers were deleted.",
+        res.failed === 0,
+      );
+
+      if (res.errors.length > 0 && res.errors.length <= 3) {
+        for (const row of res.errors) {
+          adminToast(row.message, false);
+        }
+      } else if (res.errors.length > 3) {
+        adminToast(`${res.errors.length} deletions failed. Check server logs.`, false);
+      }
+    } catch (err) {
+      adminToast(err instanceof Error ? err.message : "Bulk delete failed.", false);
+    } finally {
+      setBulkDeleting(false);
     }
   }
 
@@ -474,6 +567,9 @@ export default function AdminCustomersPage() {
   const pageStart =
     listTotal === 0 ? 0 : (page - 1) * CUSTOMERS_PAGE_SIZE + 1;
   const pageEnd = Math.min(page * CUSTOMERS_PAGE_SIZE, listTotal);
+  const allOnPageSelected =
+    customers.length > 0 && customers.every((c) => selectedIds.has(c.id));
+  const pageActionBusy = busy || bulkDeleting;
 
   return (
     <AdminPageLayout
@@ -679,6 +775,35 @@ export default function AdminCustomersPage() {
               }}
             />
 
+            {selectedIds.size > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/8 px-3 py-2.5">
+                <p className="text-sm text-rose-100/90">
+                  <span className="font-semibold text-rose-50">
+                    {selectedIds.size}
+                  </span>{" "}
+                  customer{selectedIds.size === 1 ? "" : "s"} selected
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="dashboard-pro-btn-ghost text-xs"
+                    disabled={pageActionBusy}
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    Clear selection
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-rose-500/45 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/25 disabled:opacity-50"
+                    disabled={pageActionBusy}
+                    onClick={() => void onBulkDelete()}
+                  >
+                    {bulkDeleting ? "Deleting…" : "Delete selected"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             {loading ? (
               <div className="admin-products-table-empty">
                 Loading customers…
@@ -702,6 +827,16 @@ export default function AdminCustomersPage() {
                 <table className="panel-3d-table admin-customers-table w-full">
                   <thead>
                     <tr>
+                      <th className="w-10">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all customers on this page"
+                          checked={allOnPageSelected}
+                          disabled={pageActionBusy || customers.length === 0}
+                          onChange={toggleSelectAllOnPage}
+                          className="h-4 w-4 rounded border-border accent-brand"
+                        />
+                      </th>
                       <th>Customer</th>
                       <th>Roles</th>
                       <th>Status</th>
@@ -716,6 +851,16 @@ export default function AdminCustomersPage() {
                       const roleSubtitle = getPrimaryRoleLabel(c.roles);
                       return (
                       <tr key={c.id}>
+                        <td data-label="Select" className="align-middle">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${c.email}`}
+                            checked={selectedIds.has(c.id)}
+                            disabled={pageActionBusy}
+                            onChange={() => toggleSelected(c.id)}
+                            className="h-4 w-4 rounded border-border accent-brand"
+                          />
+                        </td>
                         <td data-label="Customer">
                           <p className="font-medium text-foreground">
                             {getCustomerDisplayName(c)}
@@ -738,7 +883,7 @@ export default function AdminCustomersPage() {
                             onChange={(v) =>
                               void onInlineStatusChange(c, v as CustomerStatus)
                             }
-                            disabled={busy || statusUpdatingId === c.id}
+                            disabled={pageActionBusy || statusUpdatingId === c.id}
                             className={`admin-customers-status-select admin-customers-status-select--${c.status}`}
                             options={STATUSES.map((s) => ({
                               value: s,
@@ -777,7 +922,7 @@ export default function AdminCustomersPage() {
                             <button
                               type="button"
                               onClick={() => onDelete(c)}
-                              disabled={busy}
+                              disabled={pageActionBusy}
                               className="dashboard-pro-btn-ghost text-xs text-rose-400 hover:text-rose-300 disabled:opacity-50"
                             >
                               Delete

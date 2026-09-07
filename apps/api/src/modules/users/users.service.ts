@@ -15,6 +15,10 @@ import { KycStatus, NotificationEvent, Role, UserStatus } from '../../common/enu
 import { round2 } from '../../common/utils/money';
 import { escapeRegex } from '../../common/utils/escape-regex';
 import {
+  guestSessionAccountEmailFilter,
+  isGuestSessionAccount,
+} from '../../common/utils/guest-user';
+import {
   expandRoleFilter,
   isAdministratorRole,
   normalizeAssignedRoles,
@@ -113,7 +117,10 @@ export class UsersService {
 
   /** Registered accounts only — guest checkout sessions are excluded. */
   private registeredCustomersFilter(): FilterQuery<UserDocument> {
-    return { isGuest: { $ne: true } };
+    return {
+      isGuest: { $ne: true },
+      ...guestSessionAccountEmailFilter(),
+    };
   }
 
   /**
@@ -610,7 +617,7 @@ export class UsersService {
       throw new BadRequestException('You cannot delete your own account');
     }
 
-    const user = await this.userModel.findById(userId).exec();
+    const user = await this.userModel.findById(userId).select('+passwordHash').exec();
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -625,6 +632,27 @@ export class UsersService {
     }
 
     await this.devices.revokeAll(userId);
+
+    if (isGuestSessionAccount(user)) {
+      await this.walletModel
+        .deleteOne({ userId: new Types.ObjectId(userId) })
+        .exec();
+      await this.userModel.deleteOne({ _id: userId }).exec();
+      return { deleted: true, soft: false };
+    }
+
+    const normalizedEmail = user.email?.trim().toLowerCase() ?? '';
+    if (
+      normalizedEmail.startsWith('deleted+') &&
+      normalizedEmail.endsWith('@removed.local') &&
+      !user.passwordHash
+    ) {
+      await this.walletModel
+        .deleteOne({ userId: new Types.ObjectId(userId) })
+        .exec();
+      await this.userModel.deleteOne({ _id: userId }).exec();
+      return { deleted: true, soft: false };
+    }
 
     const orderCount = await this.orderModel
       .countDocuments({ userId: new Types.ObjectId(userId) })
@@ -647,6 +675,49 @@ export class UsersService {
 
     await this.userModel.deleteOne({ _id: userId }).exec();
     return { deleted: true, soft: false };
+  }
+
+  async adminBulkDelete(
+    userIds: string[],
+    adminId: string,
+  ): Promise<{
+    requested: number;
+    hardDeleted: number;
+    softDeleted: number;
+    failed: number;
+    errors: Array<{ id: string; message: string }>;
+  }> {
+    const uniqueIds = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+    let hardDeleted = 0;
+    let softDeleted = 0;
+    let failed = 0;
+    const errors: Array<{ id: string; message: string }> = [];
+
+    for (const id of uniqueIds) {
+      try {
+        const result = await this.adminDelete(id, adminId);
+        if (result.soft) {
+          softDeleted += 1;
+        } else {
+          hardDeleted += 1;
+        }
+      } catch (err) {
+        failed += 1;
+        errors.push({
+          id,
+          message:
+            err instanceof Error ? err.message : 'Delete failed',
+        });
+      }
+    }
+
+    return {
+      requested: uniqueIds.length,
+      hardDeleted,
+      softDeleted,
+      failed,
+      errors,
+    };
   }
 
   private dayStart(): Date {

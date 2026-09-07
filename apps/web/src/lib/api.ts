@@ -1421,6 +1421,23 @@ export function adminDeleteCustomer(
   return authRequest(`/users/admin/${id}`, { method: "DELETE" });
 }
 
+export interface AdminBulkDeleteCustomersResult {
+  requested: number;
+  hardDeleted: number;
+  softDeleted: number;
+  failed: number;
+  errors: Array<{ id: string; message: string }>;
+}
+
+export function adminBulkDeleteCustomers(
+  ids: string[],
+): Promise<AdminBulkDeleteCustomersResult> {
+  return authRequest<AdminBulkDeleteCustomersResult>("/users/admin/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export function adminCreditCustomer(
   userId: string,
   amount: number,
@@ -2360,6 +2377,12 @@ export function activateLicense(): Promise<LicenseAdminStatus> {
 
 export function validateLicense(): Promise<LicenseAdminStatus> {
   return authRequest<LicenseAdminStatus>("/license/admin/validate", {
+    method: "POST",
+  });
+}
+
+export function deactivateLicense(): Promise<LicenseAdminStatus> {
+  return authRequest<LicenseAdminStatus>("/license/admin/deactivate", {
     method: "POST",
   });
 }

@@ -49,4 +49,9 @@ export class LicenseAdminController {
     await this.license.validate(true);
     return this.license.getAdminStatus();
   }
+
+  @Post('deactivate')
+  deactivate() {
+    return this.license.deactivate();
+  }
 }

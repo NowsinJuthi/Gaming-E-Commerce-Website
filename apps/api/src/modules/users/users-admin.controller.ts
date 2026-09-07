@@ -19,6 +19,7 @@ import { AdminCustomerEmailDto } from './dto/admin-customer-email.dto';
 import { AdminCustomerNoteDto } from './dto/admin-customer-note.dto';
 import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { AdminBulkDeleteUsersDto } from './dto/admin-bulk-delete-users.dto';
 import { QueryAdminUsersDto } from './dto/query-admin-users.dto';
 import { UsersService } from './users.service';
 
@@ -46,6 +47,14 @@ export class UsersAdminController {
   @Post()
   create(@Body() dto: AdminCreateUserDto) {
     return this.users.adminCreate(dto);
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(
+    @Body() dto: AdminBulkDeleteUsersDto,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.users.adminBulkDelete(dto.ids, admin.id);
   }
 
   @Patch(':id')

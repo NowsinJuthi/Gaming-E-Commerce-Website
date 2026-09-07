@@ -4,9 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
 import {
-  AdminOrderPageIntro,
   AdminOrderTwoColumnLayout,
-  SETTINGS_QUICK_LINKS,
 } from "@/components/admin/admin-order-page-shell";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { ProductFormOrderCard } from "@/components/admin/product-form-section";
@@ -14,11 +12,13 @@ import { CheckIcon, KeyIcon, PulseIcon, ShieldIcon } from "@/components/admin/ic
 import { adminToast, hideAdminToast } from "@/lib/admin-toast";
 import {
   activateLicenseKey,
+  deactivateLicense,
   validateLicense,
   type LicenseAdminStatus,
 } from "@/lib/api";
 import { invalidateLicenseStatusCache, useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { LICENSE_ADMIN_ROUTE_FEATURES } from "@/lib/license-features";
+import { AdminLicenseContactPanel } from "@/components/admin/AdminLicenseContactPanel";
 
 const inputCls = "admin-input w-full";
 const labelCls =
@@ -33,16 +33,16 @@ const ROUTE_LABELS: Record<string, string> = {
 };
 
 function statusLabel(status: LicenseAdminStatus): string {
+  if (status.devBypass) return "Dev mode (no license)";
   if (status.valid) return "Active";
-  if (status.devBypass) return "Dev mode";
   if (!status.serverReady) return "Server not configured";
   if (status.configured) return "Key saved";
   return "Inactive";
 }
 
 function statusTone(status: LicenseAdminStatus): string {
-  if (status.valid) return "text-emerald-400";
   if (status.devBypass) return "text-sky-400";
+  if (status.valid) return "text-emerald-400";
   return "text-amber-400";
 }
 
@@ -51,6 +51,12 @@ export default function AdminLicenseSettingsPage() {
   const [licenseKey, setLicenseKey] = useState("");
   const [activating, setActivating] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [replacingKey, setReplacingKey] = useState(false);
+
+  const hasSavedKey = Boolean(status?.licenseKeyMasked || status?.configured);
+  const licenseActive = Boolean(status?.valid && !status?.devBypass);
+  const showMaskedKey = hasSavedKey && !replacingKey;
 
   async function onActivate() {
     const key = licenseKey.trim();
@@ -64,6 +70,7 @@ export default function AdminLicenseSettingsPage() {
     try {
       await activateLicenseKey(key);
       setLicenseKey("");
+      setReplacingKey(false);
       invalidateLicenseStatusCache();
       await reload();
       adminToast("Website activated successfully.", true);
@@ -89,24 +96,78 @@ export default function AdminLicenseSettingsPage() {
     }
   }
 
+  async function onDeactivate() {
+    if (
+      !confirm(
+        "Remove this license key?\n\nPayment gateways, email, live chat and other licensed settings will lock until you activate a key again.",
+      )
+    ) {
+      return;
+    }
+
+    setDeactivating(true);
+    hideAdminToast();
+    try {
+      await deactivateLicense();
+      setLicenseKey("");
+      setReplacingKey(false);
+      invalidateLicenseStatusCache();
+      await reload();
+      adminToast("License key removed. Licensed features are locked.", true);
+    } catch (err) {
+      adminToast(err instanceof Error ? err.message : "Could not remove license key.", false);
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
   return (
     <AdminPageLayout
       section="Settings"
       title="License key"
-      description="Enter your license key to activate this installation. Server credentials are bundled with the app."
+      description="Activate or deactivate this website. Licensed settings stay locked until a valid key is active."
       backHref="/admin/settings"
       backLabel="All settings"
       loading={loading}
       loadingText="Loading license…"
       icon={KeyIcon}
     >
-      <AdminOrderPageIntro
-        icon={<KeyIcon className="h-4 w-4" />}
-        title="License key"
-        subtitle="Works after domain, hosting, or database changes — only your license key is required here."
-        quickLinks={SETTINGS_QUICK_LINKS}
-        quickNavLabel="Settings shortcuts"
-      />
+      {status ? (
+        <section
+          className={`admin-license-hero ${
+            status.devBypass
+              ? "admin-license-hero--dev"
+              : status.valid
+                ? "admin-license-hero--active"
+                : ""
+          }`}
+        >
+          <span className="admin-license-hero-icon" aria-hidden>
+            <KeyIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="admin-license-hero-kicker">Gaming E-Commerce Website</p>
+            <h2 className="admin-license-hero-title">
+              {loading
+                ? "Checking license…"
+                : status.devBypass
+                  ? "Dev mode — no license required"
+                  : status.valid
+                    ? "License active"
+                    : "License required"}
+            </h2>
+            <p className="admin-license-hero-desc">
+              {loading
+                ? "Reading the current license status from this server."
+                : status.devBypass
+                  ? "All features are unlocked locally. Enter a license key before production deploy."
+                  : status.valid
+                    ? "Payment gateways, email, live chat and other licensed features are available."
+                    : "Paste a valid license key below to unlock payment gateways, email, live chat and other licensed settings."}
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       <AdminOrderTwoColumnLayout
         main={
@@ -124,6 +185,13 @@ export default function AdminLicenseSettingsPage() {
                     deploy.
                   </div>
                 ) : null}
+                {status.devBypass ? (
+                  <div className="mb-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+                    Local development — no license key required. All features are
+                    unlocked on this machine only. Enter a license key before production
+                    deploy.
+                  </div>
+                ) : null}
                 <dl className="admin-order-view-detail-list admin-order-view-detail-list--in-panel">
                   <div className="admin-order-view-detail-row admin-order-view-detail-row--inline">
                     <dt>Status</dt>
@@ -135,7 +203,7 @@ export default function AdminLicenseSettingsPage() {
                       <dd>{status.licenseKeyMasked}</dd>
                     </div>
                   ) : null}
-                  {status.message && !status.devBypass ? (
+                  {status.message ? (
                     <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
                       <dt>Message</dt>
                       <dd className="text-sm text-foreground-muted">{status.message}</dd>
@@ -147,49 +215,98 @@ export default function AdminLicenseSettingsPage() {
 
             <ProductFormOrderCard
               icon={<KeyIcon className="h-4 w-4" />}
-              title="Activate with license key"
-              subtitle="From license.amarpin.com → Licenses"
+              title={hasSavedKey ? "License key" : "Activate license key"}
+              subtitle={
+                hasSavedKey
+                  ? licenseActive
+                    ? "This license is active. The key stays hidden. Remove it below to lock licensed settings."
+                    : "A key is saved on this server. Remove it or paste a new key to replace it."
+                  : "From license.amarpin.com → Licenses"
+              }
             >
               <div>
                 <label className={labelCls} htmlFor="license-key">
                   License key
                 </label>
-                <input
-                  id="license-key"
-                  className={inputCls}
-                  value={licenseKey}
-                  onChange={(e) => setLicenseKey(e.target.value)}
-                  placeholder={status?.licenseKeyMasked || "AMP-XXXX-XXXX-XXXX"}
-                  autoComplete="off"
-                  disabled={!status?.serverReady && !status?.devBypass}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void onActivate();
-                    }
-                  }}
-                />
+                {showMaskedKey ? (
+                  <input
+                    id="license-key"
+                    className={`admin-input admin-license-key-saved ${inputCls}`}
+                    type="text"
+                    value="************************"
+                    readOnly
+                    disabled
+                    autoComplete="off"
+                    aria-label="License key saved and hidden"
+                  />
+                ) : (
+                  <input
+                    id="license-key"
+                    className={`admin-input font-mono ${inputCls}`}
+                    value={licenseKey}
+                    onChange={(e) => setLicenseKey(e.target.value)}
+                    placeholder="Paste license key"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={!status?.serverReady && !status?.devBypass}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void onActivate();
+                      }
+                    }}
+                  />
+                )}
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn-primary btn-primary-sm"
-                  disabled={
-                    activating ||
-                    validating ||
-                    !licenseKey.trim() ||
-                    (!status?.serverReady && !status?.devBypass)
-                  }
-                  onClick={() => void onActivate()}
-                >
-                  {activating ? "Activating…" : "Activate"}
-                </button>
-                {status?.configured ? (
+                {!showMaskedKey ? (
+                  <button
+                    type="button"
+                    className="btn-primary btn-primary-sm"
+                    disabled={
+                      activating ||
+                      validating ||
+                      deactivating ||
+                      !licenseKey.trim() ||
+                      (!status?.serverReady && !status?.devBypass)
+                    }
+                    onClick={() => void onActivate()}
+                  >
+                    {activating ? "Activating…" : hasSavedKey ? "Replace key" : "Activate"}
+                  </button>
+                ) : null}
+                {showMaskedKey ? (
                   <button
                     type="button"
                     className="dashboard-pro-btn-ghost text-sm"
-                    disabled={activating || validating}
+                    disabled={activating || validating || deactivating}
+                    onClick={() => {
+                      setReplacingKey(true);
+                      setLicenseKey("");
+                    }}
+                  >
+                    Replace key
+                  </button>
+                ) : null}
+                {replacingKey ? (
+                  <button
+                    type="button"
+                    className="dashboard-pro-btn-ghost text-sm"
+                    disabled={activating || validating || deactivating}
+                    onClick={() => {
+                      setReplacingKey(false);
+                      setLicenseKey("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+                {status?.configured && licenseActive ? (
+                  <button
+                    type="button"
+                    className="dashboard-pro-btn-ghost text-sm"
+                    disabled={activating || validating || deactivating}
                     onClick={() => void onValidate()}
                   >
                     {validating ? "Checking…" : "Validate now"}
@@ -197,6 +314,55 @@ export default function AdminLicenseSettingsPage() {
                 ) : null}
               </div>
             </ProductFormOrderCard>
+
+            {hasSavedKey && !status?.devBypass ? (
+              <section className="admin-license-remove-card" aria-labelledby="license-remove-title">
+                <div className="admin-license-remove-head">
+                  <span className="admin-license-remove-icon" aria-hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                      <path strokeLinecap="round" d="M9 9h6M9 12h6M9 15h4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 5h10l1 14H6L7 5Z" />
+                      <path strokeLinecap="round" d="M10 5V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0">
+                    <h3 id="license-remove-title" className="text-sm font-semibold text-rose-100">
+                      Remove license key
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-rose-100/75">
+                      Deactivate this installation and clear the saved key from the server.
+                    </p>
+                  </div>
+                </div>
+                <div className="admin-license-remove-body">
+                  <p className="text-sm text-foreground-muted">
+                    {licenseActive
+                      ? "Your license is currently active on this website."
+                      : "A license key is saved but not active right now."}
+                  </p>
+                  <ul className="admin-license-remove-list">
+                    <li>Payment gateways, email and live chat settings will lock</li>
+                    <li>The key is removed from MongoDB on this server</li>
+                    <li>You can activate the same or a new key again anytime</li>
+                  </ul>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className="admin-license-deactivate-btn"
+                      disabled={activating || validating || deactivating}
+                      onClick={() => void onDeactivate()}
+                    >
+                      {deactivating ? "Removing…" : "Remove license key"}
+                    </button>
+                    {status?.licenseKeyMasked ? (
+                      <span className="text-xs text-foreground-muted">
+                        Saved key: <span className="font-mono text-rose-200/90">{status.licenseKeyMasked}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             {status?.serverReady ? (
               <ProductFormOrderCard
@@ -213,10 +379,18 @@ export default function AdminLicenseSettingsPage() {
                       <span>{row.label}</span>
                       <span
                         className={
-                          row.enabled ? "text-emerald-400" : "text-foreground-muted"
+                          row.enabled
+                            ? status.devBypass
+                              ? "text-sky-400"
+                              : "text-emerald-400"
+                            : "text-foreground-muted"
                         }
                       >
-                        {row.enabled ? "Enabled" : "Locked"}
+                        {row.enabled
+                          ? status.devBypass
+                            ? "Dev unlock"
+                            : "Enabled"
+                          : "Locked"}
                       </span>
                     </li>
                   ))}
@@ -227,6 +401,7 @@ export default function AdminLicenseSettingsPage() {
         }
         sidebar={
           <div className="space-y-4">
+            <AdminLicenseContactPanel />
             <ProductFormOrderCard
               icon={<CheckIcon className="h-4 w-4" />}
               title="Unlocked by license"

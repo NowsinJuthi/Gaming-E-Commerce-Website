@@ -38297,3 +38297,177 @@ html:not(.dev-tools-admin) script[data-nextjs-dev-overlay] {
 .contact-back { text-align: center; padding: 1rem 1.5rem 2.5rem; }
 .contact-back__link { font-size: 0.875rem; color: #64748b; text-decoration: none; transition: color 0.15s; }
 .contact-back__link:hover { color: #94a3b8; }
+
+/* Admin license warning — Log-Server style */
+.admin-license-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(var(--border) / 0.55);
+  background: rgb(var(--muted) / 0.25);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-license-contact-row:hover {
+  border-color: rgb(251 191 36 / 0.35);
+  background: rgb(251 191 36 / 0.08);
+}
+.admin-license-contact-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: rgb(251 191 36 / 0.12);
+  color: rgb(252 211 77);
+  flex-shrink: 0;
+}
+.admin-license-contact-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+.admin-license-contact-label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--foreground-muted));
+}
+.admin-license-contact-value {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(var(--foreground));
+}
+.admin-license-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid rgb(251 191 36 / 0.35);
+  background: linear-gradient(165deg, rgb(251 191 36 / 0.14) 0%, rgb(251 191 36 / 0.05) 100%);
+}
+.admin-license-hero--active {
+  border-color: rgb(52 211 153 / 0.35);
+  background: linear-gradient(165deg, rgb(52 211 153 / 0.14) 0%, rgb(52 211 153 / 0.05) 100%);
+}
+.admin-license-hero--dev {
+  border-color: rgb(56 189 248 / 0.35);
+  background: linear-gradient(165deg, rgb(56 189 248 / 0.14) 0%, rgb(56 189 248 / 0.05) 100%);
+}
+.admin-license-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: rgb(251 191 36 / 0.16);
+  color: rgb(252 211 77);
+  flex-shrink: 0;
+}
+.admin-license-hero--active .admin-license-hero-icon {
+  background: rgb(52 211 153 / 0.16);
+  color: rgb(110 231 183);
+}
+.admin-license-hero--dev .admin-license-hero-icon {
+  background: rgb(56 189 248 / 0.16);
+  color: rgb(125 211 252);
+}
+.admin-license-hero-kicker {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(252 211 77);
+}
+.admin-license-hero--active .admin-license-hero-kicker {
+  color: rgb(110 231 183);
+}
+.admin-license-hero--dev .admin-license-hero-kicker {
+  color: rgb(125 211 252);
+}
+.admin-license-hero-title {
+  margin-top: 0.15rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: rgb(var(--foreground));
+}
+.admin-license-hero-desc {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(var(--foreground-muted));
+}
+.admin-license-key-saved {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.35em;
+  color: rgb(var(--foreground));
+}
+.admin-license-remove-card {
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(244 63 94 / 0.28);
+  background: linear-gradient(165deg, rgb(244 63 94 / 0.1) 0%, rgb(244 63 94 / 0.03) 100%);
+}
+.admin-license-remove-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgb(244 63 94 / 0.15);
+}
+.admin-license-remove-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: rgb(244 63 94 / 0.14);
+  color: rgb(251 113 133);
+  flex-shrink: 0;
+}
+.admin-license-remove-body {
+  padding: 1rem 1.1rem 1.1rem;
+}
+.admin-license-remove-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: rgb(var(--foreground-muted));
+}
+.admin-license-remove-list li + li {
+  margin-top: 0.35rem;
+}
+.admin-license-deactivate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.625rem 1.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(244 63 94 / 0.55);
+  background: linear-gradient(180deg, rgb(244 63 94 / 0.22) 0%, rgb(244 63 94 / 0.12) 100%);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(254 205 211);
+  transition: filter 0.15s, border-color 0.15s, transform 0.15s;
+}
+.admin-license-deactivate-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  border-color: rgb(251 113 133 / 0.75);
+}
+.admin-license-deactivate-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}

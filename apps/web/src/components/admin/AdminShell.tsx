@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminCenterToast } from "@/components/admin/AdminCenterToast";
+import { AdminLicenseWarningBanner } from "@/components/admin/AdminLicenseWarningBanner";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { Header } from "@/components/Header";
 import { CustomerPanelShell } from "@/components/customer/CustomerPanelShell";
@@ -289,6 +290,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       <div className="w-full min-w-0 pt-14 sm:pt-16 lg:pl-80">
         <main className="admin-main w-full min-w-0 max-w-none p-3 sm:p-4 md:p-5 lg:p-6 xl:p-7">
+          <AdminLicenseWarningBanner />
           {children}
         </main>
       </div>
