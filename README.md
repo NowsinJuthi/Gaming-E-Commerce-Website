@@ -319,32 +319,32 @@ curl -s https://yourdomain.com/api/deploy-info
 
 ---
 
-## বাংলায় — হোস্টিং সংক্ষিপ্ত গাইড
+## Hosting quick reference
 
-### কী কী লাগবে
+### What you need
 
-- VPS (aaPanel সহ) · Node 20+ · MongoDB · Redis · PM2 · Nginx
-- ডোমেইন: `yourdomain.com` (ওয়েব) + `api.yourdomain.com` (API)
+- VPS with aaPanel · Node 20+ · MongoDB · Redis · PM2 · Nginx
+- Domains: `yourdomain.com` (web) + `api.yourdomain.com` (API)
 
-### দ্রুত ধাপ
+### Quick steps
 
-1. কোড আপলোড করুন `/www/wwwroot/gaming-e-commerce-website`-এ (`node_modules` বাদ)
-2. `.env` ও `apps/web/.env.production.local` সেট করুন
-3. `license.vendor-config.ts`-এ site secret দিন (একবার)
-4. `bash deploy/deploy/aapanel/redeploy.sh` চালান
-5. aaPanel-এ Nginx কনফিগ পেস্ট করুন + SSL
-6. `pnpm seed:users` → অ্যাডমিন লগইন → **License key** দিয়ে অ্যাক্টিভেট
+1. Upload code to `/www/wwwroot/gaming-e-commerce-website` (exclude `node_modules`)
+2. Set `.env` and `apps/web/.env.production.local`
+3. Add site secret in `license.vendor-config.ts` (one-time per deploy bundle)
+4. Run `bash deploy/deploy/aapanel/redeploy.sh`
+5. Paste Nginx config in aaPanel + enable SSL
+6. Run `pnpm seed:users` → admin login → activate with **License key**
 
-### ডোমেইন / হোস্টিং / MongoDB বদলালে
+### After domain, hosting, or MongoDB changes
 
-নতুন সার্ভারে অ্যাপ ডিপ্লয় করুন (vendor-config সহ), তারপর অ্যাডমিন প্যানেলে **শুধু লাইসেন্স কী** দিয়ে Activate করুন — site secret আবার দিতে হবে না।
+Deploy the app on the new server (with vendor-config), then activate in the admin panel using **only the license key** — no need to re-enter the site secret.
 
-### দুই ধরনের পরিবর্তন
+### Two types of changes
 
-| ধরন | কী করতে হবে |
-|-----|-------------|
-| অ্যাডমিন প্যানেল (লোগো, প্রোডাক্ট, সেটিংস) | Save + **Publish** + hard refresh |
-| কোড আপডেট (নতুন ফিচার, CSS) | কোড আপলোড + `redeploy.sh` |
+| Type | Action |
+|------|--------|
+| Admin panel (logo, products, settings) | Save + **Publish** + hard refresh |
+| Code updates (new features, CSS) | Upload code + run `redeploy.sh` |
 
 ---
 
