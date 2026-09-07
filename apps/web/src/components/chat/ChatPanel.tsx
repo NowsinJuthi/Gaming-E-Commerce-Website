@@ -314,6 +314,7 @@ export function ChatPanel({
   const socketRef = useRef<Socket | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const sendingRef = useRef(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomsReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyCacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -1249,10 +1250,32 @@ export function ChatPanel({
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (
+      (e.key === "Enter" || e.code === "Enter") &&
+      !e.shiftKey &&
+      !e.nativeEvent.isComposing
+    ) {
       e.preventDefault();
       void send();
     }
+  }
+
+  function onComposerKeyUp(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (quickReplyOpen) return;
+    if (
+      (e.key === "Enter" || e.code === "Enter") &&
+      !e.shiftKey &&
+      !e.nativeEvent.isComposing &&
+      !e.defaultPrevented
+    ) {
+      e.preventDefault();
+      void send();
+    }
+  }
+
+  function handleComposerSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    void send();
   }
 
   useLayoutEffect(() => {
@@ -1337,7 +1360,8 @@ export function ChatPanel({
 
   async function send() {
     const body = text.trim();
-    if (!body) return;
+    if (!body || sendingRef.current) return;
+    sendingRef.current = true;
     setText("");
     requestAnimationFrame(resizeMessageInput);
     try {
@@ -1350,6 +1374,8 @@ export function ChatPanel({
     } catch (err) {
       setText(body);
       setError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      sendingRef.current = false;
     }
   }
 
@@ -2157,7 +2183,11 @@ export function ChatPanel({
               void onImageSelected(file);
             }}
           />
-          <div className="admin-chat-composer-row">
+          <form
+            className="admin-chat-composer-row"
+            onSubmit={handleComposerSubmit}
+            noValidate
+          >
             {allowChatImages ? (
               <button
                 type="button"
@@ -2190,12 +2220,14 @@ export function ChatPanel({
                 autoCapitalize="sentences"
                 spellCheck
                 enterKeyHint="send"
+                inputMode="text"
                 data-1p-ignore
                 data-lpignore="true"
                 data-form-type="other"
                 onChange={(e) => onTyping(e.target.value)}
                 onInput={resizeMessageInput}
                 onKeyDown={onComposerKeyDown}
+                onKeyUp={onComposerKeyUp}
                 placeholder="Type a message…"
                 title={isAdmin ? "Type / for saved replies" : undefined}
                 disabled={composerLocked}
@@ -2203,14 +2235,14 @@ export function ChatPanel({
               />
             </div>
             <button
-              type="button"
-              onClick={send}
+              type="submit"
               disabled={sendLocked}
               className={sendCls}
+              aria-label="Send message"
             >
               Send
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
