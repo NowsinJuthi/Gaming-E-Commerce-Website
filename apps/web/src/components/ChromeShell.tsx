@@ -18,7 +18,6 @@ import { Toaster } from "@/components/ui/Toaster";
 import { LiveChatLauncher } from "@/components/chat/LiveChatLauncher";
 import { StoreEventsProvider } from "@/components/StoreEventsProvider";
 import { QueryProvider } from "@/components/QueryProvider";
-import { DeployBuildWatcher } from "@/components/DeployBuildWatcher";
 
 export function ChromeShell({
   children,
@@ -28,7 +27,6 @@ export function ChromeShell({
   initialContactSettings,
   initialSeoSocial,
   allowGuestChat = false,
-  appBuildId = "",
 }: {
   children: React.ReactNode;
   initialSiteMenus?: SiteMenusConfig;
@@ -41,7 +39,6 @@ export function ChromeShell({
   initialContactSettings?: ContactSettings;
   initialSeoSocial?: PublicSeoConfig["social"];
   allowGuestChat?: boolean;
-  appBuildId?: string;
 }) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
@@ -54,7 +51,6 @@ export function ChromeShell({
         <ThemeProvider>
           <SiteAppearanceProvider initialAppearance={initialAppearance}>
             <DocumentFaviconHead />
-            <DeployBuildWatcher initialBuildId={appBuildId} />
             <StoreEventsProvider />
             <a href="#main-content" className="skip-link">
               Skip to content
@@ -73,7 +69,6 @@ export function ChromeShell({
       <ThemeProvider>
         <SiteAppearanceProvider initialAppearance={initialAppearance}>
           <DocumentFaviconHead />
-          <DeployBuildWatcher initialBuildId={appBuildId} />
           <StoreEventsProvider />
           <a href="#main-content" className="skip-link">
             Skip to content

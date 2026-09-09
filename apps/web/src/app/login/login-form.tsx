@@ -21,7 +21,6 @@ import { getRecaptchaToken, warmupRecaptcha } from "@/lib/recaptcha";
 import { LoginNoAccountModal } from "@/components/auth/LoginNoAccountModal";
 import { LoginWrongPasswordModal } from "@/components/auth/LoginWrongPasswordModal";
 import {
-  LoginAnimatedIcon,
   LoginFieldCodeIcon,
   LoginFieldKeyIcon,
   LoginFieldMailIcon,
@@ -32,8 +31,9 @@ import {
   SignUpButtonIcon,
   VerifyLoginIcon,
 } from "@/components/auth/LoginAnimatedIcon";
-import { MarketingHeroBubbles } from "@/components/marketing/MarketingHeroBubbles";
 import { EyeIcon } from "@/components/admin/icons";
+import { LoginShieldGraphic } from "./LoginShieldGraphic";
+import styles from "./login.module.css";
 
 type Mode = "password" | "otp";
 
@@ -76,9 +76,9 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
   const [noAccountOpen, setNoAccountOpen] = useState(false);
   const [noAccountMessage, setNoAccountMessage] = useState<string | null>(null);
   const [wrongPasswordOpen, setWrongPasswordOpen] = useState(false);
-  const [wrongPasswordMessage, setWrongPasswordMessage] = useState<string | null>(
-    null,
-  );
+  const [wrongPasswordMessage, setWrongPasswordMessage] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
@@ -283,237 +283,297 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
 
   return (
     <>
-      <main className="login-page">
-        <MarketingHeroBubbles />
+      <main className={styles.page}>
+        <svg
+          className={`${styles.scribble} ${styles.scribbleTop}`}
+          viewBox="0 0 160 70"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M8 42 C28 8, 58 62, 88 22 S138 8, 152 36"
+            stroke="#26BFB0"
+            strokeWidth="1.4"
+          />
+          <circle cx="24" cy="18" r="3" fill="#26BFB0" />
+          <circle cx="118" cy="12" r="2.2" fill="#5EEAD4" />
+        </svg>
+        <svg
+          className={`${styles.scribble} ${styles.scribbleBottom}`}
+          viewBox="0 0 180 80"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M10 48 C40 8, 70 72, 110 28 S160 18, 172 50"
+            stroke="#0A6258"
+            strokeWidth="1.4"
+          />
+          <polygon points="150,18 158,32 142,32" stroke="#26BFB0" fill="none" />
+        </svg>
 
-        <div className="login-page__inner">
-          <div className="login-page__card">
-            <LoginAnimatedIcon mode={mode} />
+        <div className={styles.card}>
+          <div className={styles.art} aria-hidden="true">
+            <LoginShieldGraphic className={styles.shield} />
+          </div>
+          <div className={styles.right}>
+            <div className={styles.formPanel}>
+              <header className="login-page__header">
+                <h1 className="login-page__title">Welcome back</h1>
+                <p className="login-page__subtitle">
+                  {mode === "password"
+                    ? "Sign in securely with your email and password."
+                    : "Get a one-time code sent to your inbox — no password needed."}
+                </p>
+              </header>
 
-            <header className="login-page__header">
-              <h1 className="login-page__title">Welcome back</h1>
-              <p className="login-page__subtitle">
-                {mode === "password"
-                  ? "Sign in securely with your email and password."
-                  : "Get a one-time code sent to your inbox — no password needed."}
-              </p>
-            </header>
-
-            <div className="login-page__tabs" role="tablist" aria-label="Login method">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "password"}
-                onClick={() => {
-                  setMode("password");
-                  resetMessages();
-                }}
-                className={`login-page__tab${
-                  mode === "password" ? " login-page__tab--active" : ""
-                }`}
+              <div
+                className="login-page__tabs"
+                role="tablist"
+                aria-label="Login method"
               >
-                <LoginTabLockIcon className="login-page__tab-icon" />
-                Password
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "otp"}
-                onClick={() => {
-                  setMode("otp");
-                  resetMessages();
-                  warmupRecaptcha();
-                }}
-                className={`login-page__tab${
-                  mode === "otp" ? " login-page__tab--active" : ""
-                }`}
-              >
-                <LoginTabMailIcon className="login-page__tab-icon" />
-                OTP / Email Code
-              </button>
-            </div>
-
-            {error ? (
-              <div className="login-page__alert login-page__alert--error" role="alert">
-                {error}
-              </div>
-            ) : null}
-            {info ? (
-              <div className="login-page__alert login-page__alert--success" role="status">
-                {info}
-              </div>
-            ) : null}
-
-            {mode === "password" ? (
-              <div className="login-page__form" role="form" aria-label="Password login">
-                <div>
-                  <label className="login-page__label" htmlFor="login-email">
-                    Email
-                  </label>
-                  <div className="login-page__field">
-                    <LoginFieldMailIcon className="login-page__field-icon" />
-                    <input
-                      id="login-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onKeyDown={handlePasswordFieldKeyDown}
-                      className={`${inputClass} login-page__input`}
-                      autoComplete="email"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="login-page__label" htmlFor="login-password">
-                    Password
-                  </label>
-                  <div className="login-page__field">
-                    <LoginFieldKeyIcon className="login-page__field-icon" />
-                    <input
-                      id="login-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={handlePasswordFieldKeyDown}
-                      className={`${inputClass} login-page__input pr-12`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-foreground-muted transition hover:text-foreground"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? (
-                        <EyeOffIcon className="h-5 w-5" />
-                      ) : (
-                        <EyeIcon className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="login-page__forgot">
-                    <Link
-                      href={
-                        email.trim()
-                          ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
-                          : "/forgot-password"
-                      }
-                      className="login-page__forgot-link"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-                </div>
                 <button
                   type="button"
-                  disabled={loading}
-                  onClick={() => void submitPasswordLogin()}
-                  className="btn-primary w-full disabled:opacity-50"
+                  role="tab"
+                  aria-selected={mode === "password"}
+                  onClick={() => {
+                    setMode("password");
+                    resetMessages();
+                  }}
+                  className={`login-page__tab${
+                    mode === "password" ? " login-page__tab--active" : ""
+                  }`}
                 >
-                  {!loading ? <LoginSubmitIcon /> : null}
-                  {loading ? "Logging in…" : "Log in"}
+                  <LoginTabLockIcon className="login-page__tab-icon" />
+                  Password
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === "otp"}
+                  onClick={() => {
+                    setMode("otp");
+                    resetMessages();
+                    warmupRecaptcha();
+                  }}
+                  className={`login-page__tab${
+                    mode === "otp" ? " login-page__tab--active" : ""
+                  }`}
+                >
+                  <LoginTabMailIcon className="login-page__tab-icon" />
+                  OTP / Email Code
                 </button>
               </div>
-            ) : (
-              <div className="login-page__form" role="form" aria-label="Email code login">
-                <div>
-                  <label className="login-page__label" htmlFor="login-otp-email">
-                    Email
-                  </label>
-                  <div className="login-page__field">
-                    <LoginFieldMailIcon className="login-page__field-icon" />
-                    <input
-                      id="login-otp-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={otpSent}
-                      className={`${inputClass} login-page__input disabled:opacity-60`}
-                      autoComplete="email"
-                    />
-                  </div>
+
+              {error ? (
+                <div
+                  className="login-page__alert login-page__alert--error"
+                  role="alert"
+                >
+                  {error}
                 </div>
-                {otpSent ? (
+              ) : null}
+              {info ? (
+                <div
+                  className="login-page__alert login-page__alert--success"
+                  role="status"
+                >
+                  {info}
+                </div>
+              ) : null}
+
+              {mode === "password" ? (
+                <div
+                  className="login-page__form"
+                  role="form"
+                  aria-label="Password login"
+                >
                   <div>
-                    <label className="login-page__label" htmlFor="login-otp-code">
-                      6-digit code
+                    <label className="login-page__label" htmlFor="login-email">
+                      Email
                     </label>
                     <div className="login-page__field">
-                      <LoginFieldCodeIcon className="login-page__field-icon" />
+                      <LoginFieldMailIcon className="login-page__field-icon" />
                       <input
-                        id="login-otp-code"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className={`${inputClass} login-page__input login-page__input--code`}
-                        autoComplete="one-time-code"
+                        id="login-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={handlePasswordFieldKeyDown}
+                        className={`${inputClass} login-page__input`}
+                        autoComplete="email"
                       />
                     </div>
                   </div>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={loading || (!otpSent && resendCooldown > 0)}
-                  onClick={() =>
-                    void (otpSent ? submitOtpVerify() : submitOtpRequest())
-                  }
-                  className="btn-primary w-full disabled:opacity-50"
-                >
-                  {!loading && otpSent ? <VerifyLoginIcon /> : null}
-                  {!loading && !otpSent && resendCooldown <= 0 ? (
-                    <SendLoginCodeIcon />
-                  ) : null}
-                  {loading
-                    ? "Please wait…"
-                    : otpSent
-                      ? "Verify & log in"
-                      : resendCooldown > 0
-                        ? `Resend in ${resendCooldown}s`
-                        : "Send login code"}
-                </button>
-                {otpSent ? (
+                  <div>
+                    <label
+                      className="login-page__label"
+                      htmlFor="login-password"
+                    >
+                      Password
+                    </label>
+                    <div className="login-page__field">
+                      <LoginFieldKeyIcon className="login-page__field-icon" />
+                      <input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={handlePasswordFieldKeyDown}
+                        className={`${inputClass} login-page__input pr-12`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-foreground-muted transition hover:text-foreground"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOffIcon className="h-5 w-5" />
+                        ) : (
+                          <EyeIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="login-page__forgot">
+                      <Link
+                        href={
+                          email.trim()
+                            ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
+                            : "/forgot-password"
+                        }
+                        className="login-page__forgot-link"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setCode("");
-                      resetMessages();
-                    }}
-                    className="btn-ghost w-full text-sm"
+                    disabled={loading}
+                    onClick={() => void submitPasswordLogin()}
+                    className="btn-primary w-full disabled:opacity-50"
                   >
-                    Use a different email
+                    {!loading ? <LoginSubmitIcon /> : null}
+                    {loading ? "Logging in…" : "Log in"}
                   </button>
-                ) : null}
-              </div>
-            )}
-
-            <div className="login-page__signup">
-              <div className="login-page__signup-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
+                </div>
+              ) : (
+                <div
+                  className="login-page__form"
+                  role="form"
+                  aria-label="Email code login"
                 >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M19 8v6" />
-                  <path d="M22 11h-6" />
-                </svg>
+                  <div>
+                    <label
+                      className="login-page__label"
+                      htmlFor="login-otp-email"
+                    >
+                      Email
+                    </label>
+                    <div className="login-page__field">
+                      <LoginFieldMailIcon className="login-page__field-icon" />
+                      <input
+                        id="login-otp-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={otpSent}
+                        className={`${inputClass} login-page__input disabled:opacity-60`}
+                        autoComplete="email"
+                      />
+                    </div>
+                  </div>
+                  {otpSent ? (
+                    <div>
+                      <label
+                        className="login-page__label"
+                        htmlFor="login-otp-code"
+                      >
+                        6-digit code
+                      </label>
+                      <div className="login-page__field">
+                        <LoginFieldCodeIcon className="login-page__field-icon" />
+                        <input
+                          id="login-otp-code"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={code}
+                          onChange={(e) => setCode(e.target.value)}
+                          className={`${inputClass} login-page__input login-page__input--code`}
+                          autoComplete="one-time-code"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={loading || (!otpSent && resendCooldown > 0)}
+                    onClick={() =>
+                      void (otpSent ? submitOtpVerify() : submitOtpRequest())
+                    }
+                    className="btn-primary w-full disabled:opacity-50"
+                  >
+                    {!loading && otpSent ? <VerifyLoginIcon /> : null}
+                    {!loading && !otpSent && resendCooldown <= 0 ? (
+                      <SendLoginCodeIcon />
+                    ) : null}
+                    {loading
+                      ? "Please wait…"
+                      : otpSent
+                        ? "Verify & log in"
+                        : resendCooldown > 0
+                          ? `Resend in ${resendCooldown}s`
+                          : "Send login code"}
+                  </button>
+                  {otpSent ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setCode("");
+                        resetMessages();
+                      }}
+                      className="btn-ghost w-full text-sm"
+                    >
+                      Use a different email
+                    </button>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="login-page__signup">
+                <div className="login-page__signup-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M19 8v6" />
+                    <path d="M22 11h-6" />
+                  </svg>
+                </div>
+                <p className="login-page__signup-text">
+                  Don&apos;t have an account?
+                </p>
+                <Link
+                  href="/register"
+                  className="btn-secondary login-page__signup-btn"
+                >
+                  <SignUpButtonIcon />
+                  Create an account
+                </Link>
               </div>
-              <p className="login-page__signup-text">Don&apos;t have an account?</p>
-              <Link
-                href="/register"
-                className="btn-secondary login-page__signup-btn"
-              >
-                <SignUpButtonIcon />
-                Create an account
-              </Link>
             </div>
           </div>
         </div>

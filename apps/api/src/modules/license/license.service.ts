@@ -700,8 +700,6 @@ export class LicenseService implements OnModuleInit {
 
       licenseKey,
 
-      productId: this.resolveProductId(doc) || undefined,
-
       installationId: doc.installationId.trim(),
 
       websiteId: this.resolveWebsiteId(doc) || undefined,

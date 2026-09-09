@@ -16720,7 +16720,7 @@
     overflow: hidden;
     border-radius: 9999px;
     border: 1px solid rgb(var(--brand) / 0.42);
-    color: rgb(var(--brand));
+    color: rgb(var(--brand) / 0.82);
     background:
       radial-gradient(
         circle at 50% 50%,
@@ -16872,8 +16872,8 @@
     z-index: 5;
     display: grid;
     place-items: center;
-    width: 2.05rem;
-    height: 2.05rem;
+    width: 2.2rem;
+    height: 2.2rem;
     border-radius: 9999px;
     background: rgb(var(--bg-elevated) / 0.82);
     box-shadow:
@@ -16888,9 +16888,9 @@
 
   .live-chat-fab-icon,
   .admin-chat-launcher-fab-icon {
-    width: 1.5rem;
-    height: 1.5rem;
-    color: rgb(var(--brand));
+    width: 1.7rem;
+    height: 1.7rem;
+    color: rgb(var(--brand) / 0.82);
     shape-rendering: geometricPrecision;
     -webkit-font-smoothing: antialiased;
   }
@@ -17113,14 +17113,14 @@
     }
 
     .admin-chat-launcher-fab-icon-shell {
-      width: 1.65rem;
-      height: 1.65rem;
+      width: 1.85rem;
+      height: 1.85rem;
     }
 
     .live-chat-fab-icon,
     .admin-chat-launcher-fab-icon {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1.4rem;
+      height: 1.4rem;
     }
 
     .admin-chat-launcher-fab-aura {

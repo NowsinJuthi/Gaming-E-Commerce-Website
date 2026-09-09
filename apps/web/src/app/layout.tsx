@@ -201,7 +201,6 @@ export default async function RootLayout({
           initialContactSettings={contactSettings}
           initialSeoSocial={seo.social}
           allowGuestChat={panelConfig.checkout.allowGuestChat}
-          appBuildId={appBuildId}
         >
           {children}
         </ChromeShell>
