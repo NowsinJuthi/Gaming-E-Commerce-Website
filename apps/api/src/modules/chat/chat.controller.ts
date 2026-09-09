@@ -40,6 +40,7 @@ import { ChatSettingsService } from './chat-settings.service';
 import { ChatService } from './chat.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatQuickRepliesDto } from './dto/update-chat-quick-replies.dto';
+import { UpdateChatWelcomeAutoReplyDto } from './dto/update-chat-welcome-auto-reply.dto';
 import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
 import { ChatGateway } from './chat.gateway';
 import { PresenceService } from './presence.service';
@@ -137,6 +138,11 @@ export class ChatController {
       imageUrl: dto.imageUrl,
     });
     this.chatGateway.broadcastToRoom(room, 'message:new', payload);
+    this.chatGateway.scheduleWelcomeAutoReply(
+      room,
+      user,
+      String(payload.id),
+    );
     return { ok: true, id: payload.id, message: payload };
   }
 
@@ -222,6 +228,21 @@ export class ChatController {
   @RequiresLicenseFeature('liveChat')
   updateQuickReplies(@Body() dto: UpdateChatQuickRepliesDto) {
     return this.chatSettings.updateQuickReplies(dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(Role.Admin)
+  @Get('admin/welcome-auto-reply')
+  getWelcomeAutoReply() {
+    return this.chatSettings.getWelcomeAutoReply();
+  }
+
+  @UseGuards(RolesGuard, LicenseFeatureGuard)
+  @Roles(Role.Admin)
+  @Put('admin/welcome-auto-reply')
+  @RequiresLicenseFeature('liveChat')
+  updateWelcomeAutoReply(@Body() dto: UpdateChatWelcomeAutoReplyDto) {
+    return this.chatSettings.updateWelcomeAutoReply(dto);
   }
 
   @UseGuards(RolesGuard)

@@ -15,7 +15,12 @@ import {
   notifyUnreadCountChanged,
   useUnreadNotifications,
 } from "@/hooks/useUnreadNotifications";
-import { markChatNotificationsRead, startGuestChatSession, getOnlineSupportStaff } from "@/lib/api";
+import {
+  getOnlineSupportStaff,
+  markChatNotificationsRead,
+  setTokens,
+  startGuestChatSession,
+} from "@/lib/api";
 import type { ChatSupportAgent } from "@/lib/api";
 import { FabChatBubbleIcon } from "@/components/chat/FabChatBubbleIcon";
 import { canAccessLiveChat } from "@/lib/chat-access";
@@ -26,9 +31,7 @@ type ChatLauncherRole = "guest" | "customer" | "staff";
 
 function resolveLauncherRole(): ChatLauncherRole {
   const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("accessToken")
-      : null;
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
   if (!token) return "guest";
   const roles = rolesFromAccessToken(token);
   if (roles.includes("admin") || roles.includes("support")) return "staff";
@@ -63,9 +66,12 @@ export function LiveChatLauncher({
   const [supportAgents, setSupportAgents] = useState<ChatSupportAgent[]>([]);
   const chatRefreshRef = useRef<(() => Promise<void>) | null>(null);
 
-  const onChatRefreshReady = useCallback((api: { refresh: () => Promise<void> }) => {
-    chatRefreshRef.current = api.refresh;
-  }, []);
+  const onChatRefreshReady = useCallback(
+    (api: { refresh: () => Promise<void> }) => {
+      chatRefreshRef.current = api.refresh;
+    },
+    [],
+  );
 
   const syncRole = useCallback(() => {
     setRole(resolveLauncherRole());
@@ -117,9 +123,7 @@ export function LiveChatLauncher({
     setGuestError(null);
     try {
       const result = await startGuestChatSession(guestName.trim());
-      localStorage.setItem("accessToken", result.accessToken);
-      localStorage.setItem("refreshToken", result.refreshToken);
-      window.dispatchEvent(new Event("auth-change"));
+      setTokens(result.accessToken, result.refreshToken);
       syncRole();
     } catch {
       setGuestError("Could not start chat. Please try again.");
@@ -153,9 +157,7 @@ export function LiveChatLauncher({
   const isStaff = role === "staff";
   const dashboardHref = isStaff ? "/admin/chat" : "/chat";
   const messengerTitle = isStaff ? "Chats" : "Live Support";
-  const messengerSubtitle = isStaff
-    ? ""
-    : "Chat with our team in real time";
+  const messengerSubtitle = isStaff ? "" : "Chat with our team in real time";
 
   const overlay =
     open && mounted
@@ -174,12 +176,17 @@ export function LiveChatLauncher({
             >
               <header
                 className={`admin-chat-messenger-head${
-                  mobileThreadOpen ? " admin-chat-messenger-head--thread-mobile" : ""
+                  mobileThreadOpen
+                    ? " admin-chat-messenger-head--thread-mobile"
+                    : ""
                 }`}
               >
                 <div className="admin-chat-messenger-brand">
                   {isStaff ? (
-                    <span className="admin-chat-messenger-brand-icon" aria-hidden>
+                    <span
+                      className="admin-chat-messenger-brand-icon"
+                      aria-hidden
+                    >
                       <FabChatBubbleIcon className="h-5 w-5" />
                     </span>
                   ) : (
@@ -191,7 +198,9 @@ export function LiveChatLauncher({
                     />
                   )}
                   <div className="min-w-0">
-                    <p className="admin-chat-messenger-title">{messengerTitle}</p>
+                    <p className="admin-chat-messenger-title">
+                      {messengerTitle}
+                    </p>
                     {messengerSubtitle ? (
                       <p className="admin-chat-messenger-subtitle">
                         {messengerSubtitle}
@@ -234,7 +243,10 @@ export function LiveChatLauncher({
                     <div className="live-chat-guest-prompt-glow" aria-hidden />
                     <div className="live-chat-guest-prompt-inner">
                       <div className="live-chat-guest-prompt-icon-wrap">
-                        <span className="live-chat-guest-prompt-icon-ring" aria-hidden />
+                        <span
+                          className="live-chat-guest-prompt-icon-ring"
+                          aria-hidden
+                        />
                         <span className="live-chat-guest-prompt-icon">
                           <FabChatBubbleIcon className="h-9 w-9" />
                         </span>
@@ -248,7 +260,8 @@ export function LiveChatLauncher({
                               Start a conversation
                             </h3>
                             <p className="live-chat-guest-prompt-desc">
-                              Enter your name to chat with our support team without logging in.
+                              Enter your name to chat with our support team
+                              without logging in.
                             </p>
                           </div>
                           <form
@@ -265,7 +278,9 @@ export function LiveChatLauncher({
                               autoFocus
                             />
                             {guestError ? (
-                              <p className="text-xs text-danger">{guestError}</p>
+                              <p className="text-xs text-danger">
+                                {guestError}
+                              </p>
                             ) : null}
                             <button
                               type="submit"
@@ -280,7 +295,10 @@ export function LiveChatLauncher({
                             <button
                               type="button"
                               className="underline"
-                              onClick={() => { setOpen(false); router.push("/login?next=%2Fchat"); }}
+                              onClick={() => {
+                                setOpen(false);
+                                router.push("/login?next=%2Fchat");
+                              }}
                             >
                               sign in
                             </button>{" "}
@@ -295,14 +313,18 @@ export function LiveChatLauncher({
                               Sign in to chat
                             </h3>
                             <p className="live-chat-guest-prompt-desc">
-                              Log in or create an account to message our support team in real time.
+                              Log in or create an account to message our support
+                              team in real time.
                             </p>
                           </div>
                           <div className="live-chat-guest-prompt-actions">
                             <button
                               type="button"
                               className="live-chat-guest-prompt-btn live-chat-guest-prompt-btn--primary"
-                              onClick={() => { setOpen(false); router.push("/login?next=%2Fchat"); }}
+                              onClick={() => {
+                                setOpen(false);
+                                router.push("/login?next=%2Fchat");
+                              }}
                             >
                               Sign in
                             </button>
@@ -407,7 +429,10 @@ export function LiveChatLauncher({
             aria-expanded={open}
           >
             <span className="admin-chat-launcher-fab-border-spin" aria-hidden />
-            <span className="admin-chat-launcher-fab-shimmer-loop" aria-hidden />
+            <span
+              className="admin-chat-launcher-fab-shimmer-loop"
+              aria-hidden
+            />
             <span className="admin-chat-launcher-fab-icon-shell">
               <FabChatBubbleIcon
                 className="admin-chat-launcher-fab-icon"
@@ -421,7 +446,10 @@ export function LiveChatLauncher({
           </button>
           {unread > 0 ? (
             <>
-              <span className="admin-chat-launcher-fab-badge-ring" aria-hidden />
+              <span
+                className="admin-chat-launcher-fab-badge-ring"
+                aria-hidden
+              />
               <span
                 key={unread}
                 className="admin-chat-launcher-fab-badge"

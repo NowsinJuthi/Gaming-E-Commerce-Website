@@ -9,9 +9,12 @@ import {
   ChatSettingsDocument,
 } from '../../database/schemas/chat-settings.schema';
 import { UpdateChatQuickRepliesDto } from './dto/update-chat-quick-replies.dto';
+import { UpdateChatWelcomeAutoReplyDto } from './dto/update-chat-welcome-auto-reply.dto';
 
 const SETTINGS_KEY = 'global';
 const MAX_QUICK_REPLIES = 50;
+const DEFAULT_WELCOME_AUTO_REPLY =
+  'Welcome to UniQbd Support! Thanks for reaching out. Our support team will reply as soon as possible.';
 
 export interface ChatQuickReplyConfig {
   id: string;
@@ -24,6 +27,12 @@ export interface ChatQuickReplyConfig {
 
 export interface ChatQuickRepliesResponse {
   quickReplies: ChatQuickReplyConfig[];
+  updatedAt?: Date;
+}
+
+export interface ChatWelcomeAutoReplyResponse {
+  enabled: boolean;
+  message: string;
   updatedAt?: Date;
 }
 
@@ -98,6 +107,39 @@ export class ChatSettingsService implements OnModuleInit {
     return this.toQuickRepliesResponse(doc);
   }
 
+  async getWelcomeAutoReply(): Promise<ChatWelcomeAutoReplyResponse> {
+    const doc = await this.getOrCreate();
+    return this.toWelcomeAutoReplyResponse(doc);
+  }
+
+  async updateWelcomeAutoReply(
+    dto: UpdateChatWelcomeAutoReplyDto,
+  ): Promise<ChatWelcomeAutoReplyResponse> {
+    const message = dto.message.trim();
+    if (!message) {
+      throw new BadRequestException('Welcome auto-reply message is required');
+    }
+
+    const doc = await this.settingsModel
+      .findOneAndUpdate(
+        { key: SETTINGS_KEY },
+        {
+          $set: {
+            welcomeAutoReplyEnabled: dto.enabled,
+            welcomeAutoReplyMessage: message,
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+
+    if (!doc) {
+      throw new BadRequestException('Could not update welcome auto-reply');
+    }
+
+    return this.toWelcomeAutoReplyResponse(doc);
+  }
+
   private async getOrCreate(): Promise<ChatSettingsDocument> {
     let doc = await this.settingsModel.findOne({ key: SETTINGS_KEY }).exec();
     if (!doc) {
@@ -168,6 +210,17 @@ export class ChatSettingsService implements OnModuleInit {
 
     return {
       quickReplies,
+      updatedAt: doc.updatedAt,
+    };
+  }
+
+  private toWelcomeAutoReplyResponse(
+    doc: ChatSettingsDocument,
+  ): ChatWelcomeAutoReplyResponse {
+    return {
+      enabled: doc.welcomeAutoReplyEnabled === true,
+      message:
+        doc.welcomeAutoReplyMessage?.trim() || DEFAULT_WELCOME_AUTO_REPLY,
       updatedAt: doc.updatedAt,
     };
   }

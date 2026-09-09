@@ -57,7 +57,11 @@ import {
   playChatNotificationSound,
   unlockChatNotificationSound,
 } from "@/lib/chat-notification-sound";
-import { acquireChatSocket, releaseChatSocket, socketEmitAck } from "@/lib/chat-socket";
+import {
+  acquireChatSocket,
+  releaseChatSocket,
+  socketEmitAck,
+} from "@/lib/chat-socket";
 import {
   applyQuickReplySelection,
   filterQuickReplies,
@@ -121,6 +125,31 @@ function chatMessagePreview(body?: string, imageUrl?: string): string {
   return "";
 }
 
+function mergeChatMessages(
+  history: ChatMessage[],
+  liveMessages: ChatMessage[],
+): ChatMessage[] {
+  const merged = [...history];
+  const seen = new Set(
+    history.map((message) =>
+      String(message.id ?? message._id ?? message.createdAt ?? ""),
+    ),
+  );
+
+  for (const message of liveMessages) {
+    const key = String(message.id ?? message._id ?? message.createdAt ?? "");
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    merged.push(message);
+  }
+
+  return merged.sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return aTime - bTime;
+  });
+}
+
 function chatSenderInitial(name?: string, role?: string): string {
   const label = (name ?? role ?? "?").trim();
   if (!label) return "?";
@@ -173,7 +202,10 @@ function useMobileMessengerViewport(): boolean {
   return mobile;
 }
 
-function shouldSkipMessengerAutoSelect(isAdmin: boolean, messenger: boolean): boolean {
+function shouldSkipMessengerAutoSelect(
+  isAdmin: boolean,
+  messenger: boolean,
+): boolean {
   if (!isAdmin || !messenger || typeof window === "undefined") return false;
   return window.matchMedia(`(max-width: ${MOBILE_MESSENGER_MAX}px)`).matches;
 }
@@ -329,6 +361,10 @@ export function ChatPanel({
   const activeIdRef = useRef<string>("");
   const historyLoadSeqRef = useRef(0);
   const pendingRoomJoinRef = useRef<string | null>(null);
+  const roomJoinRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const roomJoinRetryRef = useRef({ roomId: "", attempts: 0 });
   const isAdminRef = useRef(isAdmin);
   const messagePollRef = useRef<number | null>(null);
   const messageSafetyPollRef = useRef<number | null>(null);
@@ -339,8 +375,9 @@ export function ChatPanel({
         .map((room) => room.customer?.id ?? room.createdBy)
         .filter((id): id is string => Boolean(id));
       if (!customerIds.length) return 0;
-      return customerIds.filter((customerId) => isUserOnline(online, customerId))
-        .length;
+      return customerIds.filter((customerId) =>
+        isUserOnline(online, customerId),
+      ).length;
     }
     return online.filter((id) => !sameId(id, meId)).length;
   }, [isAdmin, meId, online, rooms]);
@@ -390,7 +427,9 @@ export function ChatPanel({
   );
 
   const refreshOverview = useCallback(() => {
-    getChatAdminOverview().then(applyOverview).catch(() => undefined);
+    getChatAdminOverview()
+      .then(applyOverview)
+      .catch(() => undefined);
   }, [applyOverview]);
 
   const useAdminPro = isAdmin && pro;
@@ -423,16 +462,13 @@ export function ChatPanel({
   }, [quickReplyTrigger?.query, quickReplySuggestions.length]);
 
   const bg = useFlatPro || use3d ? "" : "bg-white";
-  const border =
-    useFlatPro || use3d ? "border-border/48" : "border-slate-200";
+  const border = useFlatPro || use3d ? "border-border/48" : "border-slate-200";
   const textMain = useFlatPro || use3d ? "text-foreground" : "text-slate-900";
   const textMuted =
     useFlatPro || use3d ? "text-foreground-muted" : "text-subtle";
   const inputCls = "admin-chat-composer min-w-0 flex-1 w-full";
   const composerLocked =
-    !activeIdRef.current ||
-    imageUploading ||
-    active?.status === "closed";
+    !activeIdRef.current || imageUploading || active?.status === "closed";
   const sendLocked =
     !text.trim() ||
     !activeIdRef.current ||
@@ -517,6 +553,8 @@ export function ChatPanel({
     setRooms(list);
     return list;
   }, []);
+  const loadRoomsRef = useRef(loadRooms);
+  loadRoomsRef.current = loadRooms;
 
   // Debounced staff inbox search (name / email / phone).
   const roomSearchInitRef = useRef(false);
@@ -561,7 +599,9 @@ export function ChatPanel({
       clearTimeout(overviewReloadTimer.current);
     }
     overviewReloadTimer.current = setTimeout(() => {
-      getChatAdminOverview().then(onOverviewChange).catch(() => undefined);
+      getChatAdminOverview()
+        .then(onOverviewChange)
+        .catch(() => undefined);
     }, 1200);
   }, [onOverviewChange]);
 
@@ -609,35 +649,68 @@ export function ChatPanel({
   const scheduleRoomsReloadRef = useRef(scheduleRoomsReload);
   scheduleRoomsReloadRef.current = scheduleRoomsReload;
 
+  const joinActiveSocketRoomRef = useRef<(roomIdValue: string) => void>(
+    () => undefined,
+  );
+
   const joinActiveSocketRoom = useCallback((roomIdValue: string) => {
     if (!roomIdValue) return;
+    if (activeIdRef.current && activeIdRef.current !== roomIdValue) {
+      return;
+    }
     pendingRoomJoinRef.current = roomIdValue;
     const socket = socketRef.current;
     if (!socket?.connected) return;
-    pendingRoomJoinRef.current = null;
-    void socketEmitAck<{ ok?: boolean; error?: string }>(
-      socket,
-      "room:join",
-      { roomId: roomIdValue },
-    )
+
+    const scheduleRetry = () => {
+      if (activeIdRef.current !== roomIdValue) return;
+      const state = roomJoinRetryRef.current;
+      const attempts = state.roomId === roomIdValue ? state.attempts + 1 : 1;
+      roomJoinRetryRef.current = { roomId: roomIdValue, attempts };
+      if (attempts > 5) return;
+      if (roomJoinRetryTimerRef.current) {
+        clearTimeout(roomJoinRetryTimerRef.current);
+      }
+      roomJoinRetryTimerRef.current = setTimeout(
+        () => {
+          roomJoinRetryTimerRef.current = null;
+          joinActiveSocketRoomRef.current(roomIdValue);
+        },
+        Math.min(1_000 * 2 ** (attempts - 1), 8_000),
+      );
+    };
+
+    void socketEmitAck<{ ok?: boolean; error?: string }>(socket, "room:join", {
+      roomId: roomIdValue,
+    })
       .then((res) => {
-        if (res && !res.ok) {
-          setError(res.error ?? "Could not join chat room");
+        if (res?.ok) {
+          pendingRoomJoinRef.current = null;
+          roomJoinRetryRef.current = { roomId: roomIdValue, attempts: 0 };
+          setError(null);
+          if (roomJoinRetryTimerRef.current) {
+            clearTimeout(roomJoinRetryTimerRef.current);
+            roomJoinRetryTimerRef.current = null;
+          }
+          return;
         }
+        setError(res?.error ?? "Could not join chat room");
+        scheduleRetry();
       })
-      .catch(() => {
-        if (!socketRef.current?.connected) {
-          pendingRoomJoinRef.current = roomIdValue;
-        }
-      });
+      .catch(scheduleRetry);
   }, []);
 
-  const selectRoomRef = useRef<(room: ChatRoom) => Promise<void>>(async () => {});
+  joinActiveSocketRoomRef.current = joinActiveSocketRoom;
 
   const selectRoom = useCallback(
     async (room: ChatRoom) => {
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
+      if (roomJoinRetryTimerRef.current) {
+        clearTimeout(roomJoinRetryTimerRef.current);
+        roomJoinRetryTimerRef.current = null;
+      }
+      roomJoinRetryRef.current = { roomId: id, attempts: 0 };
 
       if (activeIdRef.current === id && cached) {
         setActive(room);
@@ -681,8 +754,12 @@ export function ChatPanel({
           roomId: String(m.roomId ?? id),
           senderId: String(m.senderId ?? ""),
         }));
-        historyCacheRef.current.set(id, normalized);
-        setMessages(normalized);
+        const merged = mergeChatMessages(
+          normalized,
+          historyCacheRef.current.get(id) ?? [],
+        );
+        historyCacheRef.current.set(id, merged);
+        setMessages(merged);
         await markRoomRead(id);
         joinActiveSocketRoom(id);
         scheduleScrollBottom();
@@ -706,8 +783,6 @@ export function ChatPanel({
     [joinActiveSocketRoom, markRoomRead, scheduleScrollBottom],
   );
 
-  selectRoomRef.current = selectRoom;
-
   const syncActiveRoomMessages = useCallback(async () => {
     const rid = activeIdRef.current;
     if (!rid) return;
@@ -720,22 +795,23 @@ export function ChatPanel({
         senderId: String(m.senderId ?? ""),
       }));
       const prev = historyCacheRef.current.get(rid) ?? [];
+      const merged = mergeChatMessages(normalized, prev);
       const prevLast = prev.at(-1)?.id;
-      const nextLast = normalized.at(-1)?.id;
-      if (prev.length === normalized.length && prevLast === nextLast) {
+      const nextLast = merged.at(-1)?.id;
+      if (prev.length === merged.length && prevLast === nextLast) {
         return;
       }
       const prevIds = new Set(
         prev.map((m) => String(m.id ?? m._id ?? "")).filter(Boolean),
       );
-      const newFromOther = normalized.filter(
+      const newFromOther = merged.filter(
         (m) =>
           !prevIds.has(String(m.id ?? "")) &&
           !sameId(String(m.senderId ?? ""), meRef.current),
       );
-      historyCacheRef.current.set(rid, normalized);
+      historyCacheRef.current.set(rid, merged);
       if (sameId(rid, activeIdRef.current)) {
-        setMessages(normalized);
+        setMessages(merged);
         if (newFromOther.length > 0) {
           playChatNotificationSound();
         }
@@ -809,7 +885,14 @@ export function ChatPanel({
     } finally {
       setRefreshingChat(false);
     }
-  }, [active, isAdmin, loadRooms, refreshOverview, refreshSupportAgents, selectRoom]);
+  }, [
+    active,
+    isAdmin,
+    loadRooms,
+    refreshOverview,
+    refreshSupportAgents,
+    selectRoom,
+  ]);
 
   useEffect(() => {
     onRefreshReady?.({ refresh: refreshChat });
@@ -845,17 +928,27 @@ export function ChatPanel({
     };
 
     const startMessagePoll = () => {
-      stopMessagePoll();
+      if (messagePollRef.current !== null) return;
       void syncActiveRoomMessagesRef.current();
+      if (isAdminRef.current) {
+        void loadRoomsRef.current().catch(() => undefined);
+      }
       messagePollRef.current = window.setInterval(() => {
         void syncActiveRoomMessagesRef.current();
-      }, 8_000);
+        if (isAdminRef.current) {
+          void loadRoomsRef.current().catch(() => undefined);
+        }
+      }, 3_000);
     };
 
     const onConnect = () => {
       setConnected(true);
+      setError(null);
       stopMessagePoll();
       void syncActiveRoomMessagesRef.current();
+      if (isAdminRef.current) {
+        void loadRoomsRef.current().catch(() => undefined);
+      }
       getOnlineUsers()
         .then((ids) => {
           setOnline(ids);
@@ -866,33 +959,18 @@ export function ChatPanel({
         .catch(() => undefined);
       const rid = activeIdRef.current || pendingRoomJoinRef.current;
       if (rid) {
-        pendingRoomJoinRef.current = null;
-        void socketEmitAck(socket, "room:join", { roomId: rid }).catch(() => {
-          pendingRoomJoinRef.current = rid;
-        });
-      } else if (!isAdminRef.current) {
-        void socketEmitAck<{ ok?: boolean; room?: ChatRoom }>(
-          socket,
-          "support:open",
-        )
-          .then((res) => {
-            if (!res?.ok || !res.room) return;
-            const id = roomId(res.room);
-            if (!id) return;
-            const normalized = {
-              ...res.room,
-              id,
-              participants: res.room.participants ?? [],
-            };
-            setRooms([normalized]);
-            void selectRoomRef.current(normalized);
-          })
-          .catch(() => undefined);
+        roomJoinRetryRef.current = { roomId: rid, attempts: 0 };
+        joinActiveSocketRoomRef.current(rid);
       }
     };
 
     const onDisconnect = () => {
       setConnected(false);
+      startMessagePoll();
+    };
+    const onConnectError = (error: Error) => {
+      setConnected(false);
+      setError(error.message || "Could not connect to live chat");
       startMessagePoll();
     };
     const onSocketError = (e: { message?: string }) =>
@@ -965,7 +1043,10 @@ export function ChatPanel({
       const currentOverview = overviewRef.current;
       if (onOverviewChangeRef.current) {
         scheduleOverviewSyncRef.current();
-      } else if (currentOverview && chatMessagePreview(msg.body, msg.imageUrl)) {
+      } else if (
+        currentOverview &&
+        chatMessagePreview(msg.body, msg.imageUrl)
+      ) {
         applyOverviewRef.current({
           ...currentOverview,
           totalMessages: currentOverview.totalMessages + 1,
@@ -976,7 +1057,11 @@ export function ChatPanel({
       scheduleRoomsReloadRef.current();
     };
 
-    const onTyping = (p: { roomId: string; userId: string; isTyping: boolean }) => {
+    const onTyping = (p: {
+      roomId: string;
+      userId: string;
+      isTyping: boolean;
+    }) => {
       if (
         sameId(String(p.roomId), activeIdRef.current) &&
         !sameId(p.userId, meRef.current)
@@ -1002,6 +1087,7 @@ export function ChatPanel({
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("error", onSocketError);
     socket.on("message:new", onMessageNew);
     socket.on("typing", onTyping);
@@ -1029,9 +1115,13 @@ export function ChatPanel({
     }, 30_000);
     const onlinePoll = window.setInterval(refreshOnline, 45_000);
     messageSafetyPollRef.current = window.setInterval(() => {
-      if (!activeIdRef.current) return;
-      void syncActiveRoomMessagesRef.current();
-    }, 25_000);
+      if (activeIdRef.current) {
+        void syncActiveRoomMessagesRef.current();
+      }
+      if (isAdminRef.current) {
+        void loadRoomsRef.current().catch(() => undefined);
+      }
+    }, 10_000);
 
     const onVisibilityChange = () => {
       if (document.hidden) return;
@@ -1053,10 +1143,15 @@ export function ChatPanel({
       window.clearInterval(onlinePoll);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("error", onSocketError);
       socket.off("message:new", onMessageNew);
       socket.off("typing", onTyping);
       socket.off("presence:update", onPresence);
+      if (roomJoinRetryTimerRef.current) {
+        clearTimeout(roomJoinRetryTimerRef.current);
+        roomJoinRetryTimerRef.current = null;
+      }
       releaseChatSocket();
       socketRef.current = null;
     };
@@ -1098,7 +1193,7 @@ export function ChatPanel({
             shouldSkipMessengerAutoSelect(isAdmin, messenger) && !targetId;
           if (list.length > 0 && !skipDefault) {
             const target = targetId
-              ? list.find((room) => sameId(roomId(room), targetId)) ?? list[0]
+              ? (list.find((room) => sameId(roomId(room), targetId)) ?? list[0])
               : list[0];
             if (target) {
               await selectRoom(target);
@@ -1139,14 +1234,10 @@ export function ChatPanel({
   ]);
 
   useEffect(() => {
-    if (!messenger || !onMessengerMobileViewChange || !isMobileMessenger) return;
+    if (!messenger || !onMessengerMobileViewChange || !isMobileMessenger)
+      return;
     onMessengerMobileViewChange(mobileThread ? "thread" : "inbox");
-  }, [
-    isMobileMessenger,
-    messenger,
-    mobileThread,
-    onMessengerMobileViewChange,
-  ]);
+  }, [isMobileMessenger, messenger, mobileThread, onMessengerMobileViewChange]);
 
   useEffect(() => {
     if (!mobileRoomSplit || !isMobileMessenger) return;
@@ -1352,7 +1443,9 @@ export function ChatPanel({
       return false;
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Chat is not connected. Please try again.",
+        err instanceof Error
+          ? err.message
+          : "Chat is not connected. Please try again.",
       );
       return false;
     }
@@ -1420,9 +1513,7 @@ export function ChatPanel({
         ),
       );
       if (overview && previousStatus && previousStatus !== status) {
-        applyOverview(
-          patchOverviewStatus(overview, previousStatus, status),
-        );
+        applyOverview(patchOverviewStatus(overview, previousStatus, status));
       } else if (showConfig && !onOverviewChange) {
         refreshOverview();
       }
@@ -1545,7 +1636,9 @@ export function ChatPanel({
               <button
                 type="button"
                 className={`admin-chat-rooms-search-toggle${
-                  roomSearchOpen ? " admin-chat-rooms-search-toggle--active" : ""
+                  roomSearchOpen
+                    ? " admin-chat-rooms-search-toggle--active"
+                    : ""
                 }`}
                 onClick={() => {
                   if (roomSearchOpen) {
@@ -1555,7 +1648,9 @@ export function ChatPanel({
                     setRoomSearchOpen(true);
                   }
                 }}
-                aria-label={roomSearchOpen ? "Close chat search" : "Search chats"}
+                aria-label={
+                  roomSearchOpen ? "Close chat search" : "Search chats"
+                }
                 title={roomSearchOpen ? "Close search" : "Search chats"}
               >
                 {roomSearchOpen ? (
@@ -1567,7 +1662,10 @@ export function ChatPanel({
             </div>
             {roomSearchOpen ? (
               <div className="admin-chat-rooms-search">
-                <SearchIcon className="admin-chat-rooms-search-icon" aria-hidden />
+                <SearchIcon
+                  className="admin-chat-rooms-search-icon"
+                  aria-hidden
+                />
                 <input
                   type="text"
                   inputMode="search"
@@ -1609,13 +1707,17 @@ export function ChatPanel({
                   className={`admin-chat-room-card${
                     sel ? " admin-chat-room-card--active" : ""
                   }${r.unreadFromCustomer ? " admin-chat-room-card--unread" : ""}${
-                    messengerInboxUi ? " admin-chat-room-card--messenger-inbox" : ""
+                    messengerInboxUi
+                      ? " admin-chat-room-card--messenger-inbox"
+                      : ""
                   }`}
                 >
                   <ChatRoomAvatar
                     customer={r.customer}
                     online={customerOnline}
-                    className={messengerInboxUi ? "admin-chat-room-avatar--inbox" : ""}
+                    className={
+                      messengerInboxUi ? "admin-chat-room-avatar--inbox" : ""
+                    }
                   />
                   <span className="admin-chat-room-card-body">
                     <span className="admin-chat-room-card-top">
@@ -1655,183 +1757,185 @@ export function ChatPanel({
         }`}
       >
         {hideCustomerMessengerHeader ? null : (
-        <div
-          className={
-            use3d
-              ? "chat-3d-header"
-              : useChatPro || messenger
-                ? `admin-chat-header${
-                    mobileThread ? " admin-chat-header--messenger-thread" : ""
-                  }`
-                : `flex items-center justify-between border-b px-4 py-3 ${border}`
-          }
-        >
           <div
             className={
-              useChatPro || messenger
-                ? "admin-chat-header-row"
-                : "flex min-h-0 w-full items-center justify-between gap-3"
+              use3d
+                ? "chat-3d-header"
+                : useChatPro || messenger
+                  ? `admin-chat-header${
+                      mobileThread ? " admin-chat-header--messenger-thread" : ""
+                    }`
+                  : `flex items-center justify-between border-b px-4 py-3 ${border}`
             }
           >
-          <div
-            className={
-              useChatPro || messenger
-                ? "admin-chat-header-main"
-                : "flex min-w-0 items-center gap-3"
-            }
-          >
-            {mobileThread ? (
-              <button
-                type="button"
-                className="admin-chat-messenger-back-btn"
-                onClick={clearActiveRoom}
-                aria-label="Back to messages"
-              >
-                <ArrowLeftIcon className="h-5 w-5" aria-hidden />
-              </button>
-            ) : null}
-            {useCustomerPro ? (
-              <SupportTeamAvatar
-                online={supportAgents.length > 0}
-                members={supportAgents}
-              />
-            ) : isAdmin && active?.customer ? (
-              <ChatRoomAvatar
-                customer={active.customer}
-                online={isUserOnline(
-                  online,
-                  active.customer.id ?? active.createdBy,
-                )}
-                onClick={() => setCustomerInfoOpen(true)}
-              />
-            ) : null}
             <div
               className={
                 useChatPro || messenger
-                  ? "admin-chat-header-identity"
-                  : "min-w-0"
+                  ? "admin-chat-header-row"
+                  : "flex min-h-0 w-full items-center justify-between gap-3"
               }
             >
-              <p
+              <div
                 className={
                   useChatPro || messenger
-                    ? useCustomerPro
-                      ? "admin-chat-header-email admin-chat-header-email--primary"
-                      : isAdmin && active?.customer
-                        ? "admin-chat-header-email admin-chat-header-email--primary"
-                        : "admin-chat-header-name"
-                    : `font-semibold ${textMain}`
+                    ? "admin-chat-header-main"
+                    : "flex min-w-0 items-center gap-3"
                 }
               >
+                {mobileThread ? (
+                  <button
+                    type="button"
+                    className="admin-chat-messenger-back-btn"
+                    onClick={clearActiveRoom}
+                    aria-label="Back to messages"
+                  >
+                    <ArrowLeftIcon className="h-5 w-5" aria-hidden />
+                  </button>
+                ) : null}
                 {useCustomerPro ? (
-                  "UniQbd Support"
+                  <SupportTeamAvatar
+                    online={supportAgents.length > 0}
+                    members={supportAgents}
+                  />
                 ) : isAdmin && active?.customer ? (
-                  <span className="admin-chat-header-email-primary-row">
-                    <span className="min-w-0 truncate">
-                      {chatRoomCustomerLabel(active.customer)}
-                    </span>
-                    {!active.customer.displayName?.trim() &&
-                    active.customer.email?.trim() ? (
-                      <ChatEmailCopyButton
-                        email={active.customer.email.trim()}
-                      />
-                    ) : null}
-                  </span>
-                ) : (
-                  (active?.subject ?? "Support chat")
-                )}
-              </p>
-              {useCustomerPro ? (
-                <p className="admin-chat-header-email">
-                  {visibleOnlineCount > 0
-                    ? "Our team is online — we usually reply in a few minutes"
-                    : "Leave a message — we will reply when our team is back"}
-                </p>
-              ) : null}
-              {!useChatPro && !messenger ? (
+                  <ChatRoomAvatar
+                    customer={active.customer}
+                    online={isUserOnline(
+                      online,
+                      active.customer.id ?? active.createdBy,
+                    )}
+                    onClick={() => setCustomerInfoOpen(true)}
+                  />
+                ) : null}
                 <div
                   className={
-                    use3d
-                      ? "admin-chat-header-meta"
-                      : "mt-1 flex flex-wrap items-center gap-2"
+                    useChatPro || messenger
+                      ? "admin-chat-header-identity"
+                      : "min-w-0"
                   }
                 >
-                  {use3d ? (
-                    <span className="chat-3d-status">
-                      <span
-                        className={
-                          connected
-                            ? "chat-3d-status-dot"
-                            : "chat-3d-status-dot chat-3d-status-dot-off"
-                        }
-                        aria-hidden
-                      />
-                      {connected ? "Connected" : "Disconnected"}
-                    </span>
-                  ) : (
-                    <p className={`text-xs ${textMuted}`}>
-                      {connected ? (
-                        <span className="text-brand">● Connected</span>
-                      ) : (
-                        <span className="text-rose-400">● Disconnected</span>
-                      )}
+                  <p
+                    className={
+                      useChatPro || messenger
+                        ? useCustomerPro
+                          ? "admin-chat-header-email admin-chat-header-email--primary"
+                          : isAdmin && active?.customer
+                            ? "admin-chat-header-email admin-chat-header-email--primary"
+                            : "admin-chat-header-name"
+                        : `font-semibold ${textMain}`
+                    }
+                  >
+                    {useCustomerPro ? (
+                      "UniQbd Support"
+                    ) : isAdmin && active?.customer ? (
+                      <span className="admin-chat-header-email-primary-row">
+                        <span className="min-w-0 truncate">
+                          {chatRoomCustomerLabel(active.customer)}
+                        </span>
+                        {!active.customer.displayName?.trim() &&
+                        active.customer.email?.trim() ? (
+                          <ChatEmailCopyButton
+                            email={active.customer.email.trim()}
+                          />
+                        ) : null}
+                      </span>
+                    ) : (
+                      (active?.subject ?? "Support chat")
+                    )}
+                  </p>
+                  {useCustomerPro ? (
+                    <p className="admin-chat-header-email">
+                      {visibleOnlineCount > 0
+                        ? "Our team is online — we usually reply in a few minutes"
+                        : "Leave a message — we will reply when our team is back"}
                     </p>
-                  )}
-                  {online.length > 0 ? (
-                    <span className={`text-xs ${textMuted}`}>
-                      · {online.length} online
-                    </span>
+                  ) : null}
+                  {!useChatPro && !messenger ? (
+                    <div
+                      className={
+                        use3d
+                          ? "admin-chat-header-meta"
+                          : "mt-1 flex flex-wrap items-center gap-2"
+                      }
+                    >
+                      {use3d ? (
+                        <span className="chat-3d-status">
+                          <span
+                            className={
+                              connected
+                                ? "chat-3d-status-dot"
+                                : "chat-3d-status-dot chat-3d-status-dot-off"
+                            }
+                            aria-hidden
+                          />
+                          {connected ? "Connected" : "Disconnected"}
+                        </span>
+                      ) : (
+                        <p className={`text-xs ${textMuted}`}>
+                          {connected ? (
+                            <span className="text-brand">● Connected</span>
+                          ) : (
+                            <span className="text-rose-400">
+                              ● Disconnected
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {online.length > 0 ? (
+                        <span className={`text-xs ${textMuted}`}>
+                          · {online.length} online
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
-              ) : null}
-            </div>
-          </div>
-          {useChatPro || messenger ? (
-            <div className="admin-chat-header-end">
-              <div
-                className="admin-chat-toolbar"
-                role="toolbar"
-                aria-label="Chat actions"
-              >
-                {visibleOnlineCount > 0 || (useCustomerPro && active) ? (
-                  <div className="admin-chat-toolbar-meta">
-                    {visibleOnlineCount > 0 ? (
-                      <span
-                        className="admin-chat-toolbar-status admin-chat-toolbar-status--online"
-                        aria-live="polite"
-                      >
-                        <span
-                          className="admin-chat-toolbar-status-dot"
-                          aria-hidden
-                        />
-                        {visibleOnlineCount} online
-                      </span>
+              </div>
+              {useChatPro || messenger ? (
+                <div className="admin-chat-header-end">
+                  <div
+                    className="admin-chat-toolbar"
+                    role="toolbar"
+                    aria-label="Chat actions"
+                  >
+                    {visibleOnlineCount > 0 || (useCustomerPro && active) ? (
+                      <div className="admin-chat-toolbar-meta">
+                        {visibleOnlineCount > 0 ? (
+                          <span
+                            className="admin-chat-toolbar-status admin-chat-toolbar-status--online"
+                            aria-live="polite"
+                          >
+                            <span
+                              className="admin-chat-toolbar-status-dot"
+                              aria-hidden
+                            />
+                            {visibleOnlineCount} online
+                          </span>
+                        ) : null}
+                        {useCustomerPro && active ? (
+                          <span
+                            className={`admin-chat-toolbar-status${
+                              active.status === "open"
+                                ? " admin-chat-toolbar-status--online"
+                                : " admin-chat-toolbar-status--closed"
+                            }`}
+                          >
+                            {active.status}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
-                    {useCustomerPro && active ? (
-                      <span
-                        className={`admin-chat-toolbar-status${
-                          active.status === "open"
-                            ? " admin-chat-toolbar-status--online"
-                            : " admin-chat-toolbar-status--closed"
+                    <div className="admin-chat-toolbar-actions">
+                      <ChatHeaderRefreshButton
+                        onClick={() => void refreshChat()}
+                        busy={refreshingChat}
+                        disabled={loading}
+                        className={`admin-chat-toolbar-btn${
+                          isAdmin ? " admin-chat-refresh-btn--staff" : ""
                         }`}
-                      >
-                        {active.status}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="admin-chat-toolbar-actions">
-                  <ChatHeaderRefreshButton
-                    onClick={() => void refreshChat()}
-                    busy={refreshingChat}
-                    disabled={loading}
-                    className={`admin-chat-toolbar-btn${
-                      isAdmin ? " admin-chat-refresh-btn--staff" : ""
-                    }`}
-                  />
-                  {isAdmin && active ? (
-                    <>
-                      <ChatSoundToggle toolbar />
+                      />
+                      {isAdmin && active ? (
+                        <>
+                          <ChatSoundToggle toolbar />
                           <button
                             type="button"
                             disabled={deletingRoomId === roomId(active)}
@@ -1868,78 +1972,78 @@ export function ChatPanel({
                               <CheckIcon className="h-4 w-4" aria-hidden />
                             </button>
                           )}
-                    </>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  {mobileThread && onMessengerClose ? (
+                    <button
+                      type="button"
+                      className="admin-chat-messenger-close admin-chat-messenger-close--thread"
+                      onClick={onMessengerClose}
+                      aria-label="Close chat"
+                      title="Close chat"
+                    >
+                      <CloseIcon className="h-5 w-5" aria-hidden />
+                    </button>
                   ) : null}
                 </div>
-              </div>
-              {mobileThread && onMessengerClose ? (
-                <button
-                  type="button"
-                  className="admin-chat-messenger-close admin-chat-messenger-close--thread"
-                  onClick={onMessengerClose}
-                  aria-label="Close chat"
-                  title="Close chat"
-                >
-                  <CloseIcon className="h-5 w-5" aria-hidden />
-                </button>
+              ) : !isAdmin ? (
+                <div className="flex items-center gap-2">
+                  <ChatHeaderRefreshButton
+                    onClick={() => void refreshChat()}
+                    busy={refreshingChat}
+                    disabled={loading}
+                    className="shell-icon-btn"
+                    showLabel={false}
+                  />
+                </div>
+              ) : isAdmin && active ? (
+                <div className="flex items-center gap-2">
+                  <ChatHeaderRefreshButton
+                    onClick={() => void refreshChat()}
+                    busy={refreshingChat}
+                    disabled={loading}
+                    className="shell-icon-btn"
+                    showLabel={false}
+                  />
+                  <button
+                    type="button"
+                    disabled={deletingRoomId === roomId(active)}
+                    onClick={() =>
+                      void removeRoom(
+                        roomId(active),
+                        active.subject ?? "Support",
+                      )
+                    }
+                    className="chat-3d-room-delete chat-3d-room-delete-header"
+                    aria-label="Delete chat room"
+                    title="Delete chat"
+                  >
+                    <TrashIcon className="h-4 w-4" aria-hidden />
+                  </button>
+                  {active.status === "open" ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleRoomStatus("closed")}
+                      className="chat-3d-room-delete chat-3d-room-delete-action"
+                    >
+                      <CloseIcon className="h-4 w-4 shrink-0" aria-hidden />
+                      Close room
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => toggleRoomStatus("open")}
+                      className="panel-3d-btn-ghost panel-3d-btn-sm"
+                    >
+                      Reopen
+                    </button>
+                  )}
+                </div>
               ) : null}
             </div>
-          ) : !isAdmin ? (
-            <div className="flex items-center gap-2">
-              <ChatHeaderRefreshButton
-                onClick={() => void refreshChat()}
-                busy={refreshingChat}
-                disabled={loading}
-                className="shell-icon-btn"
-                showLabel={false}
-              />
-            </div>
-          ) : isAdmin && active ? (
-            <div className="flex items-center gap-2">
-              <ChatHeaderRefreshButton
-                onClick={() => void refreshChat()}
-                busy={refreshingChat}
-                disabled={loading}
-                className="shell-icon-btn"
-                showLabel={false}
-              />
-              <button
-                type="button"
-                disabled={deletingRoomId === roomId(active)}
-                onClick={() =>
-                  void removeRoom(
-                    roomId(active),
-                    active.subject ?? "Support",
-                  )
-                }
-                className="chat-3d-room-delete chat-3d-room-delete-header"
-                aria-label="Delete chat room"
-                title="Delete chat"
-              >
-                <TrashIcon className="h-4 w-4" aria-hidden />
-              </button>
-              {active.status === "open" ? (
-                <button
-                  type="button"
-                  onClick={() => toggleRoomStatus("closed")}
-                  className="chat-3d-room-delete chat-3d-room-delete-action"
-                >
-                  <CloseIcon className="h-4 w-4 shrink-0" aria-hidden />
-                  Close room
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => toggleRoomStatus("open")}
-                  className="panel-3d-btn-ghost panel-3d-btn-sm"
-                >
-                  Reopen
-                </button>
-              )}
-            </div>
-          ) : null}
           </div>
-        </div>
         )}
 
         {showAverageResponseHeader && (useChatPro || messenger) ? (
@@ -1972,9 +2076,7 @@ export function ChatPanel({
           {historyLoading ? (
             <div
               className={
-                useChatPro
-                  ? "dashboard-pro-empty py-16"
-                  : "py-16 text-center"
+                useChatPro ? "dashboard-pro-empty py-16" : "py-16 text-center"
               }
             >
               <p className={`text-sm ${textMuted}`}>Loading messages…</p>
@@ -2159,7 +2261,11 @@ export function ChatPanel({
               )}
             </div>
           )}
-          <div ref={bottomRef} className="chat-messages-scroll-anchor" aria-hidden />
+          <div
+            ref={bottomRef}
+            className="chat-messages-scroll-anchor"
+            aria-hidden
+          />
         </div>
 
         <div

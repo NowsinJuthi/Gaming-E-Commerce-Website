@@ -6,12 +6,17 @@ import { ChatIcon, MailIcon, SettingsIcon } from "@/components/admin/icons";
 import { ProductFormOrderCard } from "@/components/admin/product-form-section";
 import { adminToast, hideAdminToast } from "@/lib/admin-toast";
 import {
+  getChatWelcomeAutoReply,
   getChatQuickReplies,
   getCustomerPanelAdminSettings,
+  updateChatWelcomeAutoReply,
   updateCustomerPanelSettings,
 } from "@/lib/api";
 import { hasStrictAdminRole } from "@/lib/auth-roles";
 import { resolveNavItemEnabled } from "@/lib/customer-panel";
+
+const DEFAULT_WELCOME_AUTO_REPLY =
+  "Welcome to UniQbd Support! Thanks for reaching out. Our support team will reply as soon as possible.";
 
 function SettingSwitchRow({
   title,
@@ -66,6 +71,16 @@ export function LiveChatSettingsPanel() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [quickReplyCount, setQuickReplyCount] = useState<number | null>(null);
   const [quickReplyEnabled, setQuickReplyEnabled] = useState<number | null>(null);
+  const [welcomeEnabled, setWelcomeEnabled] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState(
+    DEFAULT_WELCOME_AUTO_REPLY,
+  );
+  const [savedWelcomeEnabled, setSavedWelcomeEnabled] = useState(false);
+  const [savedWelcomeMessage, setSavedWelcomeMessage] = useState(
+    DEFAULT_WELCOME_AUTO_REPLY,
+  );
+  const [welcomeLoading, setWelcomeLoading] = useState(true);
+  const [savingWelcome, setSavingWelcome] = useState(false);
 
   useEffect(() => {
     const sync = () => setIsAdmin(hasStrictAdminRole());
@@ -125,6 +140,39 @@ export function LiveChatSettingsPanel() {
           setQuickReplyEnabled(null);
         }
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setWelcomeLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setWelcomeLoading(true);
+    getChatWelcomeAutoReply()
+      .then((result) => {
+        if (cancelled) return;
+        const message = result.message.trim() || DEFAULT_WELCOME_AUTO_REPLY;
+        setWelcomeEnabled(result.enabled);
+        setSavedWelcomeEnabled(result.enabled);
+        setWelcomeMessage(message);
+        setSavedWelcomeMessage(message);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWelcomeEnabled(false);
+        setSavedWelcomeEnabled(false);
+        setWelcomeMessage(DEFAULT_WELCOME_AUTO_REPLY);
+        setSavedWelcomeMessage(DEFAULT_WELCOME_AUTO_REPLY);
+      })
+      .finally(() => {
+        if (!cancelled) setWelcomeLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -223,9 +271,38 @@ export function LiveChatSettingsPanel() {
     }
   }, [averageResponseTime, savedAverageResponseTime]);
 
+  const handleSaveWelcomeAutoReply = useCallback(async () => {
+    const message = welcomeMessage.trim();
+    if (!message) {
+      adminToast("Welcome message is required.", false);
+      return;
+    }
+
+    setSavingWelcome(true);
+    hideAdminToast();
+    try {
+      const updated = await updateChatWelcomeAutoReply({
+        enabled: welcomeEnabled,
+        message,
+      });
+      setWelcomeEnabled(updated.enabled);
+      setSavedWelcomeEnabled(updated.enabled);
+      setWelcomeMessage(updated.message);
+      setSavedWelcomeMessage(updated.message);
+      adminToast("Welcome auto-reply updated.", true);
+    } catch (err) {
+      adminToast(err instanceof Error ? err.message : "Update failed.", false);
+    } finally {
+      setSavingWelcome(false);
+    }
+  }, [welcomeEnabled, welcomeMessage]);
+
   const togglesDisabled = settingsLoading;
   const responseTimeDirty =
     averageResponseTime.trim() !== savedAverageResponseTime.trim();
+  const welcomeDirty =
+    welcomeEnabled !== savedWelcomeEnabled ||
+    welcomeMessage.trim() !== savedWelcomeMessage.trim();
 
   return (
     <div className="space-y-4">
@@ -304,6 +381,66 @@ export function LiveChatSettingsPanel() {
             </div>
           </div>
         </div>
+      </ProductFormOrderCard>
+
+      <ProductFormOrderCard
+        icon={<ChatIcon className="h-4 w-4" />}
+        title="Automatic welcome reply"
+        subtitle="Reply instantly when a customer starts a new conversation"
+        className="w-full"
+      >
+        {isAdmin ? (
+          <div className="space-y-3">
+            <SettingSwitchRow
+              title="Enable welcome auto-reply"
+              description="After the first customer message in a support conversation, send this reply once. It will not repeat for every message."
+              checked={welcomeEnabled}
+              disabled={welcomeLoading || savingWelcome}
+              ariaLabel="Enable live chat welcome auto-reply"
+              onToggle={setWelcomeEnabled}
+            />
+            <div>
+              <label
+                htmlFor="chat-welcome-auto-reply"
+                className="mb-1.5 block text-xs font-medium text-foreground"
+              >
+                Welcome message
+              </label>
+              <textarea
+                id="chat-welcome-auto-reply"
+                rows={4}
+                maxLength={1000}
+                value={welcomeMessage}
+                disabled={welcomeLoading || savingWelcome}
+                onChange={(event) => setWelcomeMessage(event.target.value)}
+                className="admin-input min-h-24 w-full resize-y"
+                placeholder={DEFAULT_WELCOME_AUTO_REPLY}
+              />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-foreground-muted">
+                  {welcomeMessage.length.toLocaleString()} / 1,000 characters
+                </span>
+                <button
+                  type="button"
+                  disabled={
+                    welcomeLoading ||
+                    savingWelcome ||
+                    !welcomeDirty ||
+                    !welcomeMessage.trim()
+                  }
+                  onClick={() => void handleSaveWelcomeAutoReply()}
+                  className="dashboard-pro-btn-ghost shrink-0 px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {savingWelcome ? "Saving…" : "Save welcome reply"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-foreground-muted">
+            Welcome auto-replies are managed by administrators.
+          </p>
+        )}
       </ProductFormOrderCard>
 
       <ProductFormOrderCard

@@ -5506,6 +5506,31 @@ export function updateChatQuickReplies(
   });
 }
 
+export interface ChatWelcomeAutoReply {
+  enabled: boolean;
+  message: string;
+  updatedAt?: string;
+}
+
+export function getChatWelcomeAutoReply(): Promise<ChatWelcomeAutoReply> {
+  return authRequest<ChatWelcomeAutoReply>(
+    "/chat/admin/welcome-auto-reply",
+  );
+}
+
+export function updateChatWelcomeAutoReply(input: {
+  enabled: boolean;
+  message: string;
+}): Promise<ChatWelcomeAutoReply> {
+  return authRequest<ChatWelcomeAutoReply>(
+    "/chat/admin/welcome-auto-reply",
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export interface ChatStaffQuickRepliesResponse {
   quickReplies: ChatQuickReply[];
 }

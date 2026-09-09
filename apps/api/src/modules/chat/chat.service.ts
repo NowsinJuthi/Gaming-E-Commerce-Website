@@ -4,31 +4,44 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
-import { ChatRoomStatus, ChatRoomType, NotificationAudience, Role } from '../../common/enums';
-import { isEphemeralGuestUser } from '../../common/utils/guest-user';
+} from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model, Types } from "mongoose";
+import {
+  ChatRoomStatus,
+  ChatRoomType,
+  NotificationAudience,
+  Role,
+} from "../../common/enums";
+import { isEphemeralGuestUser } from "../../common/utils/guest-user";
 import {
   CHAT_STAFF_ROLES,
   isAdministratorRole,
   isChatStaff,
   userHasRole,
-} from '../../common/utils/role.utils';
-import { PaginatedResult, PaginationDto } from '../../common/dto/pagination.dto';
+} from "../../common/utils/role.utils";
+import {
+  PaginatedResult,
+  PaginationDto,
+} from "../../common/dto/pagination.dto";
 import {
   ChatMessage,
   ChatMessageDocument,
-} from '../../database/schemas/chat-message.schema';
+} from "../../database/schemas/chat-message.schema";
 import {
   ChatRoom,
   ChatRoomDocument,
-} from '../../database/schemas/chat-room.schema';
-import { User, UserDocument, UserProfile } from '../../database/schemas/user.schema';
-import type { AuthenticatedUser } from '../auth/auth.types';
-import { NotificationsService } from '../notifications/notifications.service';
-import { ChatNotificationService } from '../notifications/chat-notification.service';
-import { UploadsService } from '../../shared/uploads/uploads.service';
+} from "../../database/schemas/chat-room.schema";
+import {
+  User,
+  UserDocument,
+  UserProfile,
+} from "../../database/schemas/user.schema";
+import type { AuthenticatedUser } from "../auth/auth.types";
+import { NotificationsService } from "../notifications/notifications.service";
+import { ChatNotificationService } from "../notifications/chat-notification.service";
+import { UploadsService } from "../../shared/uploads/uploads.service";
+import { ChatSettingsService } from "./chat-settings.service";
 
 const isStaff = (user: AuthenticatedUser): boolean => isChatStaff(user.roles);
 
@@ -57,7 +70,7 @@ const resolveSenderDisplayName = (
   }
   const fullName = [profile.firstName, profile.lastName]
     .filter(Boolean)
-    .join(' ')
+    .join(" ")
     .trim();
   if (fullName) {
     return fullName;
@@ -65,7 +78,7 @@ const resolveSenderDisplayName = (
   if (profile.firstName?.trim()) {
     return profile.firstName.trim();
   }
-  const localPart = source.email.split('@')[0]?.trim();
+  const localPart = source.email.split("@")[0]?.trim();
   if (localPart) {
     return localPart;
   }
@@ -73,10 +86,10 @@ const resolveSenderDisplayName = (
 };
 
 const chatMessagePreview = (body?: string, imageUrl?: string): string => {
-  const text = body?.trim() ?? '';
+  const text = body?.trim() ?? "";
   if (text) return text.slice(0, 200);
-  if (imageUrl?.trim()) return '[Image]';
-  return '';
+  if (imageUrl?.trim()) return "[Image]";
+  return "";
 };
 
 @Injectable()
@@ -91,6 +104,7 @@ export class ChatService {
     private readonly notifications: NotificationsService,
     private readonly chatNotifications: ChatNotificationService,
     private readonly uploads: UploadsService,
+    private readonly chatSettings: ChatSettingsService,
   ) {}
 
   /**
@@ -98,18 +112,21 @@ export class ChatService {
    * disabled. Pass `allowGuestChat` from the panel settings (resolved at the
    * controller / gateway call-site so ChatService needs no extra dependency).
    */
-  assertRegisteredChatUser(user: AuthenticatedUser, allowGuestChat: boolean): void {
+  assertRegisteredChatUser(
+    user: AuthenticatedUser,
+    allowGuestChat: boolean,
+  ): void {
     if (isStaff(user)) return;
     if (allowGuestChat) return;
     if (user.isGuest || isEphemeralGuestUser(user)) {
-      throw new ForbiddenException('Login is required to use live chat');
+      throw new ForbiddenException("Login is required to use live chat");
     }
   }
 
   private assertValidChatImageUrl(imageUrl: string, roomId: string): void {
     const marker = `/uploads/live-chat/${roomId}/`;
     if (!imageUrl.includes(marker)) {
-      throw new BadRequestException('Invalid chat image URL');
+      throw new BadRequestException("Invalid chat image URL");
     }
   }
 
@@ -156,7 +173,7 @@ export class ChatService {
           status: ChatRoomStatus.Open,
           participants: [userId],
           createdBy: userId,
-          subject: 'Support',
+          subject: "Support",
         });
       } catch (error) {
         const code = (error as { code?: number }).code;
@@ -172,7 +189,7 @@ export class ChatService {
     }
 
     if (!room) {
-      throw new InternalServerErrorException('Failed to open support room');
+      throw new InternalServerErrorException("Failed to open support room");
     }
 
     await this.roomModel
@@ -207,7 +224,7 @@ export class ChatService {
     }
     const staffUsers = await this.userModel
       .find({ roles: { $in: [...CHAT_STAFF_ROLES] } })
-      .select('_id')
+      .select("_id")
       .lean()
       .exec();
     const staffIds = staffUsers.map((u) => u._id);
@@ -257,22 +274,22 @@ export class ChatService {
   private async findCustomerIdsMatching(
     term: string,
   ): Promise<Types.ObjectId[]> {
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rx = new RegExp(escaped, 'i');
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rx = new RegExp(escaped, "i");
     const or: Record<string, unknown>[] = [
       { email: rx },
       { phone: rx },
-      { 'profile.displayName': rx },
-      { 'profile.firstName': rx },
-      { 'profile.lastName': rx },
+      { "profile.displayName": rx },
+      { "profile.firstName": rx },
+      { "profile.lastName": rx },
     ];
-    const digits = term.replace(/\D+/g, '');
+    const digits = term.replace(/\D+/g, "");
     if (digits.length >= 4 && digits !== term) {
       or.push({ phone: new RegExp(digits) });
     }
     const users = await this.userModel
       .find({ $or: or })
-      .select('_id')
+      .select("_id")
       .limit(300)
       .lean()
       .exec();
@@ -299,9 +316,7 @@ export class ChatService {
     return rooms.map((room) =>
       this.serializeRoom(
         room,
-        room.createdBy
-          ? creatorMap.get(String(room.createdBy))
-          : undefined,
+        room.createdBy ? creatorMap.get(String(room.createdBy)) : undefined,
         staffView ? unreadRoomIds.has(String(room._id)) : false,
       ),
     );
@@ -331,13 +346,13 @@ export class ChatService {
         $addFields: {
           staffReads: {
             $size: {
-              $setIntersection: ['$readBy', staffIds],
+              $setIntersection: ["$readBy", staffIds],
             },
           },
         },
       },
       { $match: { staffReads: 0 } },
-      { $group: { _id: '$roomId' } },
+      { $group: { _id: "$roomId" } },
     ]);
 
     return new Set(rows.map((row) => String(row._id)));
@@ -353,7 +368,7 @@ export class ChatService {
     }
     const users = await this.userModel
       .find({ roles: { $in: [...CHAT_STAFF_ROLES] } })
-      .select('_id')
+      .select("_id")
       .lean()
       .exec();
     this.staffUserIdsCache = users.map((user) => user._id as Types.ObjectId);
@@ -366,7 +381,12 @@ export class ChatService {
   ): Promise<
     Map<
       string,
-      { _id: Types.ObjectId; email: string; phone?: string; profile?: UserProfile }
+      {
+        _id: Types.ObjectId;
+        email: string;
+        phone?: string;
+        profile?: UserProfile;
+      }
     >
   > {
     const uniqueIds = [...new Set(creatorIds.filter(Boolean))];
@@ -375,7 +395,7 @@ export class ChatService {
     }
     const users = await this.userModel
       .find({ _id: { $in: uniqueIds } })
-      .select('email phone profile')
+      .select("email phone profile")
       .lean()
       .exec();
     return new Map(
@@ -393,16 +413,18 @@ export class ChatService {
 
   async findCreatorSummary(
     creatorId: string,
-  ): Promise<
-    | { _id: Types.ObjectId; email: string; phone?: string; profile?: UserProfile }
-    | null
-  > {
+  ): Promise<{
+    _id: Types.ObjectId;
+    email: string;
+    phone?: string;
+    profile?: UserProfile;
+  } | null> {
     if (!Types.ObjectId.isValid(creatorId)) {
       return null;
     }
     const user = await this.userModel
       .findById(creatorId)
-      .select('email phone profile')
+      .select("email phone profile")
       .lean()
       .exec();
     if (!user) {
@@ -419,7 +441,7 @@ export class ChatService {
   async listRoomIdsForUser(userId: string): Promise<string[]> {
     const rooms = await this.roomModel
       .find({ participants: new Types.ObjectId(userId) })
-      .select('_id')
+      .select("_id")
       .lean()
       .exec();
     return rooms.map((r) => String(r._id));
@@ -435,11 +457,9 @@ export class ChatService {
   ): Promise<ChatRoomDocument> {
     const room = await this.roomModel.findById(roomId).exec();
     if (!room) {
-      throw new NotFoundException('Room not found');
+      throw new NotFoundException("Room not found");
     }
-    const isParticipant = room.participants.some(
-      (p) => String(p) === user.id,
-    );
+    const isParticipant = room.participants.some((p) => String(p) === user.id);
     if (isParticipant) {
       return room;
     }
@@ -458,11 +478,11 @@ export class ChatService {
         )
         .exec();
       if (!updated) {
-        throw new NotFoundException('Room not found');
+        throw new NotFoundException("Room not found");
       }
       return updated;
     }
-    throw new ForbiddenException('Access denied');
+    throw new ForbiddenException("Access denied");
   }
 
   // --- Messages ---
@@ -474,12 +494,12 @@ export class ChatService {
     imageUrl?: string,
   ): Promise<ChatMessageDocument> {
     if (room.status === ChatRoomStatus.Closed) {
-      throw new BadRequestException('This conversation is closed');
+      throw new BadRequestException("This conversation is closed");
     }
-    const text = body?.trim() ?? '';
-    const image = imageUrl?.trim() ?? '';
+    const text = body?.trim() ?? "";
+    const image = imageUrl?.trim() ?? "";
     if (!text && !image) {
-      throw new BadRequestException('Message must include text or an image');
+      throw new BadRequestException("Message must include text or an image");
     }
     if (image) {
       this.assertValidChatImageUrl(image, String(room._id));
@@ -489,7 +509,7 @@ export class ChatService {
     const role = primaryRole(user);
     const sender = await this.userModel
       .findById(user.id)
-      .select('email profile')
+      .select("email profile")
       .lean()
       .exec();
     const senderName = resolveSenderDisplayName(
@@ -542,27 +562,125 @@ export class ChatService {
     this.assertRegisteredChatUser(user, options.allowGuestChat);
     if (options.imageUrl?.trim() && options.allowImageUpload === false) {
       throw new BadRequestException(
-        'Picture uploads are disabled for live chat',
+        "Picture uploads are disabled for live chat",
       );
     }
     const room = await this.getAccessibleRoom(user, roomId);
-    const notifyRoom = await this.ensureStaffParticipants(room);
     const message = await this.saveMessage(
-      notifyRoom,
+      room,
       user,
       options.body,
       options.imageUrl,
     );
     const payload = this.serialize(message);
-    const freshRoom =
-      (await this.findRoomById(String(notifyRoom._id))) ?? notifyRoom;
-    await this.chatNotifications.notifyChatMessage(
-      freshRoom,
+    // Notifications are secondary side effects. Waiting for their MongoDB,
+    // email, or Telegram work here delays the Socket.IO broadcast and can make
+    // the client hit its ack timeout and submit the same message over REST.
+    void this.chatNotifications.notifyChatMessage(
+      room,
       user,
       options.body,
       options.imageUrl,
     );
-    return { payload, room: freshRoom };
+    return { payload, room };
+  }
+
+  /**
+   * Creates the configured welcome reply after the first customer message in
+   * a support room. The room marker is claimed atomically so simultaneous
+   * customer sends cannot create duplicate automatic replies.
+   */
+  async createWelcomeAutoReply(
+    room: ChatRoomDocument,
+    sender: AuthenticatedUser,
+    triggerMessageId: string,
+  ): Promise<Record<string, unknown> | null> {
+    if (isStaff(sender) || room.type !== ChatRoomType.Support) {
+      return null;
+    }
+
+    const settings = await this.chatSettings.getWelcomeAutoReply();
+    if (!settings.enabled || !settings.message.trim()) {
+      return null;
+    }
+
+    const firstCustomerMessage = await this.messageModel
+      .findOne({
+        roomId: room._id,
+        senderRole: { $nin: [...CHAT_STAFF_ROLES] },
+      })
+      .sort({ createdAt: 1, _id: 1 })
+      .select("_id")
+      .lean()
+      .exec();
+    if (
+      !firstCustomerMessage ||
+      String(firstCustomerMessage._id) !== triggerMessageId
+    ) {
+      return null;
+    }
+
+    const staff = await this.userModel
+      .findOne({ roles: { $in: [...CHAT_STAFF_ROLES] } })
+      .select("_id roles")
+      .lean()
+      .exec();
+    if (!staff) {
+      return null;
+    }
+
+    const claimedRoom = await this.roomModel
+      .findOneAndUpdate(
+        {
+          _id: room._id,
+          welcomeAutoReplySentAt: { $exists: false },
+        },
+        { $set: { welcomeAutoReplySentAt: new Date() } },
+        { new: true },
+      )
+      .exec();
+    if (!claimedRoom) {
+      return null;
+    }
+
+    const staffRole = staff.roles?.some(isAdministratorRole)
+      ? Role.Administrator
+      : userHasRole(staff.roles ?? [], Role.Editor)
+        ? Role.Editor
+        : Role.Support;
+
+    try {
+      const message = await this.messageModel.create({
+        roomId: room._id,
+        senderId: staff._id,
+        senderRole: staffRole,
+        senderName: "UniQbd Support",
+        senderFirstName: "Support",
+        body: settings.message.trim(),
+        readBy: [staff._id],
+      });
+      await this.roomModel
+        .updateOne(
+          { _id: room._id },
+          {
+            $set: {
+              lastMessage: chatMessagePreview(settings.message),
+              lastMessageAt: new Date(),
+              lastSenderId: staff._id,
+            },
+          },
+        )
+        .exec();
+      return this.serialize(message);
+    } catch (error) {
+      await this.roomModel
+        .updateOne(
+          { _id: room._id },
+          { $unset: { welcomeAutoReplySentAt: 1 } },
+        )
+        .exec();
+      throw error;
+    }
   }
 
   async getHistory(
@@ -607,7 +725,7 @@ export class ChatService {
     }
     const users = await this.userModel
       .find({ _id: { $in: missingSenderIds } })
-      .select('email profile roles')
+      .select("email profile roles")
       .lean()
       .exec();
     return new Map(
@@ -633,7 +751,11 @@ export class ChatService {
     const userId = new Types.ObjectId(user.id);
     await this.messageModel
       .updateMany(
-        { roomId: new Types.ObjectId(roomId), senderId: { $ne: userId }, readBy: { $ne: userId } },
+        {
+          roomId: new Types.ObjectId(roomId),
+          senderId: { $ne: userId },
+          readBy: { $ne: userId },
+        },
         { $addToSet: { readBy: userId } },
       )
       .exec();
@@ -652,14 +774,14 @@ export class ChatService {
     roomId: string,
   ): Promise<{ success: boolean }> {
     if (!isStaff(user)) {
-      throw new ForbiddenException('Only staff can delete chat rooms');
+      throw new ForbiddenException("Only staff can delete chat rooms");
     }
     if (!Types.ObjectId.isValid(roomId)) {
-      throw new NotFoundException('Room not found');
+      throw new NotFoundException("Room not found");
     }
     const room = await this.roomModel.findById(roomId).exec();
     if (!room) {
-      throw new NotFoundException('Room not found');
+      throw new NotFoundException("Room not found");
     }
     await this.messageModel.deleteMany({ roomId: room._id }).exec();
     this.uploads.deleteLiveChatRoomFolder(String(room._id));
@@ -673,13 +795,13 @@ export class ChatService {
     status: ChatRoomStatus,
   ): Promise<ChatRoomDocument> {
     if (!isStaff(user)) {
-      throw new ForbiddenException('Only staff can update room status');
+      throw new ForbiddenException("Only staff can update room status");
     }
     const room = await this.roomModel
       .findByIdAndUpdate(roomId, { $set: { status } }, { new: true })
       .exec();
     if (!room) {
-      throw new NotFoundException('Room not found');
+      throw new NotFoundException("Room not found");
     }
     return room;
   }
@@ -705,7 +827,7 @@ export class ChatService {
         roles: { $in: [...CHAT_STAFF_ROLES] },
         isGuest: { $ne: true },
       })
-      .select('email profile roles')
+      .select("email profile roles")
       .lean()
       .exec();
 
@@ -738,8 +860,8 @@ export class ChatService {
       openRooms,
       closedRooms,
       totalMessages,
-      namespace: '/chat',
-      transport: 'socket.io (WebSocket)',
+      namespace: "/chat",
+      transport: "socket.io (WebSocket)",
     };
   }
 
@@ -788,9 +910,7 @@ export class ChatService {
   ): Record<string, unknown> {
     const senderId = String(message.senderId);
     const senderName =
-      message.senderName ??
-      senderNameMap?.get(senderId) ??
-      message.senderRole;
+      message.senderName ?? senderNameMap?.get(senderId) ?? message.senderRole;
     return {
       id: String(message._id),
       roomId: String(message.roomId),

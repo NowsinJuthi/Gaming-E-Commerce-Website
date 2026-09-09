@@ -23,7 +23,7 @@ function attachAuthListener(): void {
   if (_authListenerAttached || typeof window === "undefined") return;
   _authListenerAttached = true;
 
-  window.addEventListener("auth-change", () => {
+  const syncAuth = () => {
     if (!_socket) return;
     const nextToken = currentToken();
     if (!nextToken) {
@@ -34,8 +34,17 @@ function attachAuthListener(): void {
     const tokenChanged = _lastToken !== nextToken;
     _lastToken = nextToken;
     _socket.auth = { token: nextToken };
-    if (tokenChanged || !_socket.connected) {
+    if (tokenChanged) {
       reconnectChatSocket(_socket);
+    } else if (!_socket.connected) {
+      _socket.connect();
+    }
+  };
+
+  window.addEventListener("auth-change", syncAuth);
+  window.addEventListener("storage", (event) => {
+    if (event.key === "accessToken" || event.key === "refreshToken") {
+      syncAuth();
     }
   });
 }

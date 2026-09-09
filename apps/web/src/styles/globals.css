@@ -16499,6 +16499,7 @@
   }
 
   .admin-chat-launcher {
+    --brand: 245 183 55;
     position: fixed;
     right: 1.25rem;
     bottom: 1.25rem;

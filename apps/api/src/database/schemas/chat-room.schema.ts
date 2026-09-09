@@ -44,6 +44,10 @@ export class ChatRoom {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   lastSenderId?: Types.ObjectId;
 
+  /** Set atomically when the one-time welcome auto-reply is claimed. */
+  @Prop()
+  welcomeAutoReplySentAt?: Date;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

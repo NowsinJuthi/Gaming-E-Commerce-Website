@@ -1,38 +1,39 @@
-import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { Logger, UsePipes, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Public } from '../../common/decorators/public.decorator';
-import { ChatRoomType } from '../../common/enums';
-import { isEphemeralGuestUser } from '../../common/utils/guest-user';
-import { isChatStaff } from '../../common/utils/role.utils';
-import type { ChatRoomDocument } from '../../database/schemas/chat-room.schema';
-import type { AuthenticatedUser, JwtPayload } from '../auth/auth.types';
-import { AuthService } from '../auth/auth.service';
-import { ChatService } from './chat.service';
-import { PresenceService } from './presence.service';
-import { SendMessageDto } from './dto/send-message.dto';
-import { TypingDto } from './dto/typing.dto';
-import { RoomIdDto } from './dto/room-id.dto';
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Public } from "../../common/decorators/public.decorator";
+import { ChatRoomType } from "../../common/enums";
+import { isEphemeralGuestUser } from "../../common/utils/guest-user";
+import { isChatStaff } from "../../common/utils/role.utils";
+import type { ChatRoomDocument } from "../../database/schemas/chat-room.schema";
+import type { AuthenticatedUser, JwtPayload } from "../auth/auth.types";
+import { AuthService } from "../auth/auth.service";
+import { ChatService } from "./chat.service";
+import { PresenceService } from "./presence.service";
+import { SendMessageDto } from "./dto/send-message.dto";
+import { TypingDto } from "./dto/typing.dto";
+import { RoomIdDto } from "./dto/room-id.dto";
 
 const userRoom = (userId: string): string => `user:${userId}`;
 const chatRoom = (roomId: string): string => `chat:${roomId}`;
-const staffRoom = 'staff:chat';
+const staffRoom = "staff:chat";
 
 const participantId = (participant: unknown): string => {
   if (
     participant &&
-    typeof participant === 'object' &&
-    '_id' in participant &&
+    typeof participant === "object" &&
+    "_id" in participant &&
     (participant as { _id?: unknown })._id
   ) {
     return String((participant as { _id: unknown })._id);
@@ -50,8 +51,10 @@ const isStaff = (user: AuthenticatedUser): boolean => isChatStaff(user.roles);
  */
 @Public()
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-@WebSocketGateway({ namespace: '/chat', cors: true })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@WebSocketGateway({ namespace: "/chat", cors: true })
+export class ChatGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer() private readonly server!: Server;
   private readonly logger = new Logger(ChatGateway.name);
 
@@ -63,27 +66,34 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly auth: AuthService,
   ) {}
 
-  async handleConnection(client: Socket): Promise<void> {
-    let user: AuthenticatedUser;
-    try {
-      user = await this.authenticate(client);
-    } catch {
-      client.emit('error', { message: 'Unauthorized' });
-      client.disconnect(true);
-      return;
-    }
+  afterInit(server: Server): void {
+    // Namespace middleware finishes authentication and room membership before
+    // Socket.IO tells the browser it is connected. This removes the startup
+    // race where room:join/message:send could arrive before client.data.user
+    // and the per-user/staff fan-out rooms were ready.
+    server.use(async (client: Socket, next) => {
+      try {
+        const user = await this.authenticate(client);
+        client.data.user = user;
+        await client.join(userRoom(user.id));
+        if (isStaff(user)) {
+          await client.join(staffRoom);
+        }
+        next();
+      } catch {
+        next(new Error("Unauthorized"));
+      }
+    });
+  }
 
-    client.data.user = user;
-    await client.join(userRoom(user.id));
-    if (isStaff(user)) {
-      await client.join(staffRoom);
-    }
+  handleConnection(client: Socket): void {
+    const user = client.data.user as AuthenticatedUser;
 
     void this.presence
       .connect(user.id, client.id)
       .then((firstConnection) => {
         if (firstConnection) {
-          this.server.emit('presence:update', {
+          this.server.emit("presence:update", {
             userId: user.id,
             online: true,
           });
@@ -110,7 +120,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const stillOnline = await this.presence.disconnect(user.id, client.id);
       if (!stillOnline) {
-        this.server.emit('presence:update', { userId: user.id, online: false });
+        this.server.emit("presence:update", { userId: user.id, online: false });
       }
     } catch (err) {
       this.logger.warn(
@@ -119,7 +129,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('support:open')
+  @SubscribeMessage("support:open")
   async openSupport(@ConnectedSocket() client: Socket) {
     const user = this.user(client);
     try {
@@ -133,7 +143,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: true, room: this.serializeRoom(room) };
   }
 
-  @SubscribeMessage('room:join')
+  @SubscribeMessage("room:join")
   async joinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: RoomIdDto,
@@ -148,7 +158,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('message:send')
+  @SubscribeMessage("message:send")
   async sendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: SendMessageDto,
@@ -166,7 +176,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           imageUrl: dto.imageUrl,
         },
       );
-      this.broadcastToRoom(room, 'message:new', payload);
+      this.broadcastToRoom(room, "message:new", payload);
+      this.scheduleWelcomeAutoReply(room, user, String(payload.id));
       await this.presence.setTyping(dto.roomId, user.id, false);
       return { ok: true, id: payload.id, message: payload };
     } catch (error) {
@@ -184,7 +195,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.emitToRoom(room, event, payload, exceptUserId);
   }
 
-  @SubscribeMessage('typing')
+  scheduleWelcomeAutoReply(
+    room: ChatRoomDocument,
+    sender: AuthenticatedUser,
+    triggerMessageId: string,
+  ): void {
+    void this.chat
+      .createWelcomeAutoReply(room, sender, triggerMessageId)
+      .then((payload) => {
+        if (payload) {
+          this.broadcastToRoom(room, "message:new", payload);
+        }
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Welcome auto-reply skipped: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+  }
+
+  @SubscribeMessage("typing")
   async typing(
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: TypingDto,
@@ -196,7 +228,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.presence.setTyping(dto.roomId, user.id, dto.isTyping);
       this.emitToRoom(
         notifyRoom,
-        'typing',
+        "typing",
         { roomId: dto.roomId, userId: user.id, isTyping: dto.isTyping },
         user.id,
       );
@@ -206,18 +238,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('message:read')
-  async read(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() dto: RoomIdDto,
-  ) {
+  @SubscribeMessage("message:read")
+  async read(@ConnectedSocket() client: Socket, @MessageBody() dto: RoomIdDto) {
     const user = this.user(client);
     try {
       const room = await this.chat.getAccessibleRoom(user, dto.roomId);
       await this.chat.markRead(user, dto.roomId);
       this.emitToRoom(
         room,
-        'message:read',
+        "message:read",
         { roomId: dto.roomId, userId: user.id },
         user.id,
       );
@@ -227,14 +256,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('presence:heartbeat')
+  @SubscribeMessage("presence:heartbeat")
   async presenceHeartbeat(@ConnectedSocket() client: Socket) {
     const user = this.user(client);
     await this.presence.touchAlive(user.id, client.id);
     return { ok: true };
   }
 
-  @SubscribeMessage('presence:list')
+  @SubscribeMessage("presence:list")
   async presenceList() {
     const online = await this.presence.listOnline();
     return { ok: true, online };
@@ -247,7 +276,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     roomId: string,
   ): Promise<void> {
     const currentRooms = Array.from(client.rooms).filter((name) =>
-      name.startsWith('chat:'),
+      name.startsWith("chat:"),
     );
     for (const name of currentRooms) {
       if (name !== chatRoom(roomId)) {
@@ -275,7 +304,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     for (const participant of targets) {
       const id = participantId(participant);
-      if (!id || id === 'undefined') {
+      if (!id || id === "undefined") {
         continue;
       }
       if (exceptUserId && id === exceptUserId) {
@@ -303,17 +332,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const query = client.handshake.query?.token;
     const token =
       auth?.token ??
-      (typeof header === 'string'
-        ? header.replace(/^Bearer\s+/i, '')
+      (typeof header === "string"
+        ? header.replace(/^Bearer\s+/i, "")
         : undefined) ??
-      (typeof query === 'string' ? query : undefined);
+      (typeof query === "string" ? query : undefined);
     if (!token) {
-      throw new Error('Missing token');
+      throw new Error("Missing token");
     }
-    const secret = this.config.get<string>('jwt.accessSecret');
+    const secret = this.config.get<string>("jwt.accessSecret");
     const payload = await this.jwt.verifyAsync<JwtPayload>(token, { secret });
     if (!payload?.sub) {
-      throw new Error('Invalid token');
+      throw new Error("Invalid token");
     }
     return {
       id: payload.sub,
@@ -338,6 +367,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : 'Request failed';
+    return error instanceof Error ? error.message : "Request failed";
   }
 }

@@ -35,6 +35,16 @@ export class ChatSettings {
   @Prop({ type: [ChatQuickReplyDoc], default: [] })
   quickReplies!: ChatQuickReplyDoc[];
 
+  @Prop({ default: false })
+  welcomeAutoReplyEnabled!: boolean;
+
+  @Prop({
+    trim: true,
+    default:
+      'Welcome to UniQbd Support! Thanks for reaching out. Our support team will reply as soon as possible.',
+  })
+  welcomeAutoReplyMessage!: string;
+
   updatedAt?: Date;
 }
 

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { CacheKeys } from '../../shared/cache/cache-keys';
 import { CacheService } from '../../shared/cache/cache.service';
 import type { ChatRoomDocument } from '../../database/schemas/chat-room.schema';
@@ -18,7 +17,6 @@ export class TelegramChatNotifier {
 
   constructor(
     private readonly telegram: TelegramSettingsService,
-    private readonly config: ConfigService,
     private readonly cache: CacheService,
   ) {}
 
@@ -42,7 +40,6 @@ export class TelegramChatNotifier {
       }
 
       const preview = previewMessage(body, imageUrl);
-      const replyUrl = this.buildReplyUrl(roomId);
       const subject = room.subject?.trim() || 'Live Support';
       const customerLabel = sender.email?.trim() || 'Customer';
 
@@ -52,18 +49,9 @@ export class TelegramChatNotifier {
         `<b>Chat:</b> ${escapeHtml(subject)}`,
         `<b>Customer:</b> ${escapeHtml(customerLabel)}`,
         `<b>Message:</b> ${escapeHtml(preview || '—')}`,
-        '',
-        `<b>Reply link:</b>`,
-        `<a href="${escapeHtml(replyUrl)}">${escapeHtml(replyUrl)}</a>`,
       ].join('\n');
 
-      const result = await this.telegram.sendHtmlMessage(text, undefined, {
-        replyMarkup: {
-          inline_keyboard: [
-            [{ text: '💬 Reply in chat', url: replyUrl }],
-          ],
-        },
-      });
+      const result = await this.telegram.sendHtmlMessage(text);
 
       if (result.success) {
         await this.cache.set(
@@ -85,13 +73,6 @@ export class TelegramChatNotifier {
     }
   }
 
-  private buildReplyUrl(roomId: string): string {
-    const appUrl =
-      this.config.get<string>('payments.appUrl') ??
-      process.env.WEB_APP_URL ??
-      'http://localhost:3000';
-    return `${appUrl.replace(/\/$/, '')}/admin/chat?room=${encodeURIComponent(roomId)}`;
-  }
 }
 
 function previewMessage(body?: string, imageUrl?: string): string {
