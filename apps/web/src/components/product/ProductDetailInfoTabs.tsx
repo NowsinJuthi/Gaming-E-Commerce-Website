@@ -134,10 +134,6 @@ export function ProductDetailInfoTabs({
                   onClick={() => onTabChange(t.id)}
                   className={`product-pdp-info-tab-btn${
                     active ? " product-pdp-info-tab-btn--active" : ""
-                  }${
-                    !active && t.id !== "description"
-                      ? " product-pdp-info-tab-btn--secondary"
-                      : ""
                   }`}
                 >
                   <span

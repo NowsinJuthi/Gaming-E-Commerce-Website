@@ -511,7 +511,7 @@ export function InventoryCodeList({
                         onChange={(e) => setEditCost(e.target.value)}
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={busy}
@@ -531,7 +531,7 @@ export function InventoryCodeList({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="break-all font-mono text-xs text-foreground">
                         {item.value}
@@ -543,7 +543,7 @@ export function InventoryCodeList({
                       </p>
                     </div>
                     {canMutate ? (
-                      <div className="flex shrink-0 gap-1">
+                      <div className="flex flex-wrap gap-1 self-end sm:shrink-0">
                         <button
                           type="button"
                           disabled={busy}
@@ -571,7 +571,7 @@ export function InventoryCodeList({
       )}
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-2 text-xs text-subtle">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-subtle">
           <button
             type="button"
             disabled={page <= 1 || loading}

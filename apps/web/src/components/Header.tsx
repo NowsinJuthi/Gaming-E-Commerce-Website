@@ -547,7 +547,7 @@ export function Header({
                   unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
                 }
               >
-                <BellIcon className="h-5 w-5" />
+                <BellIcon className="h-5 w-5 text-[#f5b737]" />
                 {unread > 0 ? (
                   <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}
@@ -666,7 +666,7 @@ export function Header({
                   unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
                 }
               >
-                <BellIcon className="h-5 w-5" />
+                <BellIcon className="h-5 w-5 text-[#f5b737]" />
                 {unread > 0 ? (
                   <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}

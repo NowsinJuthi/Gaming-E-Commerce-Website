@@ -571,7 +571,7 @@ export default function AdminStockPage() {
       }
     >
       {error ? (
-        <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+        <div className="mb-5 flex flex-col items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <span>{error}</span>
           <button
             type="button"
@@ -798,7 +798,88 @@ export default function AdminStockPage() {
               ) : null}
             </div>
           ) : (
-            <div className="admin-products-table-wrap panel-3d-table-wrap overflow-x-auto">
+            <>
+              <div className="admin-stock-mobile-list grid gap-2 md:hidden">
+                {filteredProducts.map((p) => {
+                  const available = getAdminProductAvailableStock(p);
+                  const status = (p.status ?? "draft") as ProductStatusValue;
+                  const thumb = productThumb(p);
+                  const isSelected = selected?._id === p._id;
+                  const level = stockLevelBadge(available, status);
+
+                  return (
+                    <button
+                      key={p._id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => void selectProduct(p)}
+                      className={`admin-stock-mobile-card${
+                        isSelected ? " admin-stock-mobile-card--selected" : ""
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-black/25">
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={thumb}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <BoxIcon className="h-4 w-4 text-foreground-muted" />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-foreground">
+                            {p.title}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[11px] text-subtle">
+                            /{p.slug}
+                            {p.sku ? ` · ${p.sku}` : ""}
+                          </span>
+                        </span>
+                        <span
+                          className={
+                            isSelected
+                              ? "admin-stock-action admin-stock-action--active"
+                              : "admin-stock-action"
+                          }
+                        >
+                          {isSelected ? "Managing" : "Manage"}
+                        </span>
+                      </span>
+
+                      <span className="mt-3 grid grid-cols-2 gap-2 text-left">
+                        <span className="admin-stock-mobile-meta">
+                          <span className="admin-stock-mobile-meta-label">Type</span>
+                          <span className="truncate text-xs text-foreground">
+                            {TYPE_LABEL[p.type] ?? p.type}
+                          </span>
+                        </span>
+                        <span className="admin-stock-mobile-meta">
+                          <span className="admin-stock-mobile-meta-label">Available</span>
+                          <span className={stockTone(available, status)}>
+                            {available}
+                          </span>
+                        </span>
+                        <span className="admin-stock-mobile-meta">
+                          <span className="admin-stock-mobile-meta-label">Status</span>
+                          <span className={STATUS_STYLE[status] ?? STATUS_STYLE.draft}>
+                            {formatStatus(status)}
+                          </span>
+                        </span>
+                        <span className="admin-stock-mobile-meta">
+                          <span className="admin-stock-mobile-meta-label">Level</span>
+                          <span className={level.className}>{level.label}</span>
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="admin-products-table-wrap panel-3d-table-wrap hidden overflow-x-auto md:block">
               <table className="panel-3d-table admin-table--stock w-full text-sm">
                 <thead>
                   <tr>
@@ -906,7 +987,8 @@ export default function AdminStockPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </AdminOrderListCard>
 
@@ -995,7 +1077,7 @@ export default function AdminStockPage() {
                   </div>
 
                   {unassignedStock && unassignedStock.available > 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3">
+                    <div className="flex flex-col items-stretch gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-foreground">
                         <span className="font-semibold">
                           {unassignedStock.available} old code
@@ -1020,7 +1102,7 @@ export default function AdminStockPage() {
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-subtle">
                         Select package
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="admin-stock-package-grid">
                         {stockedPackageTabs.map((pkg) => {
                           const pkgStock =
                             packageStocks.find(
@@ -1083,7 +1165,7 @@ export default function AdminStockPage() {
                     </p>
                   ) : null}
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3 min-[380px]:gap-3">
                     {(
                       [
                         [
@@ -1138,7 +1220,7 @@ export default function AdminStockPage() {
                 <dt>Inventory</dt>
                 <dd className="admin-product-form-sidebar-fields">
 
-                  <div className="admin-stock-detail-body grid gap-0 lg:grid-cols-2 lg:divide-x lg:divide-border/60">
+                  <div className="admin-stock-detail-body grid gap-6 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-border/60">
                   <section className="admin-stock-panel p-0 lg:pr-5">
                     <div className="admin-stock-panel-head">
                       <h3 className="text-sm font-semibold text-foreground">

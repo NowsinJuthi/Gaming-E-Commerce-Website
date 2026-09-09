@@ -415,7 +415,7 @@ export function CartView({
               <div className="cart-discounts-box-fields">
                 <Link
                   href="/checkout"
-                  className="dashboard-pro-btn block w-full text-center"
+                  className="dashboard-pro-btn cart-proceed-checkout-btn block w-full text-center"
                 >
                   Proceed to checkout
                 </Link>
