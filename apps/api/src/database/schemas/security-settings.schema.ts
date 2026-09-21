@@ -88,6 +88,23 @@ export class AuditSettingsDoc {
   enabled!: boolean;
 }
 
+@Schema({ _id: false })
+export class EmailDomainPolicyDoc {
+  @Prop({ default: false })
+  allowlistEnabled!: boolean;
+
+  /** Normalized hostnames, e.g. gmail.com */
+  @Prop({ type: [String], default: [] })
+  allowlist!: string[];
+
+  @Prop({ type: [String], default: [] })
+  blocklist!: string[];
+
+  /** Admin saved email domain policy; skips auto default allowlist seed. */
+  @Prop({ default: false })
+  customized!: boolean;
+}
+
 /**
  * Singleton platform security configuration. Env vars seed defaults; admin
  * overrides persist here and apply at runtime (rate limits, captcha, activity).
@@ -117,6 +134,9 @@ export class SecuritySettings {
 
   @Prop({ type: AuditSettingsDoc, default: () => ({}) })
   audit!: AuditSettingsDoc;
+
+  @Prop({ type: EmailDomainPolicyDoc, default: () => ({}) })
+  emailDomains!: EmailDomainPolicyDoc;
 
   updatedAt?: Date;
 }

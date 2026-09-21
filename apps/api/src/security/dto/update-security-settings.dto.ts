@@ -1,14 +1,19 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+const EMAIL_DOMAIN_PATTERN = /^[a-z0-9.-]+\.[a-z]{2,}$/;
 
 class ThrottleSettingsDto {
   @IsOptional()
@@ -132,6 +137,43 @@ class AuditSettingsDto {
   enabled?: boolean;
 }
 
+class EmailDomainSettingsDto {
+  @IsOptional()
+  @IsBoolean()
+  allowlistEnabled?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => normalizeDomainDtoList(value))
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  @MaxLength(253, { each: true })
+  @Matches(EMAIL_DOMAIN_PATTERN, {
+    each: true,
+    message: 'Each allowlist entry must be a valid domain hostname',
+  })
+  allowlist?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => normalizeDomainDtoList(value))
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  @MaxLength(253, { each: true })
+  @Matches(EMAIL_DOMAIN_PATTERN, {
+    each: true,
+    message: 'Each blocklist entry must be a valid domain hostname',
+  })
+  blocklist?: string[];
+}
+
+function normalizeDomainDtoList(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((entry) =>
+    typeof entry === 'string' ? entry.trim().toLowerCase() : entry,
+  );
+}
+
 export class UpdateSecuritySettingsDto {
   @IsOptional()
   @ValidateNested()
@@ -162,4 +204,9 @@ export class UpdateSecuritySettingsDto {
   @ValidateNested()
   @Type(() => AuditSettingsDto)
   audit?: AuditSettingsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EmailDomainSettingsDto)
+  emailDomains?: EmailDomainSettingsDto;
 }

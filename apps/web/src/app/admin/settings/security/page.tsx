@@ -19,6 +19,7 @@ import {
 } from "@/components/admin/icons";
 import {
   createAccessBlock,
+  getRecommendedEmailDomains,
   getSecurityAdminOverview,
   getSecuritySettings,
   listAccessBlocks,
@@ -38,6 +39,7 @@ type Tab =
   | "overview"
   | "rate-limit"
   | "recaptcha"
+  | "email-domains"
   | "cloudflare"
   | "helmet"
   | "blocks"
@@ -48,6 +50,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "rate-limit", label: "Rate limiting" },
   { id: "recaptcha", label: "reCAPTCHA" },
+  { id: "email-domains", label: "Email domains" },
   { id: "cloudflare", label: "Cloudflare" },
   { id: "helmet", label: "Helmet" },
   { id: "blocks", label: "IP & country blocks" },
@@ -145,10 +148,157 @@ function SecurityOverviewStats({ items }: { items: SecurityOverviewStat[] }) {
 type SecuritySettingsSection =
   | "throttle"
   | "recaptcha"
+  | "emailDomains"
   | "cloudflare"
   | "activity"
   | "helmet"
   | "audit";
+
+const DOMAIN_LINE_PATTERN = /^[a-z0-9.-]+\.[a-z]{2,}$/;
+
+function parseDomainLines(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of text.split(/[\n,;\s]+/)) {
+    const domain = line.trim().toLowerCase();
+    if (!domain || seen.has(domain)) continue;
+    if (!DOMAIN_LINE_PATTERN.test(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
+function emailDomainPolicyStatus(
+  policy: SecuritySettings["emailDomains"],
+): string {
+  if (policy.allowlist.length > 0) {
+    return `Allowlist only · ${policy.allowlist.length} allowed · all others blocked`;
+  }
+  if (policy.blocklist.length > 0) {
+    return `Open · ${policy.blocklist.length} extra blocked`;
+  }
+  return "Open · any email domain";
+}
+
+function EmailDomainListEditor({
+  label,
+  hint,
+  domains,
+  onChange,
+  bulkPlaceholder,
+}: {
+  label: string;
+  hint: string;
+  domains: string[];
+  onChange: (domains: string[]) => void;
+  bulkPlaceholder: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const [bulk, setBulk] = useState("");
+
+  const addDraft = () => {
+    const parsed = parseDomainLines(draft);
+    if (parsed.length === 0) return;
+    const merged = [...domains];
+    const seen = new Set(domains);
+    for (const domain of parsed) {
+      if (seen.has(domain)) continue;
+      seen.add(domain);
+      merged.push(domain);
+    }
+    merged.sort();
+    onChange(merged);
+    setDraft("");
+  };
+
+  const applyBulk = () => {
+    const parsed = parseDomainLines(bulk);
+    if (parsed.length === 0) return;
+    const merged = [...domains];
+    const seen = new Set(domains);
+    for (const domain of parsed) {
+      if (seen.has(domain)) continue;
+      seen.add(domain);
+      merged.push(domain);
+    }
+    merged.sort();
+    onChange(merged);
+    setBulk("");
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/60 bg-white/[0.02] p-4">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="mt-1 text-xs text-subtle">{hint}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {domains.length === 0 ? (
+          <span className="text-xs text-subtle">No domains yet.</span>
+        ) : (
+          domains.map((domain) => (
+            <span
+              key={domain}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-white/[0.04] px-2.5 py-1 font-mono text-xs text-foreground-muted"
+            >
+              {domain}
+              <button
+                type="button"
+                className="text-subtle hover:text-foreground"
+                aria-label={`Remove ${domain}`}
+                onClick={() => onChange(domains.filter((d) => d !== domain))}
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1">
+          <label className={labelCls}>Add domain</label>
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addDraft();
+              }
+            }}
+            className={inputCls}
+            placeholder="gmail.com"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={addDraft}
+          className="btn-secondary shrink-0 px-4 py-2 text-sm"
+        >
+          Add
+        </button>
+      </div>
+      <div>
+        <label className={labelCls}>Bulk paste (one per line)</label>
+        <textarea
+          value={bulk}
+          onChange={(event) => setBulk(event.target.value)}
+          rows={4}
+          className={`${inputCls} font-mono text-xs`}
+          placeholder={bulkPlaceholder}
+        />
+        <button
+          type="button"
+          onClick={applyBulk}
+          className="mt-2 text-xs font-semibold text-teal-400 hover:text-teal-300"
+        >
+          Merge pasted domains
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function patchSettingsSection<K extends SecuritySettingsSection>(
   current: SecuritySettings,
@@ -361,6 +511,7 @@ export default function AdminSecurityPage() {
   const [activityUserId, setActivityUserId] = useState("");
   const [activitySearch, setActivitySearch] = useState("");
   const [secretKey, setSecretKey] = useState("");
+  const [importingDomains, setImportingDomains] = useState(false);
   const [coreLoading, setCoreLoading] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -404,7 +555,14 @@ export default function AdminSecurityPage() {
         getSecuritySettings(),
       ]);
       setOverview(overviewData);
-      setSettings(settingsData);
+      setSettings({
+        ...settingsData,
+        emailDomains: settingsData.emailDomains ?? {
+          allowlistEnabled: false,
+          allowlist: [],
+          blocklist: [],
+        },
+      });
     } catch {
       if (!silent) {
         setOverview(null);
@@ -582,6 +740,38 @@ export default function AdminSecurityPage() {
     },
     [],
   );
+
+  const importRecommendedDomains = useCallback(async () => {
+    if (!settings) return;
+    setImportingDomains(true);
+    hideAdminToast();
+    try {
+      const { domains } = await getRecommendedEmailDomains();
+      const seen = new Set(settings.emailDomains.allowlist);
+      const merged = [...settings.emailDomains.allowlist];
+      for (const domain of domains) {
+        if (seen.has(domain)) continue;
+        seen.add(domain);
+        merged.push(domain);
+      }
+      merged.sort();
+      patchSettings("emailDomains", {
+        allowlist: merged,
+        allowlistEnabled: merged.length > 0,
+      });
+      adminToast(
+        `Merged ${domains.length} recommended domains. Save to apply — only these domains can register.`,
+        true,
+      );
+    } catch (err) {
+      adminToast(
+        err instanceof Error ? err.message : "Import failed.",
+        false,
+      );
+    } finally {
+      setImportingDomains(false);
+    }
+  }, [settings, patchSettings]);
 
   const saveAuditEnabled = useCallback(
     (enabled: boolean) => {
@@ -1116,6 +1306,99 @@ export default function AdminSecurityPage() {
                 >
                   {busy ? "Saving…" : "Save reCAPTCHA"}
                 </button>
+                  </dd>
+                </div>
+              </ProductFormOrderCard>
+            )}
+
+            {tab === "email-domains" && settings && (
+              <ProductFormOrderCard
+                icon={<KeyIcon className="h-4 w-4" />}
+                title="Registration email domains"
+                subtitle={emailDomainPolicyStatus(settings.emailDomains)}
+                className="admin-product-form-section"
+              >
+                <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                  <dt>Policy</dt>
+                  <dd className="admin-product-form-sidebar-fields space-y-3">
+                    <p className="text-sm text-foreground-muted">
+                      Allowlist-এ যে domain গুলো add করবেন, শুধু সেগুলো দিয়ে
+                      register করা যাবে। বাকি সব domain স্বয়ংক্রিয়ভাবে block।
+                      List খালি করলে আবার সব domain open (blocklist ছাড়া)।
+                    </p>
+                    <p className="text-xs text-subtle">
+                      Admin panel থেকে manually customer add করলে এই rule লাগে
+                      না।
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy || importingDomains || coreLoading}
+                      onClick={() => void importRecommendedDomains()}
+                      className="btn-secondary text-sm disabled:opacity-50"
+                    >
+                      {importingDomains
+                        ? "Importing…"
+                        : "Import recommended providers"}
+                    </button>
+                  </dd>
+                </div>
+                <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                  <dt>Allowlist</dt>
+                  <dd className="admin-product-form-sidebar-fields">
+                    <EmailDomainListEditor
+                      label="Allowed domains"
+                      hint="Exact hostname (e.g. yahoo.co.uk). List-এ না থাকলে signup block।"
+                      domains={settings.emailDomains.allowlist}
+                      onChange={(allowlist) =>
+                        patchSettings("emailDomains", {
+                          allowlist,
+                          allowlistEnabled: allowlist.length > 0,
+                        })
+                      }
+                      bulkPlaceholder={"gmail.com\nyahoo.com\noutlook.com"}
+                    />
+                  </dd>
+                </div>
+                <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                  <dt>Blocklist (optional)</dt>
+                  <dd className="admin-product-form-sidebar-fields">
+                    <EmailDomainListEditor
+                      label="Extra blocked domains"
+                      hint="Allowlist খালি থাকলে শুধু এই domain গুলো block। Allowlist active থাকলে allowlist-এর বাইরে যাই block-ই থাকুক।"
+                      domains={settings.emailDomains.blocklist}
+                      onChange={(blocklist) =>
+                        patchSettings("emailDomains", { blocklist })
+                      }
+                      bulkPlaceholder={"tempmail.com\ndisposable.example"}
+                    />
+                  </dd>
+                </div>
+                <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                  <dt>Save</dt>
+                  <dd className="admin-product-form-sidebar-fields">
+                    <button
+                      type="button"
+                      disabled={busy || coreLoading}
+                      onClick={() => {
+                        const { allowlist, blocklist } =
+                          settings.emailDomains;
+                        void save(
+                          {
+                            emailDomains: {
+                              allowlist,
+                              blocklist,
+                              allowlistEnabled: allowlist.length > 0,
+                            },
+                          },
+                          allowlist.length > 0
+                            ? "Saved — only allowlisted domains can register."
+                            : "Email domain policy saved.",
+                        );
+                      }}
+                      className="btn-primary disabled:opacity-50"
+                    >
+                      {busy ? "Saving…" : "Save email domains"}
+                    </button>
                   </dd>
                 </div>
               </ProductFormOrderCard>

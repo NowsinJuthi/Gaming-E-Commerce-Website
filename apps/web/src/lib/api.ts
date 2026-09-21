@@ -1929,7 +1929,17 @@ export interface SecuritySettings {
   audit: {
     enabled: boolean;
   };
+  emailDomains: {
+    allowlistEnabled: boolean;
+    allowlist: string[];
+    blocklist: string[];
+  };
   updatedAt?: string;
+}
+
+export interface RegistrationEmailPolicy {
+  allowlistEnabled: boolean;
+  allowedDomains?: string[];
 }
 
 export interface AuditLogItem {
@@ -1971,6 +1981,23 @@ export function getSecuritySettings(): Promise<SecuritySettings> {
   return authRequest<SecuritySettings>("/security/admin/settings");
 }
 
+export function getRecommendedEmailDomains(): Promise<{ domains: string[] }> {
+  return authRequest<{ domains: string[] }>(
+    "/security/admin/recommended-email-domains",
+  );
+}
+
+export function getRegistrationEmailPolicy(): Promise<RegistrationEmailPolicy> {
+  return fetch(`${API_BASE}/security/registration-email-policy`, {
+    cache: "no-store",
+  }).then(async (res) => {
+    if (!res.ok) {
+      return { allowlistEnabled: false };
+    }
+    return res.json() as Promise<RegistrationEmailPolicy>;
+  });
+}
+
 export function updateSecuritySettings(
   patch: Partial<{
     throttle: Partial<SecuritySettings["throttle"]>;
@@ -1981,6 +2008,7 @@ export function updateSecuritySettings(
     activity: Partial<SecuritySettings["activity"]>;
     helmet: Partial<SecuritySettings["helmet"]>;
     audit: Partial<SecuritySettings["audit"]>;
+    emailDomains: Partial<SecuritySettings["emailDomains"]>;
   }>,
 ): Promise<SecuritySettings> {
   return authRequest<SecuritySettings>("/security/admin/settings", {

@@ -9,6 +9,7 @@ import { CreateAccessBlockDto } from './dto/create-access-block.dto';
 import { QueryAccessBlocksDto } from './dto/query-access-blocks.dto';
 import { UpdateSecuritySettingsDto } from './dto/update-security-settings.dto';
 import { SecurityAdminService } from './security-admin.service';
+import { RECOMMENDED_REGISTRATION_EMAIL_DOMAINS } from './email-domain-presets';
 import { SecuritySettingsService } from './security-settings.service';
 import { RequestWithContext } from './security.types';
 
@@ -35,6 +36,11 @@ export class SecurityAdminController {
   @Patch('settings')
   updateSettings(@Body() dto: UpdateSecuritySettingsDto) {
     return this.settings.updateSettings(dto);
+  }
+
+  @Get('recommended-email-domains')
+  recommendedEmailDomains() {
+    return { domains: [...RECOMMENDED_REGISTRATION_EMAIL_DOMAINS] };
   }
 
   @Get('blocks')

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { registerUser } from "@/lib/api";
+import { getRegistrationEmailPolicy, registerUser } from "@/lib/api";
 import { getRecaptchaToken, warmupRecaptcha } from "@/lib/recaptcha";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/password-rules";
 import {
@@ -43,11 +43,15 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [allowlistActive, setAllowlistActive] = useState(false);
 
   const inputClass = "input-field";
 
   useEffect(() => {
     warmupRecaptcha();
+    getRegistrationEmailPolicy()
+      .then((policy) => setAllowlistActive(Boolean(policy.allowlistEnabled)))
+      .catch(() => setAllowlistActive(false));
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -78,6 +82,11 @@ export default function RegisterPage() {
             <p className="login-page__subtitle">
               Join UniQbd and start shopping digital goods in seconds.
             </p>
+            {allowlistActive ? (
+              <p className="login-page__hint mt-2 text-center">
+                Only approved email providers can register.
+              </p>
+            ) : null}
           </header>
 
           {error && (

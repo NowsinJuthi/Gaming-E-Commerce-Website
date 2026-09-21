@@ -32,6 +32,7 @@ import { RecaptchaService } from './recaptcha.service';
 import { SecurityAdminController } from './security-admin.controller';
 import { SecurityAdminService } from './security-admin.service';
 import { SecurityController } from './security.controller';
+import { EmailDomainPolicyService } from './email-domain-policy.service';
 import { SecuritySettingsService } from './security-settings.service';
 import { AppThrottlerGuard } from './throttler/app-throttler.guard';
 import { RedisThrottlerStorage } from './throttler/redis-throttler.storage';
@@ -71,6 +72,7 @@ import { RedisThrottlerStorage } from './throttler/redis-throttler.storage';
   providers: [
     AccessBlockService,
     SecuritySettingsService,
+    EmailDomainPolicyService,
     SecurityAdminService,
     RecaptchaService,
     RecaptchaGuard,
@@ -86,6 +88,7 @@ import { RedisThrottlerStorage } from './throttler/redis-throttler.storage';
     RecaptchaGuard,
     ActivityService,
     SecuritySettingsService,
+    EmailDomainPolicyService,
   ],
 })
 export class SecurityModule {}

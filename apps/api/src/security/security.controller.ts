@@ -7,6 +7,7 @@ import { AuditService } from '../shared/audit/audit.service';
 import { ActivityService } from './activity.service';
 import { QueryActivityDto } from './dto/query-activity.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
+import { EmailDomainPolicyService } from './email-domain-policy.service';
 import { SecuritySettingsService } from './security-settings.service';
 
 @Controller('security')
@@ -15,12 +16,19 @@ export class SecurityController {
     private readonly audit: AuditService,
     private readonly activity: ActivityService,
     private readonly settings: SecuritySettingsService,
+    private readonly emailDomains: EmailDomainPolicyService,
   ) {}
 
   @Public()
   @Get('recaptcha/site-key')
   recaptchaSiteKey() {
     return this.settings.getPublicRecaptcha();
+  }
+
+  @Public()
+  @Get('registration-email-policy')
+  registrationEmailPolicy() {
+    return this.emailDomains.getPublicRegistrationPolicy();
   }
 
   @UseGuards(RolesGuard)

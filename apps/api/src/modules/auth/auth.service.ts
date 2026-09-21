@@ -48,6 +48,7 @@ import {
   VerifyEmailDto,
   VerifyOtpDto,
 } from './dto';
+import { EmailDomainPolicyService } from '../../security/email-domain-policy.service';
 import { AUTH_NO_ACCOUNT_MESSAGE, AUTH_WRONG_PASSWORD_MESSAGE } from './auth.constants';
 
 const EMAIL_VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes for 6-digit code
@@ -75,9 +76,11 @@ export class AuthService {
     private readonly sessionModel: Model<AuthSessionDocument>,
     @InjectModel(VerificationToken.name)
     private readonly tokenModel: Model<VerificationTokenDocument>,
+    private readonly emailDomainPolicy: EmailDomainPolicyService,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResult> {
+    await this.emailDomainPolicy.assertRegistrationAllowed(dto.email);
     const [existing, readiness, passwordHash] = await Promise.all([
       this.users.findByEmail(dto.email),
       this.mail.getAuthEmailReadiness(),

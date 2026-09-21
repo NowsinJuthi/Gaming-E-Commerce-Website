@@ -13,9 +13,13 @@ import {
   SecuritySettingsDocument,
 } from '../database/schemas/security-settings.schema';
 import { UpdateSecuritySettingsDto } from './dto/update-security-settings.dto';
+import { RECOMMENDED_REGISTRATION_EMAIL_DOMAINS } from './email-domain-presets';
 
 const SETTINGS_KEY = 'global';
 const CACHE_MS = 30_000;
+const DEFAULT_REGISTRATION_EMAIL_ALLOWLIST = [
+  ...RECOMMENDED_REGISTRATION_EMAIL_DOMAINS,
+];
 
 export interface EffectiveSecurityConfig {
   throttle: {
@@ -52,6 +56,11 @@ export interface EffectiveSecurityConfig {
   audit: {
     enabled: boolean;
   };
+  emailDomains: {
+    allowlistEnabled: boolean;
+    allowlist: string[];
+    blocklist: string[];
+  };
 }
 
 export interface SecuritySettingsResponse {
@@ -64,6 +73,7 @@ export interface SecuritySettingsResponse {
   activity: EffectiveSecurityConfig['activity'];
   helmet: EffectiveSecurityConfig['helmet'];
   audit: EffectiveSecurityConfig['audit'];
+  emailDomains: EffectiveSecurityConfig['emailDomains'];
   updatedAt?: Date;
 }
 
@@ -113,6 +123,7 @@ export class SecuritySettingsService {
       activity: effective.activity,
       helmet: effective.helmet,
       audit: effective.audit,
+      emailDomains: effective.emailDomains,
       updatedAt: doc.updatedAt,
     };
   }
@@ -143,6 +154,22 @@ export class SecuritySettingsService {
     if (dto.audit) {
       Object.assign(doc.audit, dto.audit);
     }
+    if (dto.emailDomains) {
+      doc.emailDomains.customized = true;
+      const { allowlist, blocklist, allowlistEnabled } = dto.emailDomains;
+      if (allowlist !== undefined) {
+        doc.emailDomains.allowlist = normalizeDomainList(allowlist);
+      }
+      if (blocklist !== undefined) {
+        doc.emailDomains.blocklist = normalizeDomainList(blocklist);
+      }
+      if (allowlist !== undefined) {
+        doc.emailDomains.allowlistEnabled =
+          doc.emailDomains.allowlist.length > 0;
+      } else if (allowlistEnabled !== undefined) {
+        doc.emailDomains.allowlistEnabled = allowlistEnabled;
+      }
+    }
     await doc.save();
     this.invalidateCache();
     return this.getSettingsResponse();
@@ -163,7 +190,17 @@ export class SecuritySettingsService {
     const doc = await this.settingsModel
       .findOneAndUpdate(
         { key: SETTINGS_KEY },
-        { $setOnInsert: { key: SETTINGS_KEY } },
+        {
+          $setOnInsert: {
+            key: SETTINGS_KEY,
+            emailDomains: {
+              allowlist: DEFAULT_REGISTRATION_EMAIL_ALLOWLIST,
+              blocklist: [],
+              allowlistEnabled: true,
+              customized: false,
+            },
+          },
+        },
         { upsert: true, new: true },
       )
       .select('+recaptcha.secretKey')
@@ -171,6 +208,30 @@ export class SecuritySettingsService {
     if (!doc) {
       throw new Error('Failed to load security settings');
     }
+    return this.ensureDefaultEmailAllowlist(doc);
+  }
+
+  private async ensureDefaultEmailAllowlist(
+    doc: SecuritySettingsDocument,
+  ): Promise<SecuritySettingsDocument> {
+    if (!doc.emailDomains) {
+      doc.emailDomains = {
+        allowlist: [],
+        blocklist: [],
+        allowlistEnabled: false,
+        customized: false,
+      } as SecuritySettingsDocument['emailDomains'];
+    }
+    if (doc.emailDomains.customized) {
+      return doc;
+    }
+    if ((doc.emailDomains.allowlist?.length ?? 0) > 0) {
+      return doc;
+    }
+    doc.emailDomains.allowlist = [...DEFAULT_REGISTRATION_EMAIL_ALLOWLIST];
+    doc.emailDomains.allowlistEnabled = true;
+    await doc.save();
+    this.invalidateCache();
     return doc;
   }
 
@@ -234,6 +295,24 @@ export class SecuritySettingsService {
       audit: {
         enabled: doc.audit.enabled ?? true,
       },
+      emailDomains: {
+        allowlist: normalizeDomainList(doc.emailDomains?.allowlist ?? []),
+        blocklist: normalizeDomainList(doc.emailDomains?.blocklist ?? []),
+        allowlistEnabled:
+          normalizeDomainList(doc.emailDomains?.allowlist ?? []).length > 0,
+      },
     };
   }
+}
+
+function normalizeDomainList(domains: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of domains) {
+    const domain = raw.trim().toLowerCase();
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
 }
