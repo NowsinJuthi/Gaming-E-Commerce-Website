@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -69,7 +70,11 @@ import {
   parseQuickReplyTrigger,
 } from "@/lib/chat-quick-reply-autocomplete";
 import { resolveMediaSrc } from "@/lib/site-appearance";
-import { isChatStaffRole, primaryChatRole } from "@/lib/chat-roles";
+import {
+  isChatStaffFromRoles,
+  isChatStaffRole,
+  primaryChatRole,
+} from "@/lib/chat-roles";
 import type { Socket } from "socket.io-client";
 
 type Props = {
@@ -1211,6 +1216,13 @@ export function ChatPanel({
         meRoleRef.current = primaryChatRole(me.roles);
         setMeId(me.id);
 
+        if (!isAdmin && isChatStaffFromRoles(me.roles)) {
+          if (typeof window !== "undefined") {
+            window.location.assign("/admin/chat");
+          }
+          return;
+        }
+
         const [on, list] = await Promise.all([
           isAdmin ? getOnlineUsers() : Promise.resolve([] as string[]),
           isAdmin ? loadRooms() : Promise.resolve([] as ChatRoom[]),
@@ -2101,6 +2113,13 @@ export function ChatPanel({
         {error && (
           <div className="mx-4 mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
             {error}
+            {error.includes("Admin") && error.includes("Live Chat") ? (
+              <p className="mt-2">
+                <Link href="/admin/chat" className="font-semibold underline">
+                  Open Admin Live Chat
+                </Link>
+              </p>
+            ) : null}
           </div>
         )}
 

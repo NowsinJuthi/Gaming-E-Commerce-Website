@@ -10,6 +10,10 @@ export function isChatStaffRole(role?: string | null): boolean {
   return CHAT_STAFF_ROLE_SET.has(String(role ?? "").toLowerCase());
 }
 
+export function isChatStaffFromRoles(roles: string[]): boolean {
+  return roles.some((role) => isChatStaffRole(role));
+}
+
 /** Primary role stored on chat messages — mirrors API `primaryRole()`. */
 export function primaryChatRole(roles: string[]): string {
   if (roles.some((r) => r === "administrator" || r === "admin")) {
