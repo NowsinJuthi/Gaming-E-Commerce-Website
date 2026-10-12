@@ -140,37 +140,37 @@ export class MediaOpsController {
     return this.media.removeLibrary(id);
   }
 
-  @Get('admin/smb-servers')
+  @Get('admin/media-shares')
   listServers() {
     return this.media.listServers();
   }
 
-  @Post('admin/smb-servers')
+  @Post('admin/media-shares')
   createServer(@Body() body: SmbBody) {
     return this.media.createServer(body);
   }
 
-  @Post('admin/smb-servers/libraries')
+  @Post('admin/media-shares/libraries')
   addShareLibrary(@Body() body: AddShareLibraryBody) {
     return this.media.addLibraryFromShare(body);
   }
 
-  @Post('admin/smb-servers/:id/credentials')
+  @Post('admin/media-shares/:id/credentials')
   savePassword(@Param('id') id: string, @Body() body: PasswordBody) {
     return this.media.savePassword(id, body.password);
   }
 
-  @Delete('admin/smb-servers/:id')
+  @Delete('admin/media-shares/:id')
   removeServer(@Param('id') id: string) {
     return this.media.removeServer(id);
   }
 
-  @Post('admin/smb-servers/:id/test')
+  @Post('admin/media-shares/:id/test')
   testServer(@Param('id') id: string) {
     return this.media.testServer(id);
   }
 
-  @Get('admin/smb-servers/:id/browse')
+  @Get('admin/media-shares/:id/browse')
   browse(@Param('id') id: string, @Query('path') path?: string) {
     return this.media.browse(id, path ?? '');
   }

@@ -78,7 +78,7 @@ export function deleteMediaLibrary(id: string) {
 }
 
 export function listSmbServers() {
-  return authRequest<{ servers: AdminSmbServer[] }>("/admin/smb-servers");
+  return authRequest<{ servers: AdminSmbServer[] }>("/admin/media-shares");
 }
 
 export function createSmbServer(body: {
@@ -90,28 +90,28 @@ export function createSmbServer(body: {
   domain?: string;
   share: string;
 }) {
-  return authRequest<AdminSmbServer>("/admin/smb-servers", {
+  return authRequest<AdminSmbServer>("/admin/media-shares", {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export function saveSmbPassword(id: string, password: string) {
-  return authRequest<AdminSmbServer>(`/admin/smb-servers/${id}/credentials`, {
+  return authRequest<AdminSmbServer>(`/admin/media-shares/${id}/credentials`, {
     method: "POST",
     body: JSON.stringify({ password }),
   });
 }
 
 export function deleteSmbServer(id: string) {
-  return authRequest<{ deleted: boolean }>(`/admin/smb-servers/${id}`, {
+  return authRequest<{ deleted: boolean }>(`/admin/media-shares/${id}`, {
     method: "DELETE",
   });
 }
 
 export function testSmbServer(id: string) {
   return authRequest<{ ok: boolean; error?: string | null }>(
-    `/admin/smb-servers/${id}/test`,
+    `/admin/media-shares/${id}/test`,
     { method: "POST" },
   );
 }
@@ -119,7 +119,7 @@ export function testSmbServer(id: string) {
 export function browseSmb(id: string, path = "") {
   const qs = path ? `?path=${encodeURIComponent(path)}` : "";
   return authRequest<{ path: string; entries: SmbBrowseEntry[] }>(
-    `/admin/smb-servers/${id}/browse${qs}`,
+    `/admin/media-shares/${id}/browse${qs}`,
   );
 }
 
@@ -129,7 +129,7 @@ export function addSmbLibrary(body: {
   name: string;
   kind: MediaLibraryKind;
 }) {
-  return authRequest<AdminMediaLibrary>("/admin/smb-servers/libraries", {
+  return authRequest<AdminMediaLibrary>("/admin/media-shares/libraries", {
     method: "POST",
     body: JSON.stringify(body),
   });
