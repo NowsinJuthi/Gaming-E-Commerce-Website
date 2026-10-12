@@ -5487,29 +5487,38 @@ export async function fetchFullChatHistory(roomId: string): Promise<ChatHistory>
   return { items, total, page: 1, limit: items.length };
 }
 
-/** Customer threads may span duplicate support rooms — merge like admin full-room view. */
+const CUSTOMER_SUPPORT_ROOM_MERGE_LIMIT = 5;
+
+/** Customer threads may span a few duplicate support rooms — merge without blocking the UI. */
 export async function fetchMergedCustomerSupportHistory(
   canonicalRoomId: string,
 ): Promise<ChatHistory> {
-  const rooms = await listChatRooms(1, 50);
   const roomIds = new Set<string>([canonicalRoomId]);
-  for (const room of rooms) {
-    const id = roomId(room);
-    if (id) roomIds.add(id);
+  try {
+    const rooms = await listChatRooms(1, CUSTOMER_SUPPORT_ROOM_MERGE_LIMIT);
+    for (const room of rooms) {
+      const id = roomId(room);
+      if (id) roomIds.add(id);
+    }
+  } catch {
+    /* canonical room history still loads */
   }
 
+  const histories = await Promise.all(
+    [...roomIds].map((rid) =>
+      fetchFullChatHistory(rid).catch(
+        (): ChatHistory => ({ items: [], total: 0, page: 1, limit: 0 }),
+      ),
+    ),
+  );
+
   const byId = new Map<string, ChatMessage>();
-  for (const rid of roomIds) {
-    try {
-      const hist = await fetchFullChatHistory(rid);
-      for (const message of hist.items) {
-        const key = String(message.id ?? message._id ?? "");
-        if (key && !byId.has(key)) {
-          byId.set(key, message);
-        }
+  for (const hist of histories) {
+    for (const message of hist.items) {
+      const key = String(message.id ?? message._id ?? "");
+      if (key && !byId.has(key)) {
+        byId.set(key, message);
       }
-    } catch {
-      /* skip unreachable duplicate room */
     }
   }
 

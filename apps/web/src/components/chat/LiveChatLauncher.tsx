@@ -62,7 +62,6 @@ export function LiveChatLauncher({
   const [guestError, setGuestError] = useState<string | null>(null);
   const [refreshingChat, setRefreshingChat] = useState(false);
   const [supportAgents, setSupportAgents] = useState<ChatSupportAgent[]>([]);
-  const [chatPanelKey, setChatPanelKey] = useState(0);
   const chatRefreshRef = useRef<(() => Promise<void>) | null>(null);
 
   const onChatRefreshReady = useCallback(
@@ -142,12 +141,6 @@ export function LiveChatLauncher({
 
   useEffect(() => {
     if (!open) setMobileThreadOpen(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      setChatPanelKey((key) => key + 1);
-    }
   }, [open]);
 
   useChatOverlayLock(open);
@@ -354,7 +347,6 @@ export function LiveChatLauncher({
                   </div>
                 ) : isStaff ? (
                   <ChatPanel
-                    key={chatPanelKey}
                     isAdmin
                     pro
                     messenger
@@ -367,7 +359,6 @@ export function LiveChatLauncher({
                   />
                 ) : (
                   <ChatPanel
-                    key={chatPanelKey}
                     embedded
                     messenger
                     onMessengerMobileViewChange={(view) =>

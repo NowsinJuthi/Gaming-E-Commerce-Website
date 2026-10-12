@@ -792,6 +792,9 @@ export function ChatPanel({
     [joinActiveSocketRoom, markRoomRead, scheduleScrollBottom],
   );
 
+  const selectRoomRef = useRef(selectRoom);
+  selectRoomRef.current = selectRoom;
+
   const syncActiveRoomMessages = useCallback(async () => {
     const rid = activeIdRef.current;
     if (!rid) return;
@@ -1204,12 +1207,13 @@ export function ChatPanel({
           const targetId = initialRoomIdRef.current?.trim();
           const skipDefault =
             shouldSkipMessengerAutoSelect(isAdmin, messenger) && !targetId;
+          if (!cancelled) setLoading(false);
           if (list.length > 0 && !skipDefault) {
             const target = targetId
               ? (list.find((room) => sameId(roomId(room), targetId)) ?? list[0])
               : list[0];
             if (target) {
-              await selectRoom(target);
+              await selectRoomRef.current(target);
             }
           }
         } else {
@@ -1221,11 +1225,13 @@ export function ChatPanel({
             participants: room.participants ?? [],
           };
           setRooms([normalized]);
-          await selectRoom(normalized);
+          if (!cancelled) setLoading(false);
+          await selectRoomRef.current(normalized);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load chat");
+          setLoading(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -1234,17 +1240,7 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [
-    isAdmin,
-    messenger,
-    initialRoomId,
-    onOverviewChange,
-    refreshOverview,
-    showConfig,
-    loadRooms,
-    selectRoom,
-    applySupportAgents,
-  ]);
+  }, [isAdmin, messenger, initialRoomId, loadRooms, applySupportAgents]);
 
   useEffect(() => {
     if (!messenger || !onMessengerMobileViewChange || !isMobileMessenger)
