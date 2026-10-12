@@ -35,8 +35,14 @@ export class SmbClientService {
   private async createClient(auth: SmbAuth): Promise<Smb2Client> {
     let SMB2: new (options: Record<string, unknown>) => Smb2Client;
     try {
-      const mod = await import('@marsaud/smb2');
-      SMB2 = (mod.default ?? mod) as new (options: Record<string, unknown>) => Smb2Client;
+      const mod = (await import('@marsaud/smb2')) as {
+        default?: new (options: Record<string, unknown>) => Smb2Client;
+      };
+      const ctor = mod.default;
+      if (!ctor) {
+        throw new Error('Samba client module did not export a constructor.');
+      }
+      SMB2 = ctor;
     } catch {
       throw new Error(
         'Samba client is not installed. Run pnpm --filter @uniqbd/api add @marsaud/smb2',
