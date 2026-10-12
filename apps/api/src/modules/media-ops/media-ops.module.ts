@@ -14,6 +14,7 @@ import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { MediaOpsController } from './media-ops.controller';
 import { MediaOpsService } from './media-ops.service';
+import { LibraryIndexService } from './library-index.service';
 import { SmbClientService } from './smb-client.service';
 
 @Module({
@@ -26,6 +27,6 @@ import { SmbClientService } from './smb-client.service';
     CryptoModule,
   ],
   controllers: [MediaOpsController, CatalogController],
-  providers: [MediaOpsService, SmbClientService, CatalogService],
+  providers: [MediaOpsService, SmbClientService, CatalogService, LibraryIndexService],
 })
 export class MediaOpsModule {}

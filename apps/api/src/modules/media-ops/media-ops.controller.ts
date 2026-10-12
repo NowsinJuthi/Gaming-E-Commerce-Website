@@ -15,6 +15,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { MEDIA_LIBRARY_KINDS, type MediaLibraryKind } from '../../database/schemas/media-library.schema';
+import { LibraryIndexService } from './library-index.service';
 import { MediaOpsService } from './media-ops.service';
 
 class LibraryBody {
@@ -118,7 +119,10 @@ class AddShareLibraryBody {
 @UseGuards(RolesGuard)
 @Roles(Role.Administrator, Role.Admin)
 export class MediaOpsController {
-  constructor(private readonly media: MediaOpsService) {}
+  constructor(
+    private readonly media: MediaOpsService,
+    private readonly index: LibraryIndexService,
+  ) {}
 
   @Get('admin/libraries')
   listLibraries() {
@@ -128,6 +132,11 @@ export class MediaOpsController {
   @Post('admin/libraries')
   createLibrary(@Body() body: LibraryBody) {
     return this.media.createLibrary(body);
+  }
+
+  @Post('admin/libraries/:id/index')
+  indexLibrary(@Param('id') id: string) {
+    return this.index.syncLibrary(id);
   }
 
   @Patch('admin/libraries/:id')

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -6,6 +6,7 @@ import {
   CatalogTitle,
   CatalogTitleDocument,
 } from '../../database/schemas/catalog-title.schema';
+import { LibraryIndexService } from './library-index.service';
 
 export type CatalogBulkAction =
   | 'publish'
@@ -33,12 +34,19 @@ function serialize(doc: CatalogTitleDocument) {
 
 @Injectable()
 export class CatalogService {
+  private readonly logger = new Logger(CatalogService.name);
+
   constructor(
     @InjectModel(CatalogTitle.name)
     private readonly titles: Model<CatalogTitleDocument>,
+    private readonly index: LibraryIndexService,
   ) {}
 
   async list(kind: CatalogKind, q?: string) {
+    await this.index.sync(kind).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Could not read media libraries.';
+      this.logger.warn(message);
+    });
     const filter: Record<string, unknown> = { kind };
     const term = q?.trim();
     if (term) {

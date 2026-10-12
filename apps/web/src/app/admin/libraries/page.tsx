@@ -7,6 +7,7 @@ import styles from "@/components/admin/libraries-page.module.css";
 import {
   createMediaLibrary,
   deleteMediaLibrary,
+  indexMediaLibrary,
   listMediaLibraries,
   updateMediaLibrary,
   type AdminMediaLibrary,
@@ -76,7 +77,21 @@ export default function AdminLibrariesPage() {
       icon={LayersIcon}
       action={
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={styles.headerBtn} onClick={() => setScanNote("Full scan")}>
+          <button
+            type="button"
+            className={styles.headerBtn}
+            onClick={() => {
+              setScanNote("Full scan");
+              void Promise.all(libraries.map((library) => indexMediaLibrary(library.id)))
+                .then(async () => {
+                  setScanNote("Full scan completed");
+                  await reload();
+                })
+                .catch((err: unknown) =>
+                  setError(err instanceof Error ? err.message : "Could not scan libraries."),
+                );
+            }}
+          >
             Full scan
           </button>
           <button type="button" className={styles.headerBtn} onClick={() => setScanNote("Last 24h scan")}>
@@ -212,7 +227,20 @@ export default function AdminLibrariesPage() {
                     <button type="button" onClick={() => setSelectedId(library.id)}>
                       Items
                     </button>
-                    <button type="button" onClick={() => setScanNote(`Full scan · ${library.name}`)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScanNote(`Full scan · ${library.name}`);
+                        void indexMediaLibrary(library.id)
+                          .then(async (result) => {
+                            setScanNote(`Full scan completed · ${result.indexed} titles`);
+                            await reload();
+                          })
+                          .catch((err: unknown) =>
+                            setError(err instanceof Error ? err.message : "Could not scan library."),
+                          );
+                      }}
+                    >
                       Full scan
                     </button>
                     <button type="button" onClick={() => setScanNote(`Last 24h scan · ${library.name}`)}>
@@ -267,7 +295,7 @@ export default function AdminLibrariesPage() {
               </button>
             </div>
             <div className={styles.logs}>
-              <div>Folder scanning is not connected on this website yet.</div>
+              <div>Reading library folders into Movie collections and Series collections.</div>
             </div>
           </section>
         ) : null}

@@ -17,6 +17,7 @@ export type SmbListedEntry = {
   name: string;
   path: string;
   isDirectory: boolean;
+  sizeBytes: number | null;
 };
 
 type Smb2Client = {
@@ -79,6 +80,7 @@ export class SmbClientService {
         name,
         path: rel.replace(/\\/g, '/'),
         isDirectory,
+        sizeBytes: parsed.sizeBytes,
       });
     }
     if (entries.length === 0 && /NT_STATUS_/.test(output)) {
@@ -244,17 +246,19 @@ export class SmbClientService {
   /** smbclient `ls` lines are not grepable; `-g` does not apply to directory listings. */
   private parseSmbclientLsLine(
     line: string,
-  ): { name: string; isDirectory: boolean } | null {
+  ): { name: string; isDirectory: boolean; sizeBytes: number } | null {
     if (/blocks of size|blocks available|^Domain=\[/i.test(line)) return null;
     const human = line.match(
       /^\s{2}(.+?)\s+([ADHSRN]+)\s+(\d+)\s+\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\s*$/,
     );
     const name = human?.[1]?.trim();
     const modes = human?.[2];
+    const size = Number(human?.[3]);
     if (!name || !modes) return null;
     return {
       name,
       isDirectory: modes.includes('D'),
+      sizeBytes: Number.isFinite(size) ? size : 0,
     };
   }
 
@@ -374,6 +378,7 @@ export class SmbClientService {
           name,
           path: full.replace(/\\/g, '/'),
           isDirectory,
+          sizeBytes: null,
         });
       }
       entries.sort((a, b) => {

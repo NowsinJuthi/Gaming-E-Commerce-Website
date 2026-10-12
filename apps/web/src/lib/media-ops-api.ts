@@ -71,6 +71,12 @@ export function updateMediaLibrary(
   });
 }
 
+export function indexMediaLibrary(id: string) {
+  return authRequest<{ indexed: number }>(`/admin/libraries/${id}/index`, {
+    method: "POST",
+  });
+}
+
 export function deleteMediaLibrary(id: string) {
   return authRequest<{ deleted: boolean }>(`/admin/libraries/${id}`, {
     method: "DELETE",

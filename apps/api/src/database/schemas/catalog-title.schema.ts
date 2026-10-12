@@ -38,8 +38,13 @@ export class CatalogTitle {
 
   @Prop({ type: Number, default: null })
   seasonCount?: number | null;
+
+  /** Stable id for a file or folder imported from a media library. */
+  @Prop({ type: String })
+  sourceKey?: string;
 }
 
 export type CatalogTitleDocument = HydratedDocument<CatalogTitle>;
 export const CatalogTitleSchema = SchemaFactory.createForClass(CatalogTitle);
 CatalogTitleSchema.index({ kind: 1, title: 1 });
+CatalogTitleSchema.index({ sourceKey: 1 }, { unique: true, sparse: true });

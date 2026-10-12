@@ -41,6 +41,9 @@ export class MediaLibrary {
 
   @Prop({ default: 0 })
   unmatchedCount!: number;
+
+  @Prop({ type: Date, default: null })
+  lastIndexedAt?: Date | null;
 }
 
 export type MediaLibraryDocument = HydratedDocument<MediaLibrary>;
