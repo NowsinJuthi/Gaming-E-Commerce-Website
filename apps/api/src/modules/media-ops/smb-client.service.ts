@@ -33,10 +33,24 @@ export class SmbClientService {
   }
 
   private async createClient(auth: SmbAuth): Promise<Smb2Client> {
-    let SMB2: new (options: Record<string, unknown>) => Smb2Client;
+    let SMB2: new (options: {
+      share: string;
+      domain: string;
+      username: string;
+      password: string;
+      port?: number;
+      autoCloseTimeout?: number;
+    }) => Smb2Client;
     try {
-      const mod = (await import('@marsaud/smb2')) as {
-        default?: new (options: Record<string, unknown>) => Smb2Client;
+      const mod = (await import('@marsaud/smb2')) as unknown as {
+        default?: new (options: {
+          share: string;
+          domain: string;
+          username: string;
+          password: string;
+          port?: number;
+          autoCloseTimeout?: number;
+        }) => Smb2Client;
       };
       const ctor = mod.default;
       if (!ctor) {
