@@ -711,6 +711,55 @@ export class ChatService {
     }
   }
 
+  /** All support messages for the logged-in customer (merged duplicate rooms). */
+  async getCustomerSupportHistory(
+    user: AuthenticatedUser,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    if (isStaff(user)) {
+      throw new ForbiddenException(
+        "Staff must use Admin → Live Chat for customer conversations",
+      );
+    }
+    const userId = new Types.ObjectId(user.id);
+    const rooms = await this.roomModel
+      .find({
+        type: ChatRoomType.Support,
+        $or: [{ createdBy: userId }, { participants: userId }],
+      })
+      .select("_id")
+      .lean()
+      .exec();
+    const roomIds = rooms.map((room) => room._id);
+    if (!roomIds.length) {
+      return {
+        items: [],
+        total: 0,
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+    }
+    const filter = { roomId: { $in: roomIds } };
+    const { page, limit } = pagination;
+    const [items, total] = await Promise.all([
+      this.messageModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .exec(),
+      this.messageModel.countDocuments(filter).exec(),
+    ]);
+    const ordered = items.reverse();
+    const nameMap = await this.loadSenderNameMap(ordered);
+    return {
+      items: ordered.map((message) => this.serialize(message, nameMap)),
+      total,
+      page,
+      limit,
+    };
+  }
+
   async getHistory(
     user: AuthenticatedUser,
     roomId: string,

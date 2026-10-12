@@ -36,7 +36,7 @@ import {
   deleteChatRoom,
   getChatAdminOverview,
   fetchFullChatHistory,
-  fetchMergedCustomerSupportHistory,
+  fetchFullCustomerSupportHistory,
   getCustomerPanelConfig,
   getMe,
   getOnlineUsers,
@@ -436,7 +436,7 @@ export function ChatPanel({
   }, [applyOverview]);
 
   const useAdminPro = isAdmin && pro;
-  const useCustomerPro = !isAdmin && embedded;
+  const useCustomerPro = !isAdmin && (embedded || messenger);
   const useChatPro = useAdminPro || useCustomerPro;
   const showAverageResponseHeader = Boolean(
     (useChatPro || messenger) && (isAdmin ? active?.customer : true),
@@ -748,7 +748,7 @@ export function ChatPanel({
       try {
         const hist = isAdminRef.current
           ? await fetchFullChatHistory(id)
-          : await fetchMergedCustomerSupportHistory(id);
+          : await fetchFullCustomerSupportHistory();
         if (
           historyLoadSeqRef.current !== loadSeq ||
           activeIdRef.current !== id
@@ -801,7 +801,7 @@ export function ChatPanel({
     try {
       const hist = isAdminRef.current
         ? await fetchFullChatHistory(rid)
-        : await fetchMergedCustomerSupportHistory(rid);
+        : await fetchFullCustomerSupportHistory();
       const normalized = hist.items.map((m) => ({
         ...m,
         id: m.id ?? m._id,

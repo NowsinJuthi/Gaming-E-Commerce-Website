@@ -147,6 +147,16 @@ export class ChatController {
     });
   }
 
+  @Get('rooms/support/history')
+  async customerSupportHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() pagination: ChatHistoryQueryDto,
+  ) {
+    const allowGuestChat = await this.isGuestChatAllowed();
+    this.chat.assertRegisteredChatUser(user, allowGuestChat);
+    return this.chat.getCustomerSupportHistory(user, pagination);
+  }
+
   @Get('rooms/:id/messages')
   async history(
     @CurrentUser() user: AuthenticatedUser,

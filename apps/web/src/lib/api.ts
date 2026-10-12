@@ -5487,47 +5487,32 @@ export async function fetchFullChatHistory(roomId: string): Promise<ChatHistory>
   return { items, total, page: 1, limit: items.length };
 }
 
-const CUSTOMER_SUPPORT_ROOM_MERGE_LIMIT = 5;
-
-/** Customer threads may span a few duplicate support rooms — merge without blocking the UI. */
-export async function fetchMergedCustomerSupportHistory(
-  canonicalRoomId: string,
+export function getCustomerSupportHistory(
+  page = 1,
+  limit = 100,
 ): Promise<ChatHistory> {
-  const roomIds = new Set<string>([canonicalRoomId]);
-  try {
-    const rooms = await listChatRooms(1, CUSTOMER_SUPPORT_ROOM_MERGE_LIMIT);
-    for (const room of rooms) {
-      const id = roomId(room);
-      if (id) roomIds.add(id);
-    }
-  } catch {
-    /* canonical room history still loads */
-  }
-
-  const histories = await Promise.all(
-    [...roomIds].map((rid) =>
-      fetchFullChatHistory(rid).catch(
-        (): ChatHistory => ({ items: [], total: 0, page: 1, limit: 0 }),
-      ),
-    ),
+  return authRequest<ChatHistory>(
+    `/chat/rooms/support/history?page=${page}&limit=${limit}`,
   );
+}
 
-  const byId = new Map<string, ChatMessage>();
-  for (const hist of histories) {
-    for (const message of hist.items) {
-      const key = String(message.id ?? message._id ?? "");
-      if (key && !byId.has(key)) {
-        byId.set(key, message);
-      }
+/** Merged customer support thread (all duplicate rooms) — one fast API query per page. */
+export async function fetchFullCustomerSupportHistory(): Promise<ChatHistory> {
+  const limit = CHAT_HISTORY_PAGE_SIZE;
+  const pageBatches: ChatMessage[][] = [];
+  let total = 0;
+  let page = 1;
+  while (page <= CHAT_HISTORY_MAX_PAGES) {
+    const hist = await getCustomerSupportHistory(page, limit);
+    total = hist.total;
+    pageBatches.push(hist.items);
+    if (page * limit >= total || hist.items.length < limit) {
+      break;
     }
+    page += 1;
   }
-
-  const items = [...byId.values()].sort((a, b) => {
-    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return aTime - bTime;
-  });
-  return { items, total: items.length, page: 1, limit: items.length };
+  const items = pageBatches.reverse().flat();
+  return { items, total, page: 1, limit: items.length };
 }
 
 export function sendChatMessage(
