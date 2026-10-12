@@ -29,8 +29,8 @@ logs/
 !**/*.env.example
 !**/*.env.*.example
 
-# User uploads (product images, logos)
-uploads/
+# User uploads (product images, logos) — repo root only, not apps/api/src/shared/uploads
+/uploads/
 
 # Archives and local scratch files
 *.tar.gz
