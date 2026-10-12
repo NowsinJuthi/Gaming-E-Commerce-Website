@@ -5470,14 +5470,6 @@ export function getChatHistory(
 }
 
 export async function fetchFullChatHistory(roomId: string): Promise<ChatHistory> {
-  try {
-    const single = await getChatHistory(roomId, 1, 500);
-    if (single.items.length >= single.total) {
-      return single;
-    }
-  } catch {
-    // Fall back to paged loads when the server still caps limit at 100.
-  }
   const limit = CHAT_HISTORY_PAGE_SIZE;
   const pageBatches: ChatMessage[][] = [];
   let total = 0;

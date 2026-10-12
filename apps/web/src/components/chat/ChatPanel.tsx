@@ -350,6 +350,8 @@ export function ChatPanel({
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomsReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyCacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  /** Socket may cache a few live messages per room — only skip REST when a full load finished. */
+  const historyFullyLoadedRef = useRef<Set<string>>(new Set());
   // Tracks recently seen message IDs to prevent duplicate sounds/actions when
   // the server emits message:new via multiple channels (room + user + staff).
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
@@ -706,14 +708,14 @@ export function ChatPanel({
     async (room: ChatRoom) => {
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
-      const hasCachedHistory = cached !== undefined;
+      const fullyLoaded = historyFullyLoadedRef.current.has(id);
       if (roomJoinRetryTimerRef.current) {
         clearTimeout(roomJoinRetryTimerRef.current);
         roomJoinRetryTimerRef.current = null;
       }
       roomJoinRetryRef.current = { roomId: id, attempts: 0 };
 
-      if (activeIdRef.current === id && hasCachedHistory) {
+      if (activeIdRef.current === id && fullyLoaded && cached !== undefined) {
         setActive(room);
         setTyping(null);
         setHistoryLoading(false);
@@ -730,17 +732,17 @@ export function ChatPanel({
       setTyping(null);
       joinActiveSocketRoom(id);
 
-      if (hasCachedHistory) {
+      if (fullyLoaded && cached !== undefined) {
         setHistoryLoading(false);
-        setMessages(cached ?? []);
+        setMessages(cached);
         await markRoomRead(id);
         scheduleScrollBottom();
         return;
       }
 
-      setMessages([]);
+      setMessages(cached?.length ? cached : []);
       setHistoryLoading(true);
-      historyCacheRef.current.delete(id);
+      historyFullyLoadedRef.current.delete(id);
 
       try {
         const hist = await fetchFullChatHistory(id);
@@ -761,6 +763,7 @@ export function ChatPanel({
           historyCacheRef.current.get(id) ?? [],
         );
         historyCacheRef.current.set(id, merged);
+        historyFullyLoadedRef.current.add(id);
         setMessages(merged);
         await markRoomRead(id);
         joinActiveSocketRoom(id);
@@ -770,6 +773,7 @@ export function ChatPanel({
           historyLoadSeqRef.current === loadSeq &&
           activeIdRef.current === id
         ) {
+          historyFullyLoadedRef.current.delete(id);
           setMessages([]);
           setError("Failed to load messages for this room.");
         }
@@ -861,6 +865,7 @@ export function ChatPanel({
         if (current) {
           const id = roomId(current);
           historyCacheRef.current.delete(id);
+          historyFullyLoadedRef.current.delete(id);
           const updated = list.find((room) => roomId(room) === id) ?? current;
           await selectRoom(updated);
         }
@@ -869,7 +874,9 @@ export function ChatPanel({
 
       const current = active;
       if (current) {
-        historyCacheRef.current.delete(roomId(current));
+        const rid = roomId(current);
+        historyCacheRef.current.delete(rid);
+        historyFullyLoadedRef.current.delete(rid);
         await selectRoom(current);
         return;
       }
@@ -881,7 +888,9 @@ export function ChatPanel({
         participants: room.participants ?? [],
       };
       setRooms([normalized]);
-      historyCacheRef.current.delete(roomId(normalized));
+      const rid = roomId(normalized);
+      historyCacheRef.current.delete(rid);
+      historyFullyLoadedRef.current.delete(rid);
       await selectRoom(normalized);
     } catch {
       setError("Could not refresh chat.");
@@ -1538,6 +1547,7 @@ export function ChatPanel({
     try {
       await deleteChatRoom(id);
       historyCacheRef.current.delete(id);
+      historyFullyLoadedRef.current.delete(id);
       const list = await loadRooms();
       if (active && roomId(active) === id) {
         activeIdRef.current = "";
@@ -2132,7 +2142,7 @@ export function ChatPanel({
               )}
             </div>
           ) : (
-            messages.map((m) => {
+            messages.map((m, index) => {
               const mine = sameId(String(m.senderId ?? ""), meRef.current);
               const isStaffMsg = isChatStaffRole(m.senderRole);
               const alignRight = isAdmin ? isStaffMsg : mine;
@@ -2167,7 +2177,7 @@ export function ChatPanel({
 
               return (
                 <div
-                  key={m.id ?? m.createdAt}
+                  key={String(m.id ?? m._id ?? `${m.createdAt ?? "m"}-${index}`)}
                   className={`chat-bubble-row${alignRight ? " chat-bubble-row--mine" : " chat-bubble-row--theirs"}`}
                 >
                   {showAvatar ? (
