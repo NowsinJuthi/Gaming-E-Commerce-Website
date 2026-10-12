@@ -8,7 +8,9 @@ import {
   createMediaLibrary,
   deleteMediaLibrary,
   indexMediaLibrary,
+  listLibraryItems,
   listMediaLibraries,
+  type LibraryIndexedItem,
   updateMediaLibrary,
   type AdminMediaLibrary,
   type MediaLibraryKind,
@@ -29,6 +31,8 @@ export default function AdminLibrariesPage() {
   const [editKind, setEditKind] = useState<MediaLibraryKind>("movies");
   const [editRootPath, setEditRootPath] = useState("");
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [scanLogs, setScanLogs] = useState<string[]>([]);
+  const [items, setItems] = useState<LibraryIndexedItem[]>([]);
 
   const reload = useCallback(async () => {
     const data = await listMediaLibraries();
@@ -43,6 +47,30 @@ export default function AdminLibrariesPage() {
       )
       .finally(() => setLoading(false));
   }, [reload]);
+
+  async function runScan(label: string, targets: AdminMediaLibrary[]) {
+    setBusy(true);
+    setError(null);
+    setScanNote(label);
+    setScanLogs(["Reading folders and matching posters…"]);
+    try {
+      const results = [];
+      for (const library of targets) {
+        results.push(await indexMediaLibrary(library.id));
+      }
+      setScanLogs(results.flatMap((result) => result.logs));
+      setScanNote(`${label} completed`);
+      await reload();
+      if (selectedId) {
+        const data = await listLibraryItems(selectedId);
+        setItems(data.items);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not scan libraries.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function openEdit(library: AdminMediaLibrary) {
     setEditing(library);
@@ -77,24 +105,10 @@ export default function AdminLibrariesPage() {
       icon={LayersIcon}
       action={
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={styles.headerBtn}
-            onClick={() => {
-              setScanNote("Full scan");
-              void Promise.all(libraries.map((library) => indexMediaLibrary(library.id)))
-                .then(async () => {
-                  setScanNote("Full scan completed");
-                  await reload();
-                })
-                .catch((err: unknown) =>
-                  setError(err instanceof Error ? err.message : "Could not scan libraries."),
-                );
-            }}
-          >
+          <button type="button" className={styles.headerBtn} disabled={busy} onClick={() => void runScan("Full scan", libraries)}>
             Full scan
           </button>
-          <button type="button" className={styles.headerBtn} onClick={() => setScanNote("Last 24h scan")}>
+          <button type="button" className={styles.headerBtn} disabled={busy} onClick={() => void runScan("Last 24h scan", libraries)}>
             Last 24h Scan
           </button>
         </div>
@@ -224,26 +238,23 @@ export default function AdminLibrariesPage() {
                     <button type="button" onClick={() => openEdit(library)}>
                       Edit
                     </button>
-                    <button type="button" onClick={() => setSelectedId(library.id)}>
-                      Items
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setScanNote(`Full scan · ${library.name}`);
-                        void indexMediaLibrary(library.id)
-                          .then(async (result) => {
-                            setScanNote(`Full scan completed · ${result.indexed} titles`);
-                            await reload();
-                          })
+                        setSelectedId(library.id);
+                        void listLibraryItems(library.id)
+                          .then((data) => setItems(data.items))
                           .catch((err: unknown) =>
-                            setError(err instanceof Error ? err.message : "Could not scan library."),
+                            setError(err instanceof Error ? err.message : "Could not load items."),
                           );
                       }}
                     >
+                      Items
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => void runScan(`Full scan · ${library.name}`, [library])}>
                       Full scan
                     </button>
-                    <button type="button" onClick={() => setScanNote(`Last 24h scan · ${library.name}`)}>
+                    <button type="button" disabled={busy} onClick={() => void runScan(`Last 24h scan · ${library.name}`, [library])}>
                       Last 24h Scan
                     </button>
                     <button
@@ -295,7 +306,11 @@ export default function AdminLibrariesPage() {
               </button>
             </div>
             <div className={styles.logs}>
-              <div>Reading library folders into Movie collections and Series collections.</div>
+              {scanLogs.length === 0 ? (
+                <div>Waiting for scan output…</div>
+              ) : (
+                scanLogs.map((line, index) => <div key={`${index}-${line}`}>{line}</div>)
+              )}
             </div>
           </section>
         ) : null}
@@ -406,9 +421,27 @@ export default function AdminLibrariesPage() {
                     <th>Codec</th>
                   </tr>
                 </thead>
-                <tbody />
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.fileName}</td>
+                      <td>
+                        <span
+                          className={`${styles.statusPill} ${
+                            item.status === "matched" ? styles.statusMatched : styles.statusMissing
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>{item.match}</td>
+                      <td>{item.resolution}</td>
+                      <td>{item.codec}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
-              <p className="px-4 py-8 text-sm text-subtle">No items indexed yet.</p>
+              {items.length === 0 ? <p className="px-4 py-8 text-sm text-subtle">No items indexed yet.</p> : null}
             </div>
           </section>
         ) : null}

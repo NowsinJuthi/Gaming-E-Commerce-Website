@@ -139,6 +139,11 @@ export class MediaOpsController {
     return this.index.syncLibrary(id);
   }
 
+  @Get('admin/libraries/:id/items')
+  libraryItems(@Param('id') id: string) {
+    return this.index.libraryItems(id);
+  }
+
   @Patch('admin/libraries/:id')
   updateLibrary(@Param('id') id: string, @Body() body: LibraryPatchBody) {
     return this.media.updateLibrary(id, body);

@@ -71,10 +71,24 @@ export function updateMediaLibrary(
   });
 }
 
+export type LibraryIndexedItem = {
+  id: string;
+  fileName: string;
+  status: string;
+  match: string;
+  resolution: string;
+  codec: string;
+};
+
 export function indexMediaLibrary(id: string) {
-  return authRequest<{ indexed: number }>(`/admin/libraries/${id}/index`, {
-    method: "POST",
-  });
+  return authRequest<{ indexed: number; matched: number; unmatched: number; logs: string[] }>(
+    `/admin/libraries/${id}/index`,
+    { method: "POST" },
+  );
+}
+
+export function listLibraryItems(id: string) {
+  return authRequest<{ items: LibraryIndexedItem[] }>(`/admin/libraries/${id}/items`);
 }
 
 export function deleteMediaLibrary(id: string) {

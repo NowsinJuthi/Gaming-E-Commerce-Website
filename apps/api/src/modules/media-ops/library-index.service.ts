@@ -7,6 +7,7 @@ import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media
 import { SmbServer, SmbServerDocument } from '../../database/schemas/smb-server.schema';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { SmbClientService, type SmbListedEntry } from './smb-client.service';
+import { TmdbMetadataService } from './tmdb-metadata.service';
 
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const FRESH_MS = 10 * 60 * 1000;
@@ -26,6 +27,7 @@ export class LibraryIndexService {
     private readonly titles: Model<CatalogTitleDocument>,
     private readonly crypto: CryptoService,
     private readonly smb: SmbClientService,
+    private readonly tmdb: TmdbMetadataService,
   ) {}
 
   async sync(kind: CatalogKind): Promise<void> {
@@ -36,7 +38,7 @@ export class LibraryIndexService {
       if (Date.now() > deadline) break;
       if (library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) continue;
       try {
-        await this.indexLibrary(library, kind);
+        await this.indexLibrary(library, kind, false);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Library index failed.';
         this.logger.warn(`Could not index ${library.name}: ${message}`);
@@ -44,32 +46,73 @@ export class LibraryIndexService {
     }
   }
 
-  async syncLibrary(id: string): Promise<{ indexed: number }> {
-    if (!Types.ObjectId.isValid(id)) return { indexed: 0 };
+  async syncLibrary(id: string): Promise<{ indexed: number; matched: number; unmatched: number; logs: string[] }> {
+    const empty = { indexed: 0, matched: 0, unmatched: 0, logs: ['Library not found.'] };
+    if (!Types.ObjectId.isValid(id)) return empty;
     const library = await this.libraries.findById(id).exec();
-    if (!library) return { indexed: 0 };
+    if (!library) return empty;
     const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
-    const indexed = await this.indexLibrary(library, kind);
-    return { indexed };
+    const result = await this.indexLibrary(library, kind, true);
+    return result;
   }
 
-  private async indexLibrary(library: MediaLibraryDocument, kind: CatalogKind): Promise<number> {
+  async libraryItems(id: string) {
+    if (!Types.ObjectId.isValid(id)) return { items: [] };
+    const rows = await this.titles
+      .find({ sourceKey: new RegExp(`^${id}:`) })
+      .sort({ title: 1 })
+      .limit(200)
+      .exec();
+    return {
+      items: rows.map((row) => ({
+        id: String(row._id),
+        fileName: row.videoFileName || row.title,
+        status: row.posterUrl ? 'matched' : 'unmatched',
+        match: row.title,
+        resolution: '—',
+        codec: '—',
+      })),
+    };
+  }
+
+  private async indexLibrary(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    force: boolean,
+  ): Promise<{ indexed: number; matched: number; unmatched: number; logs: string[] }> {
+    if (!force && library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) {
+      return {
+        indexed: library.itemCount,
+        matched: Math.max(0, library.itemCount - library.unmatchedCount),
+        unmatched: library.unmatchedCount,
+        logs: [`${library.name} was scanned recently.`],
+      };
+    }
+    const logs: string[] = [];
+    if (!this.tmdb.enabled()) {
+      logs.push('TMDB_API_KEY is missing, so posters cannot be matched.');
+    }
     const entries = await this.list(library, library.smbRemotePath ?? '');
     const videos = entries.filter((entry) => !entry.isDirectory && this.isVideo(entry.name));
     const folders = entries.filter((entry) => entry.isDirectory);
     let indexed = 0;
+    let matched = 0;
+    let lookups = 0;
+
+    const remember = (didMatch: boolean) => {
+      indexed += 1;
+      if (didMatch) matched += 1;
+    };
 
     if (kind === 'movie' && videos.length > 0 && videos.length >= folders.length) {
       for (const file of videos.slice(0, MAX_TITLES)) {
-        await this.upsertFromFile(library, kind, file);
-        indexed += 1;
+        remember(await this.upsertFromFile(library, kind, file, () => lookups++ < (force ? 12 : 6)));
       }
     } else {
       const source = kind === 'series' ? folders : folders.length > 0 ? folders : videos;
       for (const entry of source.slice(0, MAX_TITLES)) {
-        if (entry.isDirectory) await this.upsertFromFolder(library, kind, entry);
-        else await this.upsertFromFile(library, kind, entry);
-        indexed += 1;
+        if (entry.isDirectory) remember(await this.upsertFromFolder(library, kind, entry, () => lookups++ < (force ? 12 : 6)));
+        else remember(await this.upsertFromFile(library, kind, entry, () => lookups++ < (force ? 12 : 6)));
       }
       if (kind === 'movie') {
         for (const folder of folders.slice(0, ENRICH_LIMIT)) {
@@ -78,49 +121,68 @@ export class LibraryIndexService {
             .filter((entry) => !entry.isDirectory && this.isVideo(entry.name))
             .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
           if (!file) continue;
-          const parsed = this.parseTitle(folder.name);
           await this.titles.updateOne(
             { sourceKey: this.sourceKey(library, folder.path) },
-            {
-              $set: {
-                videoFileName: file.name,
-                videoFileSizeBytes: file.sizeBytes,
-                ...(parsed.year ? { year: parsed.year } : {}),
-              },
-            },
+            { $set: { videoFileName: file.name, videoFileSizeBytes: file.sizeBytes } },
           );
         }
       }
     }
 
+    const unmatched = Math.max(0, indexed - matched);
     library.itemCount = indexed;
+    library.missingCount = 0;
+    library.unmatchedCount = unmatched;
     library.lastIndexedAt = new Date();
     await library.save();
-    return indexed;
+    logs.unshift(
+      `${library.name}: ${indexed} titles, ${matched} matched on TMDB, ${unmatched} without a poster.`,
+    );
+    return { indexed, matched, unmatched, logs };
   }
 
-  private async upsertFromFile(library: MediaLibraryDocument, kind: CatalogKind, file: SmbListedEntry) {
+  private async upsertFromFile(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    file: SmbListedEntry,
+    allowLookup: () => boolean,
+  ): Promise<boolean> {
     const parsed = this.parseTitle(file.name);
+    const meta = allowLookup() ? await this.lookup(kind, parsed.title, parsed.year) : null;
     await this.upsert(library, file.path, {
       kind,
-      title: parsed.title,
-      year: parsed.year ?? new Date().getFullYear(),
+      title: meta?.title || parsed.title,
+      year: meta?.year || parsed.year || new Date().getFullYear(),
       videoFileName: file.name,
       videoFileSizeBytes: file.sizeBytes,
+      posterUrl: meta?.posterUrl ?? null,
       seasonCount: null,
     });
+    return Boolean(meta?.posterUrl);
   }
 
-  private async upsertFromFolder(library: MediaLibraryDocument, kind: CatalogKind, folder: SmbListedEntry) {
+  private async upsertFromFolder(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    folder: SmbListedEntry,
+    allowLookup: () => boolean,
+  ): Promise<boolean> {
     const parsed = this.parseTitle(folder.name);
+    const meta = allowLookup() ? await this.lookup(kind, parsed.title, parsed.year) : null;
     await this.upsert(library, folder.path, {
       kind,
-      title: parsed.title,
-      year: parsed.year ?? new Date().getFullYear(),
+      title: meta?.title || parsed.title,
+      year: meta?.year || parsed.year || new Date().getFullYear(),
       videoFileName: null,
       videoFileSizeBytes: null,
-      seasonCount: kind === 'series' ? null : null,
+      posterUrl: meta?.posterUrl ?? null,
+      seasonCount: null,
     });
+    return Boolean(meta?.posterUrl);
+  }
+
+  private lookup(kind: CatalogKind, title: string, year: number | null) {
+    return kind === 'series' ? this.tmdb.searchSeries(title, year) : this.tmdb.searchMovie(title, year);
   }
 
   private async upsert(
@@ -132,28 +194,34 @@ export class LibraryIndexService {
       year: number;
       videoFileName: string | null;
       videoFileSizeBytes: number | null;
+      posterUrl: string | null;
       seasonCount: number | null;
     },
   ) {
+    const set: Record<string, unknown> = {
+      kind: fields.kind,
+      videoFileName: fields.videoFileName,
+      videoFileSizeBytes: fields.videoFileSizeBytes,
+    };
+    const onInsert: Record<string, unknown> = {
+      published: true,
+      availability: 'available',
+      featured: false,
+      trending: false,
+      seasonCount: fields.seasonCount,
+    };
+    if (fields.posterUrl) {
+      set.title = fields.title;
+      set.year = fields.year;
+      set.posterUrl = fields.posterUrl;
+    } else {
+      onInsert.title = fields.title;
+      onInsert.year = fields.year;
+      onInsert.posterUrl = null;
+    }
     await this.titles.updateOne(
       { sourceKey: this.sourceKey(library, relativePath) },
-      {
-        $setOnInsert: {
-          title: fields.title,
-          year: fields.year,
-          published: true,
-          availability: 'available',
-          featured: false,
-          trending: false,
-          posterUrl: null,
-          seasonCount: fields.seasonCount,
-        },
-        $set: {
-          kind: fields.kind,
-          videoFileName: fields.videoFileName,
-          videoFileSizeBytes: fields.videoFileSizeBytes,
-        },
-      },
+      { $setOnInsert: onInsert, $set: set },
       { upsert: true },
     );
   }

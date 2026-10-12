@@ -152,6 +152,7 @@ export const validationSchema = Joi.object({
   SMTP_FROM_EMAIL: Joi.string().allow('').optional(),
   ADMIN_ALERT_EMAIL: Joi.string().allow('').optional(),
   WEB_APP_URL: Joi.string().allow('').optional(),
+  TMDB_API_KEY: Joi.string().allow('').optional(),
 }).custom((env: Record<string, unknown>, helpers) => {
   if (
     env.NODE_ENV === 'production' &&
