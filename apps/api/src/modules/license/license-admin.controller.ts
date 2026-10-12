@@ -2,14 +2,12 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { UpdateLicenseSettingsDto } from './dto/update-license-settings.dto';
 import { ApplyLicenseKeyDto } from './dto/apply-license-key.dto';
 import { LicenseService } from './license.service';
 
@@ -22,11 +20,6 @@ export class LicenseAdminController {
   @Get('status')
   status() {
     return this.license.getAdminStatus();
-  }
-
-  @Patch('settings')
-  updateSettings(@Body() dto: UpdateLicenseSettingsDto) {
-    return this.license.updateSettings(dto);
   }
 
   @Post('activate')

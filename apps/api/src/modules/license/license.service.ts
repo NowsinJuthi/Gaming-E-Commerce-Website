@@ -106,19 +106,7 @@ export type LicenseAdminStatus = {
 
   missingLicenseKey: boolean;
 
-  missingSiteSecret: boolean;
-
   licenseKeyMasked: string;
-
-  productId: string;
-
-  websiteId: string;
-
-  installationId: string;
-
-  apiUrl: string;
-
-  hasSiteSecret: boolean;
 
   lastValidatedAt: string | null;
 
@@ -204,14 +192,6 @@ export class LicenseService implements OnModuleInit {
 
 
 
-    const productId = this.resolveProductId(doc);
-
-    const websiteId = this.resolveWebsiteId(doc);
-
-    const apiUrl = this.resolveApiUrl(doc);
-
-
-
     if (devBypass) {
 
       const features = this.allFeaturesEnabled();
@@ -240,19 +220,7 @@ export class LicenseService implements OnModuleInit {
 
         missingLicenseKey: !hasKey,
 
-        missingSiteSecret: !hasSecret,
-
         licenseKeyMasked: this.maskLicenseKey(doc.licenseKey),
-
-        productId,
-
-        websiteId,
-
-        installationId: doc.installationId,
-
-        apiUrl,
-
-        hasSiteSecret: hasSecret,
 
         lastValidatedAt: doc.lastValidatedAt?.toISOString() ?? null,
 
@@ -322,19 +290,7 @@ export class LicenseService implements OnModuleInit {
 
       missingLicenseKey: !hasKey,
 
-      missingSiteSecret: !hasSecret,
-
       licenseKeyMasked: this.maskLicenseKey(doc.licenseKey),
-
-      productId,
-
-      websiteId,
-
-      installationId: doc.installationId,
-
-      apiUrl,
-
-      hasSiteSecret: hasSecret,
 
       lastValidatedAt: doc.lastValidatedAt?.toISOString() ?? null,
 
@@ -355,20 +311,6 @@ export class LicenseService implements OnModuleInit {
       })),
 
     };
-
-  }
-
-
-
-  async updateSettings(
-
-    dto: UpdateLicenseSettingsDto,
-
-  ): Promise<LicenseAdminStatus> {
-
-    await this.saveSettings(dto);
-
-    return this.getAdminStatus();
 
   }
 
@@ -428,7 +370,7 @@ export class LicenseService implements OnModuleInit {
 
       throw new ForbiddenException(
 
-        'License server is not configured. Set site secret in license.vendor-config.ts.',
+        'License server is not configured. Contact your hosting administrator.',
 
       );
 
@@ -617,30 +559,6 @@ export class LicenseService implements OnModuleInit {
     if (dto.licenseKey !== undefined) {
 
       doc.licenseKey = dto.licenseKey.trim();
-
-    }
-
-    if (dto.productId !== undefined) {
-
-      doc.productId = dto.productId.trim();
-
-    }
-
-    if (dto.websiteId !== undefined) {
-
-      doc.websiteId = dto.websiteId.trim();
-
-    }
-
-    if (dto.apiUrl !== undefined) {
-
-      doc.apiUrl = dto.apiUrl.trim();
-
-    }
-
-    if (dto.siteSecret !== undefined && dto.siteSecret.trim()) {
-
-      doc.siteSecret = dto.siteSecret.trim();
 
     }
 
@@ -874,7 +792,7 @@ export class LicenseService implements OnModuleInit {
 
       throw new ForbiddenException(
 
-        'Server vendor config is missing. Save the site secret under Admin → Settings → License (stored in MongoDB).',
+        'This server is not ready for license activation. Contact your vendor or hosting administrator.',
 
       );
 
@@ -964,19 +882,19 @@ export class LicenseService implements OnModuleInit {
 
   private resolveApiUrl(doc?: LicenseSettingsDocument): string {
 
-    const fromDoc = doc?.apiUrl?.trim();
-
-    if (fromDoc) {
-
-      return this.normalizeApiUrl(fromDoc);
-
-    }
-
     const vendor = getLicenseVendorConfig().apiUrl?.trim();
 
     if (vendor) {
 
       return this.normalizeApiUrl(vendor);
+
+    }
+
+    const fromDoc = doc?.apiUrl?.trim();
+
+    if (fromDoc) {
+
+      return this.normalizeApiUrl(fromDoc);
 
     }
 
@@ -990,9 +908,9 @@ export class LicenseService implements OnModuleInit {
 
     return (
 
-      doc?.productId?.trim() ||
-
       getLicenseVendorConfig().productId?.trim() ||
+
+      doc?.productId?.trim() ||
 
       'amarpin-pro'
 
@@ -1006,9 +924,9 @@ export class LicenseService implements OnModuleInit {
 
     return (
 
-      doc?.websiteId?.trim() ||
-
       getLicenseVendorConfig().websiteId?.trim() ||
+
+      doc?.websiteId?.trim() ||
 
       ''
 
@@ -1020,15 +938,15 @@ export class LicenseService implements OnModuleInit {
 
   private resolveSiteSecret(doc?: LicenseSettingsDocument): string {
 
-    return (
+    const fromEnv = getLicenseVendorConfig().siteSecret?.trim();
 
-      doc?.siteSecret?.trim() ||
+    if (fromEnv) {
 
-      getLicenseVendorConfig().siteSecret?.trim() ||
+      return fromEnv;
 
-      ''
+    }
 
-    );
+    return doc?.siteSecret?.trim() || '';
 
   }
 
@@ -1084,7 +1002,7 @@ export class LicenseService implements OnModuleInit {
 
     if (!serverReady) {
 
-      return 'Server vendor config is missing. Save the site secret in Admin → License (MongoDB), not in api.env.';
+      return 'This server is not configured for licensing yet. Contact your vendor or hosting administrator.';
 
     }
 

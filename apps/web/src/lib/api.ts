@@ -2437,13 +2437,7 @@ export interface LicenseAdminStatus {
   cached: boolean;
   devBypass?: boolean;
   missingLicenseKey?: boolean;
-  missingSiteSecret?: boolean;
   licenseKeyMasked: string;
-  productId: string;
-  websiteId: string;
-  installationId: string;
-  apiUrl: string;
-  hasSiteSecret: boolean;
   lastValidatedAt: string | null;
   lastValidAt: string | null;
   features: Record<LicenseFeatureKey, boolean>;
@@ -2457,20 +2451,6 @@ export interface LicenseAdminStatus {
 
 export function getLicenseAdminStatus(): Promise<LicenseAdminStatus> {
   return authRequest<LicenseAdminStatus>("/license/admin/status");
-}
-
-export function updateLicenseSettings(body: {
-  licenseKey?: string;
-  productId?: string;
-  websiteId?: string;
-  installationId?: string;
-  siteSecret?: string;
-  apiUrl?: string;
-}): Promise<LicenseAdminStatus> {
-  return authRequest<LicenseAdminStatus>("/license/admin/settings", {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
 }
 
 export function activateLicenseKey(licenseKey: string): Promise<LicenseAdminStatus> {

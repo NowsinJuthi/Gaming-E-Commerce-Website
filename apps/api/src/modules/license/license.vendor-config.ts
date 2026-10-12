@@ -1,7 +1,7 @@
 /**
- * Optional env fallback for license vendor settings. Production should store
- * apiUrl, productId, websiteId, and siteSecret in MongoDB (license_settings)
- * via Admin → License; leave LICENSE_* unset in api.env.
+ * Server-only vendor credentials (never exposed in admin UI or API responses).
+ * Set LICENSE_* in /etc/uniqbd/api.env on production. Legacy MongoDB siteSecret
+ * is read only when env is unset.
  */
 export type LicenseVendorConfig = {
   apiUrl: string;
