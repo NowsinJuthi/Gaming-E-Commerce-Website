@@ -137,18 +137,44 @@ export class ChatService {
     const openFilter = {
       type: ChatRoomType.Support,
       status: ChatRoomStatus.Open,
-      createdBy: userId,
+      $or: [{ createdBy: userId }, { participants: userId }],
     };
     const ownerFilter = {
       type: ChatRoomType.Support,
-      createdBy: userId,
+      $or: [{ createdBy: userId }, { participants: userId }],
     };
 
-    // Prefer the thread with real history (popup/dashboard must not stick to an empty duplicate open room).
-    let room = await this.roomModel
-      .findOne(ownerFilter)
-      .sort({ lastMessageAt: -1, updatedAt: -1 })
+    // Prefer the room with the most messages (empty duplicate open rooms often have a welcome preview only).
+    let room: ChatRoomDocument | null = null;
+    const roomIds = await this.roomModel
+      .find(ownerFilter)
+      .select('_id')
+      .lean()
       .exec();
+    if (roomIds.length > 0) {
+      const busiest = await this.messageModel.aggregate<{
+        _id: Types.ObjectId;
+        c: number;
+      }>([
+        {
+          $match: {
+            roomId: { $in: roomIds.map((row) => row._id) },
+          },
+        },
+        { $group: { _id: '$roomId', c: { $sum: 1 } } },
+        { $sort: { c: -1 } },
+        { $limit: 1 },
+      ]);
+      if (busiest[0]?._id) {
+        room = await this.roomModel.findById(busiest[0]._id).exec();
+      }
+    }
+    if (!room) {
+      room = await this.roomModel
+        .findOne(ownerFilter)
+        .sort({ updatedAt: -1 })
+        .exec();
+    }
 
     if (room && room.status !== ChatRoomStatus.Open) {
       const reopened = await this.roomModel
