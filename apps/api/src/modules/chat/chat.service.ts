@@ -139,31 +139,26 @@ export class ChatService {
       status: ChatRoomStatus.Open,
       createdBy: userId,
     };
+    const ownerFilter = {
+      type: ChatRoomType.Support,
+      createdBy: userId,
+    };
 
+    // Prefer the thread with real history (popup/dashboard must not stick to an empty duplicate open room).
     let room = await this.roomModel
-      .findOne(openFilter)
-      .sort({ updatedAt: -1 })
+      .findOne(ownerFilter)
+      .sort({ lastMessageAt: -1, updatedAt: -1 })
       .exec();
 
-    if (!room) {
-      const existing = await this.roomModel
-        .findOne({
-          type: ChatRoomType.Support,
-          createdBy: userId,
-        })
-        .sort({ updatedAt: -1 })
+    if (room && room.status !== ChatRoomStatus.Open) {
+      const reopened = await this.roomModel
+        .findByIdAndUpdate(
+          room._id,
+          { $set: { status: ChatRoomStatus.Open } },
+          { new: true },
+        )
         .exec();
-
-      if (existing) {
-        const reopened = await this.roomModel
-          .findByIdAndUpdate(
-            existing._id,
-            { $set: { status: ChatRoomStatus.Open } },
-            { new: true },
-          )
-          .exec();
-        room = reopened ?? existing;
-      }
+      room = reopened ?? room;
     }
 
     if (!room) {
