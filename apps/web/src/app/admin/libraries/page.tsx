@@ -5,7 +5,6 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { LayersIcon } from "@/components/admin/icons";
 import styles from "@/components/admin/libraries-page.module.css";
 import {
-  createMediaLibrary,
   deleteMediaLibrary,
   indexMediaLibrary,
   listLibraryItems,
@@ -19,9 +18,6 @@ import {
 export default function AdminLibrariesPage() {
   const [libraries, setLibraries] = useState<AdminMediaLibrary[]>([]);
   const [totals, setTotals] = useState({ items: 0, missing: 0, unmatched: 0 });
-  const [name, setName] = useState("Movies");
-  const [kind, setKind] = useState<MediaLibraryKind>("movies");
-  const [rootPath, setRootPath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -80,21 +76,6 @@ export default function AdminLibrariesPage() {
     setError(null);
   }
 
-  async function onCreate(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await createMediaLibrary({ name, kind, rootPath });
-      setRootPath("");
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add library.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const selected = libraries.find((library) => library.id === selectedId) ?? null;
 
   return (
@@ -137,54 +118,11 @@ export default function AdminLibrariesPage() {
           </div>
         </div>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <div>
-              <h2 className={styles.panelTitle}>Add library</h2>
-              <p className={styles.panelHint}>
-                Point to an absolute folder on this server. Movies and series import on scan.
-              </p>
-            </div>
-          </div>
-          <form className={styles.formGrid} onSubmit={(event) => void onCreate(event)}>
-            <div className={styles.field}>
-              <label htmlFor="lib-name">Name</label>
-              <input id="lib-name" className={styles.inputLike} value={name} onChange={(event) => setName(event.target.value)} required />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="lib-kind">Kind</label>
-              <select
-                id="lib-kind"
-                className={styles.select}
-                value={kind}
-                onChange={(event) => setKind(event.target.value as MediaLibraryKind)}
-              >
-                <option value="movies">Movies</option>
-                <option value="tv">TV</option>
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="lib-root">Media directory</label>
-              <input
-                id="lib-root"
-                className={styles.inputLike}
-                value={rootPath}
-                onChange={(event) => setRootPath(event.target.value)}
-                placeholder="D:\Media\Movies"
-                required
-              />
-            </div>
-            <button type="submit" className={styles.submitBtn} disabled={busy}>
-              {busy ? "Adding..." : "Add library"}
-            </button>
-          </form>
-        </section>
-
         {loading ? (
           <p className="text-sm text-subtle">Loading libraries…</p>
         ) : libraries.length === 0 ? (
           <div className={styles.empty}>
-            <p>No libraries yet. Add a folder above or import one from Samba file manager.</p>
+            <p>No libraries yet. Import a folder from Samba file manager.</p>
           </div>
         ) : (
           <div className={styles.grid}>
