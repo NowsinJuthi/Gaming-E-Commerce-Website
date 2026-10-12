@@ -133,11 +133,18 @@ export class ChatService {
   // --- Rooms ---
 
   async ensureSupportRoom(user: AuthenticatedUser): Promise<ChatRoomDocument> {
+    if (isStaff(user)) {
+      throw new ForbiddenException(
+        "Staff must use Admin → Live Chat for customer conversations",
+      );
+    }
+
     const userId = new Types.ObjectId(user.id);
-    const openFilter = {
+    /** Only this customer's duplicate open rooms — never match staff-as-participant on every room. */
+    const duplicateOpenFilter = {
       type: ChatRoomType.Support,
       status: ChatRoomStatus.Open,
-      $or: [{ createdBy: userId }, { participants: userId }],
+      createdBy: userId,
     };
     const ownerFilter = {
       type: ChatRoomType.Support,
@@ -200,7 +207,7 @@ export class ChatService {
         const code = (error as { code?: number }).code;
         if (code === 11000) {
           room = await this.roomModel
-            .findOne(openFilter)
+            .findOne(duplicateOpenFilter)
             .sort({ updatedAt: -1 })
             .exec();
         } else {
@@ -215,7 +222,7 @@ export class ChatService {
 
     await this.roomModel
       .updateMany(
-        { ...openFilter, _id: { $ne: room._id } },
+        { ...duplicateOpenFilter, _id: { $ne: room._id } },
         { $set: { status: ChatRoomStatus.Closed } },
       )
       .exec();
