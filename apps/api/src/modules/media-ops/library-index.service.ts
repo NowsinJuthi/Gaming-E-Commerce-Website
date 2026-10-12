@@ -89,6 +89,7 @@ export class LibraryIndexService {
       };
     }
     const logs: string[] = [];
+    const lookupDeadline = Date.now() + (force ? 45_000 : 12_000);
     if (!this.tmdb.enabled()) {
       logs.push('TMDB_API_KEY is missing, so posters cannot be matched.');
     }
@@ -106,13 +107,16 @@ export class LibraryIndexService {
 
     if (kind === 'movie' && videos.length > 0 && videos.length >= folders.length) {
       for (const file of videos.slice(0, MAX_TITLES)) {
-        remember(await this.upsertFromFile(library, kind, file, () => lookups++ < (force ? 12 : 6)));
+        remember(await this.upsertFromFile(library, kind, file, () => this.allowLookup(force, lookups++, lookupDeadline)));
       }
     } else {
       const source = kind === 'series' ? folders : folders.length > 0 ? folders : videos;
       for (const entry of source.slice(0, MAX_TITLES)) {
-        if (entry.isDirectory) remember(await this.upsertFromFolder(library, kind, entry, () => lookups++ < (force ? 12 : 6)));
-        else remember(await this.upsertFromFile(library, kind, entry, () => lookups++ < (force ? 12 : 6)));
+        if (entry.isDirectory) {
+          remember(await this.upsertFromFolder(library, kind, entry, () => this.allowLookup(force, lookups++, lookupDeadline)));
+        } else {
+          remember(await this.upsertFromFile(library, kind, entry, () => this.allowLookup(force, lookups++, lookupDeadline)));
+        }
       }
       if (kind === 'movie') {
         for (const folder of folders.slice(0, ENRICH_LIMIT)) {
@@ -135,6 +139,9 @@ export class LibraryIndexService {
     library.unmatchedCount = unmatched;
     library.lastIndexedAt = new Date();
     await library.save();
+    if (this.tmdb.enabled() && Date.now() >= lookupDeadline && unmatched > matched) {
+      logs.push('TMDB time limit reached. Run Full scan again to match the remaining titles.');
+    }
     logs.unshift(
       `${library.name}: ${indexed} titles, ${matched} matched on TMDB, ${unmatched} without a poster.`,
     );
@@ -179,6 +186,11 @@ export class LibraryIndexService {
       seasonCount: null,
     });
     return Boolean(meta?.posterUrl);
+  }
+
+  private allowLookup(force: boolean, used: number, deadline: number): boolean {
+    if (Date.now() >= deadline) return false;
+    return used < (force ? MAX_TITLES : 8);
   }
 
   private lookup(kind: CatalogKind, title: string, year: number | null) {

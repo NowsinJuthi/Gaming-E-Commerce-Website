@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -65,7 +67,11 @@ export class TmdbMetadataService {
   }
 
   private apiKey(): string {
-    return this.config.get<string>('TMDB_API_KEY')?.trim() ?? process.env.TMDB_API_KEY?.trim() ?? '';
+    const configured = this.config.get<string>('TMDB_API_KEY')?.trim();
+    if (configured) return configured;
+    const fromProcess = process.env.TMDB_API_KEY?.trim();
+    if (fromProcess) return fromProcess;
+    return readTmdbKeyFromEnvFiles();
   }
 
   private async getJson<T>(pathAndQuery: string): Promise<T | null> {
@@ -84,4 +90,37 @@ export class TmdbMetadataService {
       return null;
     }
   }
+}
+
+function readTmdbKeyFromEnvFiles(): string {
+  const paths = [
+    join(process.cwd(), '.env'),
+    '/opt/uniqbd.com/apps/api/.env',
+    join(process.cwd(), '..', '.env'),
+  ];
+  let found = '';
+  for (const path of paths) {
+    let text = '';
+    try {
+      text = readFileSync(path, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) continue;
+      if (trimmed.slice(0, eq).trim() !== 'TMDB_API_KEY') continue;
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1).trim();
+      }
+      if (value) found = value;
+    }
+  }
+  return found;
 }

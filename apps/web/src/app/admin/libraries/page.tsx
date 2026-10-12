@@ -27,6 +27,7 @@ export default function AdminLibrariesPage() {
   const [editKind, setEditKind] = useState<MediaLibraryKind>("movies");
   const [editRootPath, setEditRootPath] = useState("");
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [scanStats, setScanStats] = useState({ matched: 0, missing: 0, unmatched: 0 });
   const [scanLogs, setScanLogs] = useState<string[]>([]);
   const [items, setItems] = useState<LibraryIndexedItem[]>([]);
 
@@ -55,6 +56,11 @@ export default function AdminLibrariesPage() {
         results.push(await indexMediaLibrary(library.id));
       }
       setScanLogs(results.flatMap((result) => result.logs));
+      setScanStats({
+        matched: results.reduce((sum, result) => sum + result.matched, 0),
+        missing: 0,
+        unmatched: results.reduce((sum, result) => sum + result.unmatched, 0),
+      });
       setScanNote(`${label} completed`);
       await reload();
       if (selectedId) {
@@ -237,7 +243,9 @@ export default function AdminLibrariesPage() {
             <div className={styles.panelHead}>
               <div>
                 <h2 className={styles.panelTitle}>{scanNote}</h2>
-                <p className={styles.panelHint}>Matched 0 · Missing 0 · Duplicates 0 · Errors 0</p>
+                <p className={styles.panelHint}>
+                  Matched {scanStats.matched} · Missing {scanStats.missing} · Unmatched {scanStats.unmatched}
+                </p>
               </div>
               <button type="button" className={styles.headerBtn} onClick={() => setScanNote(null)}>
                 Close
