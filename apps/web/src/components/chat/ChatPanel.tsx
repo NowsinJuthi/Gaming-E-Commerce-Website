@@ -1393,23 +1393,12 @@ export function ChatPanel({
       }
     }
 
+    // Desktop: Enter sends, Shift+Enter newline. Mobile uses the Send button + enter key for new lines.
     if (
+      !isMobileMessenger &&
       (e.key === "Enter" || e.code === "Enter") &&
       !e.shiftKey &&
       !e.nativeEvent.isComposing
-    ) {
-      e.preventDefault();
-      void send();
-    }
-  }
-
-  function onComposerKeyUp(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (quickReplyOpen) return;
-    if (
-      (e.key === "Enter" || e.code === "Enter") &&
-      !e.shiftKey &&
-      !e.nativeEvent.isComposing &&
-      !e.defaultPrevented
     ) {
       e.preventDefault();
       void send();
@@ -2390,7 +2379,7 @@ export function ChatPanel({
                 autoCorrect="on"
                 autoCapitalize="sentences"
                 spellCheck
-                enterKeyHint="send"
+                enterKeyHint={isMobileMessenger ? "enter" : "send"}
                 inputMode="text"
                 data-1p-ignore
                 data-lpignore="true"
@@ -2398,7 +2387,6 @@ export function ChatPanel({
                 onChange={(e) => onTyping(e.target.value)}
                 onInput={resizeMessageInput}
                 onKeyDown={onComposerKeyDown}
-                onKeyUp={onComposerKeyUp}
                 placeholder={
                   isAdmin && roomClosed
                     ? "Chat closed — type to reopen and reply…"
