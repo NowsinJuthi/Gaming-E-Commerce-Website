@@ -1,10 +1,16 @@
-import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
+import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
 
 const TMDB_API = 'https://api.themoviedb.org';
 const TMDB_IMAGE = 'https://image.tmdb.org/t/p/w500';
+const POSTER_WIDTH = 480;
+const POSTER_HEIGHT = 720;
+const POSTER_QUALITY = 68;
 
 export type TmdbMatch = {
   title: string;
@@ -59,11 +65,48 @@ export class TmdbMetadataService {
     }
     const date = kind === 'movie' ? hit.release_date : hit.first_air_date;
     const parsedYear = date ? Number(date.slice(0, 4)) : null;
+    const posterUrl = hit.poster_path ? await this.savePoster(hit.poster_path) : null;
     return {
       title: name,
       year: Number.isFinite(parsedYear) ? parsedYear : null,
-      posterUrl: hit.poster_path ? `${TMDB_IMAGE}${hit.poster_path}` : null,
+      posterUrl,
     };
+  }
+
+  private async savePoster(posterPath: string): Promise<string | null> {
+    const safe = posterPath.trim();
+    if (!safe.startsWith('/') || safe.includes('..') || safe.includes('\\')) return null;
+    const filename = `${createHash('sha1').update(safe).digest('hex').slice(0, 20)}.webp`;
+    const dir = join(resolveUploadsRoot(), 'posters');
+    const output = join(dir, filename);
+    const prefix = (this.config.get<string>('app.globalPrefix') ?? 'api').replace(/^\/+|\/+$/g, '');
+    const publicUrl = `/${prefix}/uploads/posters/${filename}`;
+    if (existsSync(output)) return publicUrl;
+    try {
+      mkdirSync(dir, { recursive: true });
+      const response = await fetch(`${TMDB_IMAGE}${safe}`, {
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!response.ok) {
+        this.logger.warn(`TMDB poster responded ${response.status}`);
+        return null;
+      }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length < 32 || bytes.length > 8_000_000) return null;
+      await sharp(bytes)
+        .rotate()
+        .resize(POSTER_WIDTH, POSTER_HEIGHT, {
+          fit: 'inside',
+          withoutEnlargement: true,
+          kernel: sharp.kernel.lanczos3,
+        })
+        .webp({ quality: POSTER_QUALITY, effort: 4, smartSubsample: true })
+        .toFile(output);
+      return publicUrl;
+    } catch (error) {
+      this.logger.warn(`Could not save poster: ${error instanceof Error ? error.message : 'error'}`);
+      return null;
+    }
   }
 
   private apiKey(): string {
