@@ -20,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/var/lib/uniqbd/uploads
+ReadWritePaths=/opt/uniqbd/uploads
 UMask=0027
 
 [Install]

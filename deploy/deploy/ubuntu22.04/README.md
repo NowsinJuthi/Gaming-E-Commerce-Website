@@ -27,7 +27,7 @@ sudo bash deploy/deploy/ubuntu22.04/migrate-from-aapanel.sh "$PWD"
 ```
 
 The migration copies application files to `/opt/uniqbd/current`, moves uploads
-to `/var/lib/uniqbd/uploads`, migrates existing env files when present, builds
+to `/opt/uniqbd/uploads`, migrates existing env files when present, builds
 and verifies native services, then removes only known UniQbd application paths
 from the two aaPanel webroots. It does not create a backup.
 
@@ -50,7 +50,7 @@ The prerequisite installer:
 - installs Node.js 20 LTS, build tools, Corepack, and pinned pnpm 9.12.0;
 - installs Redis from the official Redis packages and binds it to loopback;
 - creates the non-root `uniqbd` system user;
-- creates `/opt/uniqbd/current`, `/var/lib/uniqbd/uploads`, and `/etc/uniqbd`;
+- creates `/opt/uniqbd/current`, `/opt/uniqbd/uploads`, and `/etc/uniqbd`;
 - does not install or replace aaPanel Nginx.
 
 Run it independently when needed:
@@ -147,5 +147,5 @@ sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh
 ```
 
 Uploads and environment files are not rolled back with application code; they
-remain in `/var/lib/uniqbd/uploads` and `/etc/uniqbd`. If rollback health checks
+remain in `/opt/uniqbd/uploads` and `/etc/uniqbd`. If rollback health checks
 fail, inspect `journalctl` before changing Nginx or SSL.

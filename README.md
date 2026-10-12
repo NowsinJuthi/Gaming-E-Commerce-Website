@@ -160,7 +160,7 @@ Production uses native Ubuntu 22.04 services. The application runs directly
 under systemd; aaPanel is used only for domains, SSL, and Nginx reverse proxying.
 
 - source/builds: `/opt/uniqbd/current`
-- uploads: `/var/lib/uniqbd/uploads`
+- uploads: `/opt/uniqbd/uploads`
 - API env: `/etc/uniqbd/api.env`
 - web env: `/etc/uniqbd/web.env`
 - process manager: systemd (`uniqbd-api`, `uniqbd-web`)
@@ -275,7 +275,7 @@ Configure under **Admin → Settings → Payments** (requires license feature `p
 |-------|-----|
 | Admin login "Access denied" | `pnpm seed:users` or `node apps/api/scripts/promote-admin.cjs you@email.com` |
 | Chat / WebSocket broken | Nginx `/socket.io/` on main domain — see `deploy/deploy/aapanel/nginx/` |
-| Uploads 404 | Confirm `UPLOADS_DIR=/var/lib/uniqbd/uploads`, ownership `uniqbd:uniqbd`, and Nginx `/api/uploads/` proxy |
+| Uploads 404 | Confirm `UPLOADS_DIR=/opt/uniqbd/uploads`, ownership `uniqbd:uniqbd`, and Nginx `/api/uploads/` proxy |
 | Service failed | `journalctl -u uniqbd-api -u uniqbd-web -n 100 --no-pager` |
 | Old site after upload | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh` |
 | Live diagnostics | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh` |

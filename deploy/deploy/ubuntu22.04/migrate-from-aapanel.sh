@@ -55,12 +55,12 @@ upsert_env() {
 }
 upsert_env /etc/uniqbd/api.env API_HOST 127.0.0.1
 upsert_env /etc/uniqbd/api.env API_PORT 4000
-upsert_env /etc/uniqbd/api.env UPLOADS_DIR /var/lib/uniqbd/uploads
+upsert_env /etc/uniqbd/api.env UPLOADS_DIR /opt/uniqbd/uploads
 
 if [[ -d "$SOURCE_DIR/uploads" ]]; then
   echo "==> Migrating persistent uploads"
-  rsync -a "$SOURCE_DIR/uploads/" /var/lib/uniqbd/uploads/
-  chown -R uniqbd:uniqbd /var/lib/uniqbd/uploads
+  rsync -a "$SOURCE_DIR/uploads/" /opt/uniqbd/uploads/
+  chown -R uniqbd:uniqbd /opt/uniqbd/uploads
 fi
 
 if ! "$TARGET_DIR/deploy/deploy/ubuntu22.04/deploy.sh"; then

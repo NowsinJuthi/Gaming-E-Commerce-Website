@@ -22,11 +22,11 @@ if grep -Eq '(^|=)REPLACE_WITH_|mongodb\+srv://USER:PASSWORD@CLUSTER' "$API_ENV"
 fi
 grep -Eq '^API_HOST=127\.0\.0\.1$' "$API_ENV" ||
   fail "API_HOST must be 127.0.0.1 in $API_ENV"
-grep -Eq '^UPLOADS_DIR=/var/lib/uniqbd/uploads$' "$API_ENV" ||
-  fail "UPLOADS_DIR must be /var/lib/uniqbd/uploads in $API_ENV"
+grep -Eq '^UPLOADS_DIR=/opt/uniqbd/uploads$' "$API_ENV" ||
+  fail "UPLOADS_DIR must be /opt/uniqbd/uploads in $API_ENV"
 
-install -d -o uniqbd -g uniqbd -m 0755 /var/lib/uniqbd/uploads
-chown -R uniqbd:uniqbd "$APP_DIR" /var/lib/uniqbd/uploads
+install -d -o uniqbd -g uniqbd -m 0755 /opt/uniqbd/uploads
+chown -R uniqbd:uniqbd "$APP_DIR" /opt/uniqbd/uploads
 chmod 0750 /etc/uniqbd
 chown root:uniqbd "$API_ENV" "$WEB_ENV"
 chmod 0640 "$API_ENV" "$WEB_ENV"

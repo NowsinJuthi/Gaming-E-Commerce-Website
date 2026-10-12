@@ -14,7 +14,7 @@ in aaPanel's public webroots.
 
 ```text
 /opt/uniqbd/current/              application source and builds
-/var/lib/uniqbd/uploads/          persistent uploads
+/opt/uniqbd/uploads/          persistent uploads
 /etc/uniqbd/api.env               API secrets/configuration
 /etc/uniqbd/web.env               frontend build/runtime configuration
 /www/wwwroot/uniqbd.com/          .well-known and placeholder only

@@ -62,13 +62,13 @@ fi
 
 install -d -o uniqbd -g uniqbd -m 0755 \
   /opt/uniqbd/current \
-  /var/lib/uniqbd/uploads \
-  /var/lib/uniqbd/uploads/avatars \
-  /var/lib/uniqbd/uploads/banners \
-  /var/lib/uniqbd/uploads/live-chat \
-  /var/lib/uniqbd/uploads/logos \
-  /var/lib/uniqbd/uploads/mfs-qr \
-  /var/lib/uniqbd/uploads/products
+  /opt/uniqbd/uploads \
+  /opt/uniqbd/uploads/avatars \
+  /opt/uniqbd/uploads/banners \
+  /opt/uniqbd/uploads/live-chat \
+  /opt/uniqbd/uploads/logos \
+  /opt/uniqbd/uploads/mfs-qr \
+  /opt/uniqbd/uploads/products
 install -d -o root -g uniqbd -m 0750 /etc/uniqbd
 
 for domain in uniqbd.com api.uniqbd.com; do
