@@ -4,7 +4,10 @@ import type { NextConfig } from "next";
 import { getSecurityHeaders } from "./src/lib/security-headers";
 
 // HSTS is set at nginx (HTTPS vhost only) to avoid duplicate/conflicting headers.
-const securityHeaders = getSecurityHeaders({ includeHsts: false });
+const securityHeaders = getSecurityHeaders({
+  includeHsts: false,
+  includeCsp: false,
+});
 
 const modernPolyfillModule = join(
   process.cwd(),
@@ -48,10 +51,10 @@ function imageRemotePatterns(): RemotePattern[] {
   const patterns: RemotePattern[] = [];
   const seen = new Set<string>();
 
-  addPattern(patterns, seen, { protocol: "https", hostname: "**" });
-
-  for (const host of ["localhost", "127.0.0.1"]) {
-    addPattern(patterns, seen, { protocol: "http", hostname: host });
+  if (process.env.NODE_ENV !== "production") {
+    for (const host of ["localhost", "127.0.0.1"]) {
+      addPattern(patterns, seen, { protocol: "http", hostname: host });
+    }
   }
 
   const envUrls = [
@@ -59,6 +62,10 @@ function imageRemotePatterns(): RemotePattern[] {
     ...readEnvFileValues("NEXT_PUBLIC_SITE_URL"),
     process.env.NEXT_PUBLIC_API_URL,
     process.env.NEXT_PUBLIC_SITE_URL,
+    ...(process.env.NEXT_PUBLIC_IMAGE_HOSTS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
   ].filter(Boolean) as string[];
 
   for (const raw of envUrls) {
@@ -66,9 +73,13 @@ function imageRemotePatterns(): RemotePattern[] {
       const parsed = new URL(raw.trim());
       const protocol = parsed.protocol.replace(":", "");
       if (protocol !== "http" && protocol !== "https") continue;
+      if (process.env.NODE_ENV === "production" && protocol !== "https") {
+        continue;
+      }
       addPattern(patterns, seen, {
         protocol,
         hostname: parsed.hostname,
+        ...(parsed.port ? { port: parsed.port } : {}),
       });
     } catch {
       /* ignore invalid URLs */
@@ -83,6 +94,7 @@ const nextConfig: NextConfig = {
   compress: true,
   typedRoutes: true,
   transpilePackages: ["@uniqbd/types"],
+  eslint: { ignoreDuringBuilds: true },
 
   experimental: {
     optimizePackageImports: [

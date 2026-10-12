@@ -1,3 +1,4 @@
+import { hasAuthSession, isGuestAuthSession } from "@/lib/access-token";
 import {
   ApiError,
   getCustomerPanelConfig,
@@ -41,14 +42,12 @@ export function isGuestCheckoutSession(): boolean {
 export function isEphemeralGuestSession(): boolean {
   if (typeof window === "undefined") return false;
   if (isGuestCheckoutSession()) return true;
-  return isGuestFromAccessToken(localStorage.getItem("accessToken"));
+  return isGuestAuthSession();
 }
 
 export function isRegisteredUserLoggedIn(): boolean {
   if (typeof window === "undefined") return false;
-  return (
-    Boolean(localStorage.getItem("accessToken")) && !isEphemeralGuestSession()
-  );
+  return hasAuthSession() && !isEphemeralGuestSession();
 }
 
 export async function isGuestCheckoutAllowed(
@@ -94,7 +93,7 @@ export async function ensureShoppingSession(
   if (typeof window === "undefined") return false;
 
   const allowed = await isGuestCheckoutAllowed(allowGuestCheckout);
-  const token = localStorage.getItem("accessToken");
+  const token = hasAuthSession();
 
   if (token && !isEphemeralGuestSession()) {
     return true;
@@ -116,7 +115,7 @@ export async function ensureShoppingSession(
         discardEphemeralGuestSession();
         return false;
       }
-      if (localStorage.getItem("accessToken")) {
+      if (hasAuthSession()) {
         return true;
       }
     }
@@ -127,7 +126,11 @@ export async function ensureShoppingSession(
 
   try {
     const result = await startGuestCheckoutSession();
-    setTokens(result.accessToken, result.refreshToken, { guest: true });
+    setTokens(result.accessToken, result.csrfToken ?? result.refreshToken, {
+      guest: true,
+      roles: result.user?.roles,
+      expiresIn: result.expiresIn,
+    });
     return true;
   } catch {
     return false;

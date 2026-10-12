@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -25,11 +24,14 @@ import {
 import { UserDocument } from '../../database/schemas/user.schema';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { MailService } from '../../integrations/mail/mail.service';
+import { accessTokenVersionMatches } from './access-token-version';
+import { enumerationSafeRegisterResult } from './auth-register';
 import { UsersService } from '../users/users.service';
 import { CustomerPanelSettingsService } from '../customer-panel/customer-panel-settings.service';
 import {
   AuthResult,
   AuthTokens,
+  AuthenticatedUser,
   JwtPayload,
   PublicUser,
   RegisterResult,
@@ -49,7 +51,12 @@ import {
   VerifyOtpDto,
 } from './dto';
 import { EmailDomainPolicyService } from '../../security/email-domain-policy.service';
-import { AUTH_NO_ACCOUNT_MESSAGE, AUTH_WRONG_PASSWORD_MESSAGE } from './auth.constants';
+import {
+  AUTH_INVALID_CREDENTIALS_MESSAGE,
+  AUTH_OTP_REQUEST_MESSAGE,
+} from './auth.constants';
+import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
+import { isEphemeralGuestUser } from '../../common/utils/guest-user';
 
 const EMAIL_VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes for 6-digit code
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -86,14 +93,14 @@ export class AuthService {
       this.mail.getAuthEmailReadiness(),
       this.crypto.hashPassword(dto.password),
     ]);
-    if (existing) {
-      throw new ConflictException('Email already registered');
-    }
     if (!readiness.ready) {
       throw new ServiceUnavailableException(
         readiness.message ??
           'Email service is temporarily unavailable. Please try again later.',
       );
+    }
+    if (existing) {
+      return enumerationSafeRegisterResult(existing.email);
     }
 
     const user = await this.users.create({ email: dto.email, passwordHash });
@@ -120,66 +127,54 @@ export class AuthService {
   ): Promise<AuthResult> {
     const user = await this.users.findByEmail(dto.email, true);
     if (!user) {
-      throw new HttpException(
-        {
-          message: AUTH_NO_ACCOUNT_MESSAGE,
-          accountExists: false,
-        },
-        HttpStatus.NOT_FOUND,
+      // Perform a password hash verification to reduce timing-based account
+      // enumeration without storing or exposing a real user's hash.
+      await this.crypto.verifyPassword(
+        dto.password,
+        '00000000000000000000000000000000:' +
+          '00'.repeat(64),
       );
+      throw new UnauthorizedException(AUTH_INVALID_CREDENTIALS_MESSAGE);
     }
     if (!user.passwordHash) {
-      throw new HttpException(
-        {
-          message: AUTH_WRONG_PASSWORD_MESSAGE,
-          invalidPassword: true,
-          accountExists: true,
-        },
-        HttpStatus.UNAUTHORIZED,
-      );
+      throw new UnauthorizedException(AUTH_INVALID_CREDENTIALS_MESSAGE);
     }
     const valid = await this.crypto.verifyPassword(
       dto.password,
       user.passwordHash,
     );
     if (!valid) {
-      throw new HttpException(
-        {
-          message: AUTH_WRONG_PASSWORD_MESSAGE,
-          invalidPassword: true,
-          accountExists: true,
-        },
-        HttpStatus.UNAUTHORIZED,
-      );
+      throw new UnauthorizedException(AUTH_INVALID_CREDENTIALS_MESSAGE);
     }
     if (
       user.status === UserStatus.Banned ||
       user.status === UserStatus.Suspended
     ) {
-      throw new UnauthorizedException('Account is not active');
+      throw new UnauthorizedException(AUTH_INVALID_CREDENTIALS_MESSAGE);
     }
     const tokens = await this.issueTokens(user, meta, opts);
     return { user: this.toPublic(user), ...tokens };
   }
 
-  private static readonly REFRESH_ROTATION_GRACE_MS = 30_000;
+  private static readonly REFRESH_REUSE_RACE_WINDOW_MS = 30_000;
 
   async refresh(
     dto: RefreshTokenDto,
     meta: SessionMeta,
     opts?: { accessTtlOverride?: number; refreshTtlOverride?: number },
   ): Promise<AuthTokens> {
+    if (!dto.refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
     const tokenHash = this.crypto.hashToken(dto.refreshToken);
-    const session = await this.sessionModel
-      .findOne({ tokenHash, revoked: false })
-      .exec();
+    const session = await this.sessionModel.findOne({ tokenHash }).exec();
 
     if (!session) {
-      const graceUser = await this.resolveGraceRefreshUser(tokenHash);
-      if (!graceUser) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-      return this.issueTokens(graceUser, meta, opts);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (session.revoked) {
+      await this.handleRefreshTokenReuse(session);
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
     if (session.expiresAt.getTime() < Date.now()) {
@@ -197,41 +192,90 @@ export class AuthService {
       await session.save();
       throw new UnauthorizedException('Account is not active');
     }
-    session.revoked = true;
-    await session.save();
+
+    // Claim the token atomically. Concurrent refreshes cannot both mint a new
+    // session from the same token.
+    const claimed = await this.sessionModel
+      .findOneAndUpdate(
+        { _id: session._id, revoked: false },
+        { $set: { revoked: true } },
+        { new: true },
+      )
+      .exec();
+    if (!claimed) {
+      const raced = await this.sessionModel.findById(session._id).exec();
+      if (raced) await this.handleRefreshTokenReuse(raced);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
     return this.issueTokens(user, meta, opts);
   }
 
-  /** Accept recently-rotated refresh tokens (multi-tab / mobile race). */
-  private async resolveGraceRefreshUser(tokenHash: string) {
-    const graceSince = new Date(Date.now() - AuthService.REFRESH_ROTATION_GRACE_MS);
-    const session = await this.sessionModel
-      .findOne({
-        tokenHash,
-        revoked: true,
-        updatedAt: { $gte: graceSince },
-      })
-      .exec();
-    if (!session || session.expiresAt.getTime() < Date.now()) {
-      return null;
+  private async handleRefreshTokenReuse(
+    session: AuthSessionDocument,
+  ): Promise<void> {
+    const rotatedAt = session.updatedAt?.getTime() ?? 0;
+    const likelyTabRace =
+      rotatedAt > 0 &&
+      Date.now() - rotatedAt <= AuthService.REFRESH_REUSE_RACE_WINDOW_MS;
+    if (!likelyTabRace) {
+      await this.sessionModel
+        .updateMany(
+          { userId: session.userId, revoked: false },
+          { $set: { revoked: true } },
+        )
+        .exec();
+      this.logger.warn(
+        'Refresh-token reuse detected; active sessions were revoked',
+      );
     }
-    const user = await this.users.findById(session.userId);
-    if (!user) return null;
-    if (
-      user.status === UserStatus.Banned ||
-      user.status === UserStatus.Suspended
-    ) {
-      return null;
-    }
-    return user;
   }
 
   async logout(dto: RefreshTokenDto): Promise<{ success: boolean }> {
+    if (!dto.refreshToken) {
+      return { success: true };
+    }
     const tokenHash = this.crypto.hashToken(dto.refreshToken);
     await this.sessionModel
       .updateOne({ tokenHash }, { $set: { revoked: true } })
       .exec();
     return { success: true };
+  }
+
+  async protectBrowserSession(refreshToken: string): Promise<string> {
+    const csrfToken = this.crypto.generateToken(24);
+    const result = await this.sessionModel
+      .updateOne(
+        {
+          tokenHash: this.crypto.hashToken(refreshToken),
+          revoked: false,
+        },
+        { $set: { csrfHash: this.crypto.hashToken(csrfToken) } },
+      )
+      .exec();
+    if (result.modifiedCount !== 1) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return csrfToken;
+  }
+
+  async assertBrowserCsrf(
+    refreshToken: string,
+    csrfToken: string | undefined,
+  ): Promise<void> {
+    if (!csrfToken) {
+      throw new ForbiddenException('CSRF token is required');
+    }
+    const session = await this.sessionModel
+      .findOne({
+        tokenHash: this.crypto.hashToken(refreshToken),
+        csrfHash: this.crypto.hashToken(csrfToken),
+        revoked: false,
+      })
+      .select('+csrfHash')
+      .exec();
+    if (!session) {
+      throw new ForbiddenException('Invalid CSRF token');
+    }
   }
 
   /** Resolve the current user embedded in a valid access JWT. */
@@ -265,7 +309,9 @@ export class AuthService {
     if (record.attempts >= MAX_OTP_ATTEMPTS) {
       throw new BadRequestException('Too many attempts. Please request a new code.');
     }
-    if (record.codeHash !== this.crypto.hashToken(dto.code)) {
+    if (
+      !this.crypto.equalHashes(record.codeHash, this.crypto.hashToken(dto.code))
+    ) {
       record.attempts += 1;
       await record.save();
       throw new BadRequestException('Invalid or expired verification code');
@@ -300,8 +346,7 @@ export class AuthService {
     const user = await this.users.findByEmail(dto.email);
     if (!user) {
       return {
-        accountExists: false,
-        message: AUTH_NO_ACCOUNT_MESSAGE,
+        message: AUTH_OTP_REQUEST_MESSAGE,
       };
     }
 
@@ -312,8 +357,7 @@ export class AuthService {
       type: TokenType.OtpLogin,
     });
     return {
-      accountExists: true,
-      message: 'A login code has been sent to your email.',
+      message: AUTH_OTP_REQUEST_MESSAGE,
     };
   }
 
@@ -404,7 +448,9 @@ export class AuthService {
         'Too many attempts. Request a new reset code.',
       );
     }
-    if (record.codeHash !== this.crypto.hashToken(dto.code)) {
+    if (
+      !this.crypto.equalHashes(record.codeHash, this.crypto.hashToken(dto.code))
+    ) {
       record.attempts += 1;
       await record.save();
       throw new BadRequestException('Invalid or expired reset code');
@@ -437,7 +483,9 @@ export class AuthService {
     if (record.attempts >= MAX_OTP_ATTEMPTS) {
       throw new UnauthorizedException('Too many attempts');
     }
-    if (record.codeHash !== this.crypto.hashToken(dto.code)) {
+    if (
+      !this.crypto.equalHashes(record.codeHash, this.crypto.hashToken(dto.code))
+    ) {
       record.attempts += 1;
       await record.save();
       throw new UnauthorizedException('Invalid or expired code');
@@ -496,13 +544,15 @@ export class AuthService {
     const accessTtl = opts?.accessTtlOverride ?? (this.config.get<number>('jwt.accessTtl') ?? 900);
     const defaultRefreshTtl = user.isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86400)
-      : (this.config.get<number>('jwt.refreshTtl') ?? 315360000);
+      : (this.config.get<number>('jwt.refreshTtl') ??
+        LONG_SESSION_TTL_SECONDS);
     const refreshTtl = opts?.refreshTtlOverride ?? defaultRefreshTtl;
 
     const payload: JwtPayload = {
       sub: String(user._id),
       email: user.email,
       roles: user.roles,
+      ver: user.tokenVersion ?? 0,
       ...(user.isGuest ? { isGuest: true } : {}),
     };
     const accessToken = await this.jwt.signAsync(payload, {
@@ -689,13 +739,44 @@ export class AuthService {
   }
 
   private devCodesEnabled(): boolean {
-    const env = process.env.NODE_ENV ?? 'development';
-    // Local development keeps the convenience of returning codes. Any other
-    // non-production environment (e.g. staging) must explicitly opt in so codes
-    // are never leaked by default, and production never exposes them.
-    if (env === 'production') return false;
+    const env = process.env.NODE_ENV;
+    // Missing NODE_ENV is not treated as development. Production never exposes
+    // codes. Local development keeps the convenience of returning them. Any
+    // other environment (e.g. staging) must explicitly opt in.
+    if (!env || env === 'production') return false;
     if (env === 'development') return true;
     return process.env.EXPOSE_DEV_CODES === 'true';
+  }
+
+  async authenticateAccessToken(token: string): Promise<AuthenticatedUser> {
+    const secret = this.config.get<string>('jwt.accessSecret');
+    if (!secret) {
+      throw new UnauthorizedException();
+    }
+    const payload = await this.jwt.verifyAsync<JwtPayload>(token, { secret });
+    if (!payload?.sub) {
+      throw new UnauthorizedException();
+    }
+    const user = await this.users.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('Account no longer exists');
+    }
+    if (
+      user.status === UserStatus.Banned ||
+      user.status === UserStatus.Suspended
+    ) {
+      throw new UnauthorizedException('Account is not active');
+    }
+    if (!accessTokenVersionMatches(payload.ver, user.tokenVersion)) {
+      throw new UnauthorizedException('Session is no longer valid');
+    }
+    const isGuest = isEphemeralGuestUser(user);
+    return {
+      id: String(user._id),
+      email: user.email,
+      roles: user.roles,
+      ...(isGuest ? { isGuest: true } : {}),
+    };
   }
 
   private toPublic(user: UserDocument): PublicUser {

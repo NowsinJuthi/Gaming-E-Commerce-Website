@@ -44,11 +44,18 @@ import {
 import { MfsSmsFormatService } from './mfs-sms-format.service';
 import { buildGuestThankYouPath } from '../../common/utils/guest-order-url';
 import { createGuestOrderAccessToken } from '../../common/utils/guest-order-access';
+import { resolveGuestOrderAccessSecret } from '../../common/utils/guest-order-secret';
+import { assertCanManuallyApproveMfs } from '../../common/utils/mfs-approve-access';
+import { AuditActorType } from '../../database/schemas/audit-log.schema';
+import { AuditService } from '../../shared/audit/audit.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 
 const TERMINAL = new Set<PaymentIntentStatus>([
   PaymentIntentStatus.Succeeded,
   PaymentIntentStatus.Failed,
   PaymentIntentStatus.Expired,
+  PaymentIntentStatus.Unmatched,
 ]);
 
 export type MfsCheckoutOrderItem = {
@@ -110,6 +117,8 @@ export class MfsVerificationService {
     private readonly gateways: MfsGatewayService,
     private readonly smsFormats: MfsSmsFormatService,
     private readonly config: ConfigService,
+    private readonly rolePermissions: RolePermissionsService,
+    private readonly audit: AuditService,
   ) {}
 
   async listCheckoutGateways() {
@@ -117,12 +126,9 @@ export class MfsVerificationService {
   }
 
   assertSmsSyncToken(header?: string): void {
-    const expected = this.config.get<string>('payments.mfsSmsSyncToken');
-    if (!expected?.trim()) {
-      if ((process.env.NODE_ENV ?? 'development') === 'production') {
-        throw new UnauthorizedException('MFS SMS sync is not configured');
-      }
-      return;
+    const expected = this.config.get<string>('payments.mfsSmsSyncToken')?.trim();
+    if (!expected) {
+      throw new UnauthorizedException('MFS SMS sync is not configured');
     }
     if (!header || header !== expected) {
       throw new UnauthorizedException('Invalid SMS sync token');
@@ -198,10 +204,7 @@ export class MfsVerificationService {
       .lean()
       .exec();
     if (payer?.isGuest) {
-      const secret =
-        this.config.get<string>('jwt.accessSecret') ??
-        this.config.get<string>('JWT_ACCESS_SECRET') ??
-        'guest-order-access-fallback';
+      const secret = resolveGuestOrderAccessSecret(this.config);
       const token = createGuestOrderAccessToken(
         String(order._id),
         order.orderNumber,
@@ -383,13 +386,32 @@ export class MfsVerificationService {
     return this.getCheckoutSession(userId, intentId, isStaff);
   }
 
-  async adminApprove(intentId: string): Promise<MfsCheckoutSession> {
+  async adminApprove(
+    intentId: string,
+    actor: AuthenticatedUser,
+    reason: string,
+  ): Promise<MfsCheckoutSession> {
+    const hasFinance = await this.rolePermissions.rolesHavePermission(
+      actor.roles,
+      'approve_mfs_payments',
+    );
+    assertCanManuallyApproveMfs(actor.roles, hasFinance);
+
     const intent = await this.getMfsIntent(intentId);
     if (TERMINAL.has(intent.status)) {
       return this.getCheckoutSession('', intentId, true);
     }
     intent.verificationSource = 'admin';
     await intent.save();
+    await this.audit.record({
+      action: 'mfs.manual_approve',
+      actorType: AuditActorType.User,
+      actorId: actor.id,
+      entityType: 'payment_intent',
+      entityId: String(intent._id),
+      gateway: intent.gateway,
+      metadata: { reason: reason.trim() },
+    });
     await this.payments.completeVerifiedIntent(String(intent._id), 'admin');
     return this.getCheckoutSession('', intentId, true);
   }

@@ -33,6 +33,9 @@ export class RecaptchaGuard implements CanActivate {
 
     const enabled = await this.recaptcha.isEnabled();
     if (!enabled) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new ForbiddenException('reCAPTCHA is not configured');
+      }
       return true;
     }
 

@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -71,7 +72,7 @@ export function BlogArticleReviewForm({ slug, onSubmitted }: Props) {
   const [submitted, setSubmitted] = useState(false);
 
   const syncAuth = useCallback(() => {
-    setIsLoggedIn(Boolean(localStorage.getItem("accessToken")));
+    setIsLoggedIn(hasAuthSession());
   }, []);
 
   useEffect(() => {

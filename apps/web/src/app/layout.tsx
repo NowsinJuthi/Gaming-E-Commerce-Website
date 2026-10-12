@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "@/styles/globals.css";
 import { ChromeShell } from "@/components/ChromeShell";
 import { SiteFaviconHeadLinks } from "@/components/SiteFaviconHeadLinks";
@@ -124,6 +125,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const [seo, panelConfig, contactSettings] = await Promise.all([
     getCachedSeoConfig(),
     getCachedCustomerPanelConfig(),
@@ -169,6 +171,7 @@ export default async function RootLayout({
           />
         ))}
         <ThemeScript
+          nonce={nonce}
           defaults={{
             defaultTheme: initialAppearance.defaultTheme,
             accent: initialAppearance.accent,
@@ -176,19 +179,24 @@ export default async function RootLayout({
         />
         <style
           id="site-appearance-overrides"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: appearanceCss }}
         />
         {/* Must stay inside <head>: Search Console GA verification checks here. */}
-        <GaHeadScript googleAnalyticsId={seo.analytics.googleAnalyticsId} />
+        <GaHeadScript
+          nonce={nonce}
+          googleAnalyticsId={seo.analytics.googleAnalyticsId}
+        />
       </head>
       <body>
         <GtmNoScript gtmId={seo.analytics.gtmId} />
-        {schemas.length > 0 ? <JsonLd data={schemas} /> : null}
+        {schemas.length > 0 ? <JsonLd data={schemas} nonce={nonce} /> : null}
         <SeoScripts
+          nonce={nonce}
           gtmId={seo.analytics.gtmId}
           facebookPixelId={seo.analytics.facebookPixelId}
         />
-        {isDev ? <DevToolsAdminScript /> : null}
+        {isDev ? <DevToolsAdminScript nonce={nonce} /> : null}
         {isDev ? <DevToolsAdminGate /> : null}
         <ChromeShell
           initialSiteMenus={initialSiteMenus}

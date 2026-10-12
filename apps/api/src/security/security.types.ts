@@ -9,21 +9,17 @@ export interface SecurityContext {
 
 export type RequestWithContext = Request & SecurityContext;
 
-const headerValue = (
-  value: string | string[] | undefined,
-): string | undefined => (Array.isArray(value) ? value[0] : value);
-
-/** Resolves the best client IP, preferring Cloudflare-provided headers. */
+/**
+ * Client IP for throttling and audit.
+ *
+ * Uses Express `req.ip` (honours `trust proxy`) instead of raw
+ * `CF-Connecting-IP` / `X-Forwarded-For` headers. Those headers are
+ * attacker-controlled unless nginx overwrites them from `$remote_addr`.
+ */
 export function resolveClientIp(req: Request): string | undefined {
   const ctx = req as RequestWithContext;
   if (ctx.realIp) {
     return ctx.realIp;
   }
-  const cf = headerValue(req.headers['cf-connecting-ip']);
-  if (cf) return cf;
-  const trueClient = headerValue(req.headers['true-client-ip']);
-  if (trueClient) return trueClient;
-  const forwarded = headerValue(req.headers['x-forwarded-for']);
-  if (forwarded) return forwarded.split(',')[0]?.trim();
   return req.ip;
 }

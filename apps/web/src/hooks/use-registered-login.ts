@@ -1,7 +1,5 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import { isGuestFromAccessToken } from "@/lib/chat-access";
 import { isRegisteredUserLoggedIn } from "@/lib/guest-checkout";
 
 /** Registered (non-guest) login check, kept in sync with auth changes. */
@@ -10,10 +8,7 @@ export function useRegisteredLogin(): boolean {
 
   useEffect(() => {
     const sync = () => {
-      const token = localStorage.getItem("accessToken");
-      setLoggedIn(
-        isRegisteredUserLoggedIn() && !isGuestFromAccessToken(token),
-      );
+      setLoggedIn(isRegisteredUserLoggedIn());
     };
     sync();
     window.addEventListener("auth-change", sync);

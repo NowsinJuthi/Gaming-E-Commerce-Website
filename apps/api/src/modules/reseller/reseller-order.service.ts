@@ -30,6 +30,7 @@ import {
   ResellerOrderItem,
 } from '../../database/schemas/reseller-order.schema';
 import type { ResellerDocument } from '../../database/schemas/reseller.schema';
+import { CryptoService } from '../../shared/crypto/crypto.service';
 import { WalletService } from '../wallet/wallet.service';
 import { WholesaleOrderItemDto } from './dto/create-wholesale-order.dto';
 import { ResellerService } from './reseller.service';
@@ -45,6 +46,7 @@ export class ResellerOrderService {
     private readonly inventoryModel: Model<InventoryItemDocument>,
     private readonly reseller: ResellerService,
     private readonly wallet: WalletService,
+    private readonly crypto: CryptoService,
   ) {}
 
   async create(
@@ -170,7 +172,12 @@ export class ResellerOrderService {
         .limit(limit)
         .exec(),
       this.orderModel.countDocuments(filter).exec(),
-    ]).then(([items, total]) => ({ items, total, page, limit }));
+    ]).then(([items, total]) => ({
+      items: items.map((item) => this.presentResellerOrder(item)),
+      total,
+      page,
+      limit,
+    }));
   }
 
   async list(
@@ -188,7 +195,12 @@ export class ResellerOrderService {
         .exec(),
       this.orderModel.countDocuments(filter).exec(),
     ]);
-    return { items, total, page, limit };
+    return {
+      items: items.map((item) => this.presentResellerOrder(item)),
+      total,
+      page,
+      limit,
+    };
   }
 
   async getOne(
@@ -201,7 +213,20 @@ export class ResellerOrderService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+    return this.presentResellerOrder(order);
+  }
+
+  private presentResellerOrder(
+    order: ResellerOrderDocument,
+  ): ResellerOrderDocument {
+    const plain = order.toObject ? order.toObject() : order;
+    plain.items = (plain.items ?? []).map((item) => ({
+      ...item,
+      deliveredCodes: (item.deliveredCodes ?? []).map((row) =>
+        this.crypto.openDeliveredSecret({ code: row.code }),
+      ),
+    }));
+    return plain as ResellerOrderDocument;
   }
 
   private mergeQuantities(
@@ -251,7 +276,11 @@ export class ResellerOrderService {
             break;
           }
           claimed.push(unit._id);
-          item.deliveredCodes.push({ code: unit.value });
+          item.deliveredCodes.push(
+            this.crypto.sealDeliveredSecret({
+              code: this.crypto.openInventoryValue(unit.value),
+            }),
+          );
         }
         if (claimed.length < item.quantity) {
           throw new BadRequestException(

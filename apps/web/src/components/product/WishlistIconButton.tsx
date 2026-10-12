@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useState } from "react";
 import { HeartIcon } from "@/components/admin/icons";
@@ -18,7 +19,7 @@ export function WishlistIconButton({
   async function onClick(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     e.stopPropagation();
-    if (!localStorage.getItem("accessToken")) {
+    if (!hasAuthSession()) {
       window.location.href = "/login";
       return;
     }

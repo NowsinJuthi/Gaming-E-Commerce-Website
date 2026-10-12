@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CustomerOrdersView } from "@/components/customer/CustomerOrdersView";
 import { CustomerPageLayout } from "@/components/customer/CustomerPageLayout";
-import { ApiError, clearTokens, listOrders, type OrderDetail } from "@/lib/api";
+import { ApiError, clearTokens, hasRefreshToken, listOrders, type OrderDetail } from "@/lib/api";
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function OrdersPage() {
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          if (!localStorage.getItem("refreshToken")) {
+          if (!hasRefreshToken()) {
             clearTokens();
             router.replace("/login");
           }

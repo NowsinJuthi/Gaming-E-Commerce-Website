@@ -2,6 +2,15 @@
 require('./load-env.cjs').loadApiEnv();
 
 const API = process.env.API_PUBLIC_URL || 'http://localhost:4000/api';
+const CUSTOMER_EMAIL = process.env.TEST_CUSTOMER_EMAIL;
+const CUSTOMER_PASSWORD = process.env.TEST_CUSTOMER_PASSWORD;
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
+if (!CUSTOMER_EMAIL || !CUSTOMER_PASSWORD || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  throw new Error(
+    'Set TEST_CUSTOMER_EMAIL, TEST_CUSTOMER_PASSWORD, TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD',
+  );
+}
 
 async function login(email, password) {
   const res = await fetch(`${API}/auth/login`, {
@@ -41,8 +50,8 @@ async function api(token, path, options = {}) {
 (async () => {
   console.log('=== Chat history persistence test ===');
 
-  const customer = await login('demo@uniqbd.com', 'Demo1234!');
-  const admin = await login('admin@uniqbd.com', 'Admin1234!');
+  const customer = await login(CUSTOMER_EMAIL, CUSTOMER_PASSWORD);
+  const admin = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
 
   const room = await api(customer.token, '/chat/rooms/support', { method: 'POST' });
   const roomId = room.id || room._id;

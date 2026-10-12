@@ -17,8 +17,11 @@ const API_BASE = (process.env.API_BASE || process.env.API_PUBLIC_URL || 'https:/
   '',
 );
 const APP_BASE = API_BASE.replace(/\/api$/, '');
-const EMAIL = process.env.ADMIN_EMAIL || 'admin@uniqbd.com';
-const PASSWORD = process.env.ADMIN_PASS || 'Admin1234!';
+const EMAIL = process.env.ADMIN_EMAIL;
+const PASSWORD = process.env.ADMIN_PASS;
+if (!EMAIL || !PASSWORD) {
+  throw new Error('Set ADMIN_EMAIL and ADMIN_PASS');
+}
 const SMS_BODY =
   process.env.SMS_BODY ||
   process.env.NAGAD_SMS ||

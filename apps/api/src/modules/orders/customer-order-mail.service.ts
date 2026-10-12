@@ -17,6 +17,7 @@ import {
   maskCustomerEmail,
   verifyGuestOrderAccessToken,
 } from '../../common/utils/guest-order-access';
+import { resolveGuestOrderAccessSecret } from '../../common/utils/guest-order-secret';
 import { buildCustomerOrderEmailPath } from '../../common/utils/guest-order-url';
 import { isEphemeralGuestUser, isGuestMailbox } from '../../common/utils/guest-user';
 import { Order, OrderDocument } from '../../database/schemas/order.schema';
@@ -95,10 +96,7 @@ export class CustomerOrderMailService {
     private readonly emailDeliveryLog: EmailDeliveryLogService,
     config: ConfigService,
   ) {
-    this.accessSecret =
-      config.get<string>('jwt.accessSecret') ??
-      config.get<string>('JWT_ACCESS_SECRET') ??
-      'guest-order-access-fallback';
+    this.accessSecret = resolveGuestOrderAccessSecret(config);
   }
 
   guestReceiptToken(order: OrderDocument, isGuest: boolean): string | undefined {

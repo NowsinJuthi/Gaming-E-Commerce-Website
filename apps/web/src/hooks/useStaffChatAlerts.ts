@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -15,7 +16,7 @@ export function useStaffChatAlerts(enabled = true) {
   useEffect(() => {
     if (!enabled) return;
 
-    const token = localStorage.getItem("accessToken");
+    const token = hasAuthSession();
     if (!token) return;
 
     const socket = acquireChatSocket();

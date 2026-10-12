@@ -21,6 +21,10 @@ export class InventoryItem {
   @Prop({ required: true, select: false })
   value!: string;
 
+  /** SHA-256 of the normalized plaintext, used for duplicate detection. */
+  @Prop({ select: false, index: true })
+  valueHash?: string;
+
   @Prop({
     type: String,
     enum: Object.values(InventoryStatus),
@@ -45,3 +49,7 @@ export const InventoryItemSchema = SchemaFactory.createForClass(InventoryItem);
 
 InventoryItemSchema.index({ productId: 1, status: 1 });
 InventoryItemSchema.index({ productId: 1, variationValueId: 1, status: 1 });
+InventoryItemSchema.index(
+  { productId: 1, valueHash: 1 },
+  { unique: true, sparse: true },
+);

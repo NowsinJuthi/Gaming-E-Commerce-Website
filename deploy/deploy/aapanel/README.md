@@ -38,6 +38,25 @@ The storefront vhost proxies to `127.0.0.1:3000`; the API vhost proxies to
 `127.0.0.1:4000`. Both include Socket.IO upgrade handling and standard proxy
 headers. The storefront also proxies `/api/uploads/` and `/api/app/` to the API.
 
+## Cloudflare and proxy trust (required in production)
+
+1. Orange-cloud `uniqbd.com` / `www` / `api.uniqbd.com` in Cloudflare DNS.
+2. Paste the vhost templates. They include
+   `/opt/uniqbd/current/deploy/deploy/aapanel/nginx/cloudflare-real-ip.conf`,
+   which sets `real_ip_header CF-Connecting-IP` **only** for official Cloudflare
+   ranges. Nginx then overwrites `X-Forwarded-For` / `X-Real-IP` with
+   `$remote_addr` (the restored visitor IP). Client-supplied forwarding headers
+   are not appended.
+3. Set `TRUST_PROXY_HOPS=1` in `/etc/uniqbd/api.env` (Joi allows 0–2 only).
+   Node trusts a single nginx hop. Do not raise this to “catch” extra proxies.
+4. Keep API/web bound to `127.0.0.1`. Vhost templates now include
+   `cloudflare-origin-allow.conf` so direct hits to the origin IP are denied.
+   Comment it out only for DNS-only (grey-cloud) debugging, or prefer
+   Authenticated Origin Pulls.
+5. Reload nginx: `nginx -t && nginx -s reload`.
+6. Admin → Security → Cloudflare “require headers” is defense-in-depth (`CF-Ray`
+   only). It is **not** a substitute for the origin allowlist.
+
 Do not configure aaPanel Node projects, PM2, PHP, or a second Nginx for UniQbd.
 Run the application with systemd (see `../ubuntu22.04/README.md`).
 

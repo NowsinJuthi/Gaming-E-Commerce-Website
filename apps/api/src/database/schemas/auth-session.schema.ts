@@ -12,6 +12,10 @@ export class AuthSession {
   @Prop({ required: true, index: true })
   tokenHash!: string;
 
+  /** Present only for browser sessions that use the HttpOnly refresh cookie. */
+  @Prop({ select: false })
+  csrfHash?: string;
+
   @Prop()
   userAgent?: string;
 

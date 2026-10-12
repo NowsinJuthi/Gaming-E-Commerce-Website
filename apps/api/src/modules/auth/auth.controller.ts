@@ -6,14 +6,22 @@ import {
   HttpStatus,
   Post,
   Req,
+  Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RecaptchaGuard } from '../../security/recaptcha.guard';
 import { AuthService } from './auth.service';
-import type { AuthenticatedUser, SessionMeta } from './auth.types';
+import type {
+  AuthenticatedUser,
+  AuthResult,
+  AuthTokens,
+  SessionMeta,
+} from './auth.types';
 import {
   LoginDto,
   RefreshTokenDto,
@@ -24,10 +32,24 @@ import {
   VerifyEmailDto,
   VerifyOtpDto,
 } from './dto';
+import {
+  ACCESS_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  accessCookieOptions,
+  isBrowserAuthRequest,
+  omitSecretsFromBrowserSession,
+  readNamedCookie,
+  refreshCookieOptions,
+} from './auth-cookies';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  private readonly refreshCookieName = REFRESH_COOKIE_NAME;
+
+  constructor(
+    private readonly auth: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Public()
   @UseGuards(RecaptchaGuard)
@@ -40,29 +62,77 @@ export class AuthController {
   @UseGuards(RecaptchaGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.auth.login(dto, this.meta(req));
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.login(dto, this.meta(req));
+    return this.respondWithSession(result, req, res);
   }
 
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
-    return this.auth.refresh(dto, this.meta(req));
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const cookieToken = this.readCookie(req, this.refreshCookieName);
+    const refreshToken = cookieToken ?? dto.refreshToken;
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    if (cookieToken) {
+      await this.auth.assertBrowserCsrf(
+        refreshToken,
+        this.header(req, 'x-csrf-token'),
+      );
+    }
+    const result = await this.auth.refresh(
+      { refreshToken },
+      this.meta(req),
+    );
+    return cookieToken || isBrowserAuthRequest({
+      origin: req.headers.origin,
+      cookie: req.headers.cookie,
+    })
+      ? this.toBrowserSession(result, res)
+      : result;
   }
 
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  logout(@Body() dto: RefreshTokenDto) {
-    return this.auth.logout(dto);
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const cookieToken = this.readCookie(req, this.refreshCookieName);
+    const refreshToken = cookieToken ?? dto.refreshToken;
+    if (cookieToken) {
+      await this.auth.assertBrowserCsrf(
+        cookieToken,
+        this.header(req, 'x-csrf-token'),
+      );
+    }
+    const result = await this.auth.logout({ refreshToken });
+    this.clearRefreshCookie(res);
+    return result;
   }
 
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('verify-email')
-  verifyEmail(@Body() dto: VerifyEmailDto, @Req() req: Request) {
-    return this.auth.verifyEmail(dto, this.meta(req));
+  async verifyEmail(
+    @Body() dto: VerifyEmailDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.verifyEmail(dto, this.meta(req));
+    return this.respondWithSession(result, req, res);
   }
 
   @Public()
@@ -99,15 +169,24 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('otp/verify')
-  verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
-    return this.auth.verifyOtp(dto, this.meta(req));
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.verifyOtp(dto, this.meta(req));
+    return this.respondWithSession(result, req, res);
   }
 
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('guest')
-  guest(@Req() req: Request) {
-    return this.auth.guestSession(this.meta(req));
+  async guest(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.guestSession(this.meta(req));
+    return this.respondWithSession(result, req, res);
   }
 
   @Get('me')
@@ -117,5 +196,82 @@ export class AuthController {
 
   private meta(req: Request): SessionMeta {
     return { ip: req.ip, userAgent: req.headers['user-agent'] };
+  }
+
+  private async respondWithSession(
+    result: AuthResult | AuthTokens,
+    req: Request,
+    res: Response,
+  ) {
+    if (
+      isBrowserAuthRequest({
+        origin: req.headers.origin,
+        cookie: req.headers.cookie,
+      })
+    ) {
+      return this.toBrowserSession(result, res);
+    }
+    return result;
+  }
+
+  private async toBrowserSession(
+    result: AuthResult | AuthTokens,
+    res: Response,
+  ) {
+    const csrfToken = await this.auth.protectBrowserSession(
+      result.refreshToken,
+    );
+    const production = this.config.get<string>('app.env') === 'production';
+    const isGuest =
+      'user' in result && result.user.isGuest === true;
+    const refreshMaxAge = isGuest
+      ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86_400)
+      : (this.config.get<number>('jwt.refreshTtl') ?? 2_592_000);
+    const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    res.cookie(
+      ACCESS_COOKIE_NAME,
+      result.accessToken,
+      accessCookieOptions({ production, maxAgeSeconds: accessMaxAge }),
+    );
+    res.cookie(
+      this.refreshCookieName,
+      result.refreshToken,
+      refreshCookieOptions({
+        production,
+        path: this.authCookiePath(),
+        maxAgeSeconds: refreshMaxAge,
+      }),
+    );
+    return omitSecretsFromBrowserSession({ ...result, csrfToken });
+  }
+
+  private clearRefreshCookie(res: Response): void {
+    const production = this.config.get<string>('app.env') === 'production';
+    res.clearCookie(this.refreshCookieName, {
+      httpOnly: true,
+      secure: production,
+      sameSite: 'lax',
+      path: this.authCookiePath(),
+    });
+    res.clearCookie(ACCESS_COOKIE_NAME, {
+      httpOnly: true,
+      secure: production,
+      sameSite: 'lax',
+      path: '/',
+    });
+  }
+
+  private authCookiePath(): string {
+    const prefix = this.config.get<string>('app.globalPrefix') ?? 'api';
+    return `/${prefix.replace(/^\/+|\/+$/g, '')}/auth`;
+  }
+
+  private readCookie(req: Request, name: string): string | undefined {
+    return readNamedCookie(req.headers.cookie, name);
+  }
+
+  private header(req: Request, name: string): string | undefined {
+    const value = req.headers[name];
+    return Array.isArray(value) ? value[0] : value;
   }
 }

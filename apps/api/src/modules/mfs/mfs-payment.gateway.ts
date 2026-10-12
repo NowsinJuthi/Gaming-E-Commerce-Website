@@ -6,6 +6,8 @@ import {
   CreateChargeResult,
   NormalizedPaymentStatus,
   PaymentGatewayClient,
+  RefundChargeInput,
+  RefundChargeResult,
   VerifyResult,
   WebhookParseResult,
 } from '../../integrations/payments/payment-gateway.interface';
@@ -36,6 +38,10 @@ export class MfsPaymentGateway implements PaymentGatewayClient {
   async verify(gatewayRef: string): Promise<VerifyResult> {
     const status = await this.verification.getVerificationStatus(gatewayRef);
     return { status: status as NormalizedPaymentStatus };
+  }
+
+  async refundCharge(_input: RefundChargeInput): Promise<RefundChargeResult> {
+    return { supported: false };
   }
 
   parseWebhook(payload: unknown): WebhookParseResult {

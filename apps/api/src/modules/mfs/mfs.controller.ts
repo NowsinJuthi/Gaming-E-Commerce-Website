@@ -22,9 +22,12 @@ import {
 import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ApproveMfsIntentDto } from './dto/approve-mfs-intent.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   CreateMfsGatewayDto,
@@ -43,6 +46,7 @@ import {
   MFS_QR_UPLOAD_MAX_BYTES,
   validateMfsQrUploadFile,
 } from '../../shared/uploads/mfs-qr-upload.multer';
+import { processMfsQrImageUpload } from '../../shared/uploads/mfs-qr-image.processor';
 import {
   TestMfsSmsFormatDto,
   UpdateMfsSmsFormatsDto,
@@ -171,7 +175,7 @@ export class MfsPaymentController {
 }
 
 @UseGuards(RolesGuard)
-@Roles(Role.Admin, Role.Support)
+@Roles(Role.Admin, Role.Support, Role.ShopManager)
 @Controller('payments/admin/mfs')
 export class MfsAdminController {
   constructor(
@@ -187,24 +191,28 @@ export class MfsAdminController {
   }
 
   @Post('gateways')
+  @Roles(Role.Admin, Role.ShopManager)
   createGateway(@Body() dto: CreateMfsGatewayDto) {
     return this.gateways.create(dto);
   }
 
   @Patch('gateways/:id')
+  @Roles(Role.Admin, Role.ShopManager)
   updateGateway(@Param('id') id: string, @Body() dto: UpdateMfsGatewayDto) {
     return this.gateways.update(id, dto);
   }
 
   @Delete('gateways/:id')
+  @Roles(Role.Admin, Role.ShopManager)
   async deleteGateway(@Param('id') id: string) {
     await this.gateways.remove(id);
     return { ok: true };
   }
 
   @Post('gateways/qr-upload')
+  @Roles(Role.Admin, Role.ShopManager)
   @UseInterceptors(FileInterceptor('file', mfsQrUploadMulterOptions))
-  uploadQr(
+  async uploadQr(
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: MFS_QR_UPLOAD_MAX_BYTES })],
@@ -213,8 +221,9 @@ export class MfsAdminController {
     file: Express.Multer.File,
   ) {
     validateMfsQrUploadFile(file);
-    const url = this.uploads.buildMfsQrPublicUrl(file.filename);
-    return { url, filename: file.filename };
+    const filename = await processMfsQrImageUpload(file);
+    const url = this.uploads.buildMfsQrPublicUrl(filename);
+    return { url, filename };
   }
 
   @Get('sms-logs')
@@ -223,6 +232,7 @@ export class MfsAdminController {
   }
 
   @Post('sms-logs/bulk-delete')
+  @Roles(Role.Admin, Role.ShopManager)
   bulkDeleteSmsLogs(@Body() dto: DeleteSmsLogsDto) {
     if (!dto.ids?.length && !dto.trxIds?.length) {
       throw new BadRequestException('No SMS logs selected');
@@ -231,11 +241,13 @@ export class MfsAdminController {
   }
 
   @Post('sms-logs/bulk-status')
+  @Roles(Role.Admin, Role.ShopManager)
   bulkUpdateSmsLogsStatus(@Body() dto: BulkUpdateSmsLogsStatusDto) {
     return this.verification.bulkUpdateSmsLogStatus(dto.ids, dto.status);
   }
 
   @Patch('sms-logs/:id')
+  @Roles(Role.Admin, Role.ShopManager)
   updateSmsLogStatus(
     @Param('id') id: string,
     @Body() dto: UpdateSmsLogStatusDto,
@@ -244,6 +256,7 @@ export class MfsAdminController {
   }
 
   @Delete('sms-logs/:id')
+  @Roles(Role.Admin, Role.ShopManager)
   deleteSmsLog(@Param('id') id: string) {
     return this.verification.deleteSmsLog(id);
   }
@@ -253,9 +266,16 @@ export class MfsAdminController {
     return this.verification.listMfsIntents({ status });
   }
 
+  @UseGuards(PermissionsGuard)
+  @Roles(Role.Admin, Role.ShopManager)
+  @Permissions('approve_mfs_payments')
   @Post('intents/:id/approve')
-  approveIntent(@Param('id') id: string) {
-    return this.verification.adminApprove(id);
+  approveIntent(
+    @Param('id') id: string,
+    @Body() dto: ApproveMfsIntentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.verification.adminApprove(id, user, dto.reason);
   }
 
   @Get('sms-formats')
@@ -264,16 +284,19 @@ export class MfsAdminController {
   }
 
   @Put('sms-formats')
+  @Roles(Role.Admin, Role.ShopManager)
   updateSmsFormats(@Body() dto: UpdateMfsSmsFormatsDto) {
     return this.smsFormats.updateFormats(dto);
   }
 
   @Post('sms-formats/reset')
+  @Roles(Role.Admin, Role.ShopManager)
   resetSmsFormats() {
     return this.smsFormats.resetFormats();
   }
 
   @Post('sms-formats/test')
+  @Roles(Role.Admin, Role.ShopManager)
   testSmsFormat(@Body() dto: TestMfsSmsFormatDto) {
     return this.smsFormats.testParse(dto);
   }

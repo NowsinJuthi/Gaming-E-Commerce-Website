@@ -47,7 +47,10 @@ export class RecaptchaService {
     const minScore = effective.recaptcha.minScore ?? envCfg.minScore;
 
     if (!effective.recaptcha.enabled || !secret) {
-      return { success: true }; // disabled or not configured → allow (dev/sandbox)
+      if (this.config.get<string>('app.env') === 'production') {
+        return { success: false, reason: 'not_configured' };
+      }
+      return { success: true };
     }
     if (!token) {
       return { success: false, reason: 'missing_token' };

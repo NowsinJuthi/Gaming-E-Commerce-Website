@@ -71,7 +71,10 @@ export default function VerifyEmailPage() {
     setLoading(true);
     try {
       const res = await verifyEmail(email, code);
-      setTokens(res.accessToken, res.refreshToken);
+      setTokens(res.accessToken, res.csrfToken ?? res.refreshToken, {
+        roles: res.user?.roles,
+        expiresIn: res.expiresIn,
+      });
       await attachStoredReferral();
       router.push("/dashboard");
     } catch (err) {

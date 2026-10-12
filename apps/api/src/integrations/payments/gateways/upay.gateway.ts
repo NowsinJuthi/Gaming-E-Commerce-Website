@@ -9,4 +9,5 @@ export class UpayGateway extends BasePaymentGateway {
   protected readonly cfgKey = 'upay';
   protected override readonly createPath = '/api/v1/checkout';
   protected override readonly verifyPath = '/api/v1/verify';
+  protected override readonly refundPath = '/api/v1/refund';
 }

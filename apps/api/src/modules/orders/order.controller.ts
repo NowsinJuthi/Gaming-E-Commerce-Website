@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -18,6 +19,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { OrderStatus, Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { shouldRevealDeliveredCodes } from '../../common/utils/order-access';
 import type { OrderClientMeta } from '../../common/utils/order-client-meta';
 import { resolveClientIp } from '../../security/security.types';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -112,12 +114,16 @@ export class OrderController {
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Support)
   @Get('admin/list')
-  adminList(@Query() query: AdminOrderListQueryDto) {
+  adminList(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: AdminOrderListQueryDto,
+  ) {
     return this.orders.adminList({
       status: query.status,
       q: query.q,
       page: query.page,
       limit: query.limit,
+      user,
     });
   }
 
@@ -183,7 +189,14 @@ export class OrderController {
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Support)
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (dto.giftCards?.length && !shouldRevealDeliveredCodes(user)) {
+      throw new ForbiddenException('Access denied');
+    }
     return this.orders.updateStatus(
       id,
       dto.status,
@@ -202,7 +215,7 @@ export class OrderController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(Role.Admin, Role.Support)
+  @Roles(Role.Admin)
   @Patch(':id/manual-delivery')
   saveManualDelivery(
     @Param('id') id: string,
@@ -212,7 +225,7 @@ export class OrderController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(Role.Admin, Role.Support)
+  @Roles(Role.Admin)
   @Post(':id/refund')
   refund(@Param('id') id: string, @Body() dto: RefundOrderDto) {
     return this.orders.requestRefund(id, dto.reason);

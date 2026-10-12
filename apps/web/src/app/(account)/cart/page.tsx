@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -29,7 +30,7 @@ export default function CartPage() {
     let cancelled = false;
 
     async function loadCart() {
-      if (!localStorage.getItem("accessToken")) {
+      if (!hasAuthSession()) {
         const ok = await ensureShoppingSession();
         if (cancelled) return;
         if (!ok) {

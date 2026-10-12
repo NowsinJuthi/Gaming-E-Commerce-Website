@@ -5,7 +5,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_WS_URL",
+        "NEXT_PUBLIC_SITE_URL",
+        "INTERNAL_API_URL"
+      ]
     },
     "dev": {
       "cache": false,

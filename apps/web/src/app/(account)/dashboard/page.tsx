@@ -9,6 +9,7 @@ import {
   ApiError,
   clearTokens,
   getMe,
+  hasRefreshToken,
   getOrderStats,
   getWallet,
   listOrders,
@@ -48,7 +49,7 @@ export default function DashboardPage() {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          if (!localStorage.getItem("refreshToken")) {
+          if (!hasRefreshToken()) {
             clearTokens();
             router.replace("/login");
           }

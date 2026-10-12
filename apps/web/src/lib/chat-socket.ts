@@ -1,15 +1,14 @@
 import { io, type Socket } from "socket.io-client";
+import { hasAuthSession } from "@/lib/access-token";
 import { getWsBase } from "@/lib/ws-base";
 
 let _socket: Socket | null = null;
 let _holderCount = 0;
 let _authListenerAttached = false;
-let _lastToken: string | null = null;
+let _lastAuthed = false;
 
-function currentToken(): string | null {
-  return typeof window !== "undefined"
-    ? localStorage.getItem("accessToken")
-    : null;
+function currentAuthed(): boolean {
+  return typeof window !== "undefined" ? hasAuthSession() : false;
 }
 
 function reconnectChatSocket(socket: Socket): void {
@@ -25,16 +24,16 @@ function attachAuthListener(): void {
 
   const syncAuth = () => {
     if (!_socket) return;
-    const nextToken = currentToken();
-    if (!nextToken) {
-      _lastToken = null;
+    const nextAuthed = currentAuthed();
+    if (!nextAuthed) {
+      _lastAuthed = false;
       _socket.disconnect();
       return;
     }
-    const tokenChanged = _lastToken !== nextToken;
-    _lastToken = nextToken;
-    _socket.auth = { token: nextToken };
-    if (tokenChanged) {
+    const authChanged = _lastAuthed !== nextAuthed;
+    _lastAuthed = nextAuthed;
+    _socket.auth = {};
+    if (authChanged) {
       reconnectChatSocket(_socket);
     } else if (!_socket.connected) {
       _socket.connect();
@@ -43,15 +42,16 @@ function attachAuthListener(): void {
 
   window.addEventListener("auth-change", syncAuth);
   window.addEventListener("storage", (event) => {
-    if (event.key === "accessToken" || event.key === "refreshToken") {
+    if (event.key === "authSession" || event.key === "authMeta") {
       syncAuth();
     }
   });
 }
 
-function createSocket(token: string): Socket {
+function createSocket(): Socket {
   return io(`${getWsBase()}/chat`, {
-    auth: { token },
+    withCredentials: true,
+    auth: {},
     transports: ["websocket", "polling"],
     autoConnect: true,
     reconnection: true,
@@ -66,18 +66,17 @@ function createSocket(token: string): Socket {
  * reuse one connection instead of opening duplicates.
  */
 export function acquireChatSocket(): Socket | null {
-  const token = currentToken();
-  if (!token) return null;
+  if (!currentAuthed()) return null;
 
-  const tokenChanged = Boolean(_lastToken && _lastToken !== token);
-  _lastToken = token;
+  const authChanged = _lastAuthed === false;
+  _lastAuthed = true;
 
   if (!_socket) {
-    _socket = createSocket(token);
+    _socket = createSocket();
     attachAuthListener();
   } else {
-    _socket.auth = { token };
-    if (tokenChanged && _socket.connected) {
+    _socket.auth = {};
+    if (authChanged && _socket.connected) {
       reconnectChatSocket(_socket);
     } else if (!_socket.connected) {
       _socket.connect();
@@ -94,7 +93,7 @@ export function releaseChatSocket(): void {
   if (_holderCount === 0 && _socket) {
     _socket.disconnect();
     _socket = null;
-    _lastToken = null;
+    _lastAuthed = false;
   }
 }
 
@@ -103,9 +102,6 @@ export function createChatSocket(token: string): Socket {
   const socket = acquireChatSocket();
   if (!socket) {
     throw new Error("Chat socket requires an access token");
-  }
-  if (token) {
-    socket.auth = { token };
   }
   return socket;
 }

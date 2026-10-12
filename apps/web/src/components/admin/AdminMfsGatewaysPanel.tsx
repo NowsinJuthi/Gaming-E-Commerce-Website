@@ -131,6 +131,7 @@ export function AdminMfsGatewaysPanel() {
   const [uploading, setUploading] = useState(false);
   const [qrUploadError, setQrUploadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [approveReason, setApproveReason] = useState("");
   const qrFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -271,9 +272,15 @@ export function AdminMfsGatewaysPanel() {
   }
 
   async function handleApprove(intentId: string) {
+    const reason = approveReason.trim();
+    if (reason.length < 8) {
+      adminToast("Enter an audit reason (at least 8 characters)", false);
+      return;
+    }
     try {
-      await approveAdminMfsIntent(intentId);
+      await approveAdminMfsIntent(intentId, reason);
       adminToast("Payment approved", true);
+      setApproveReason("");
       await load();
     } catch (err) {
       adminToast(err instanceof Error ? err.message : "Approve failed", false);
@@ -543,6 +550,16 @@ export function AdminMfsGatewaysPanel() {
               <PulseIcon className="h-4 w-4 text-amber-400" aria-hidden />
               Pending verifications
             </h3>
+            <label className="mb-3 block">
+              <span className={labelCls}>Manual approval reason</span>
+              <input
+                className={inputCls}
+                value={approveReason}
+                onChange={(event) => setApproveReason(event.target.value)}
+                placeholder="Why this MFS payment is being settled"
+                maxLength={500}
+              />
+            </label>
             <ul className="space-y-2">
               {pending.map((row) => (
                 <li

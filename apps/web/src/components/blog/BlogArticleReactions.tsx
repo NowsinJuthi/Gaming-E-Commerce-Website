@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -76,7 +77,7 @@ export function BlogArticleReactions({
   const [error, setError] = useState<string | null>(null);
 
   const syncAuth = useCallback(() => {
-    setIsLoggedIn(Boolean(localStorage.getItem("accessToken")));
+    setIsLoggedIn(hasAuthSession());
   }, []);
 
   useEffect(() => {

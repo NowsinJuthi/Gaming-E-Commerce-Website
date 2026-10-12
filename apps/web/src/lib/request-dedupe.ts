@@ -1,3 +1,5 @@
+import { hasAuthSession } from "@/lib/access-token";
+
 const inFlight = new Map<string, Promise<unknown>>();
 
 export function dedupeKey(
@@ -7,7 +9,7 @@ export function dedupeKey(
 ): string {
   const token =
     authenticated && typeof window !== "undefined"
-      ? (localStorage.getItem("accessToken") ?? "")
+      ? (hasAuthSession() ? "session" : "")
       : "";
   return `${method.toUpperCase()}:${url}:${token}`;
 }

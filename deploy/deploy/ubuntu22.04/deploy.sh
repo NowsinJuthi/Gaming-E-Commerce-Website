@@ -45,11 +45,17 @@ run_uniqbd corepack pnpm install --frozen-lockfile
 systemctl stop uniqbd-web.service uniqbd-api.service 2>/dev/null || true
 rm -rf "$APP_DIR/apps/api/dist" "$APP_DIR/apps/web/.next" "$APP_DIR/.turbo"
 
+log "Building shared packages"
+run_uniqbd corepack pnpm --filter @uniqbd/types build
+
 log "Building API"
 run_uniqbd corepack pnpm --filter @uniqbd/api build
 [[ -f "$APP_DIR/apps/api/dist/main.js" ]] || fail "API build did not create dist/main.js"
 
 log "Building Next.js with /etc/uniqbd/web.env"
+grep '^NEXT_PUBLIC_' "$WEB_ENV" >"$APP_DIR/apps/web/.env.production"
+chown uniqbd:uniqbd "$APP_DIR/apps/web/.env.production"
+chmod 0640 "$APP_DIR/apps/web/.env.production"
 runuser -u uniqbd -- env HOME=/opt/uniqbd bash -c \
   'set -a; source /etc/uniqbd/web.env; set +a; exec corepack pnpm --filter @uniqbd/web build'
 [[ -f "$APP_DIR/apps/web/.next/BUILD_ID" ]] || fail "Web build did not create .next/BUILD_ID"

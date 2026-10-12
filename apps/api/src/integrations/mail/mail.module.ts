@@ -11,6 +11,7 @@ import {
 import { CustomerPanelModule } from '../../modules/customer-panel/customer-panel.module';
 import { ContactInquiriesModule } from '../../modules/contact-inquiries/contact-inquiries.module';
 import { LicenseModule } from '../../modules/license/license.module';
+import { SecurityModule } from '../../security/security.module';
 import { ContactController } from './contact.controller';
 import { EmailAdminController } from './email-admin.controller';
 import { EmailSettingsService } from './email-settings.service';
@@ -24,6 +25,7 @@ import { MailerService } from './mailer.service';
     CustomerPanelModule,
     ContactInquiriesModule,
     LicenseModule,
+    SecurityModule,
     MongooseModule.forFeature([
       { name: EmailSettings.name, schema: EmailSettingsSchema },
       { name: EmailTemplate.name, schema: EmailTemplateSchema },

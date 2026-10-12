@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AdminOrderTwoColumnLayout,
 } from "@/components/admin/admin-order-page-shell";
@@ -13,6 +13,7 @@ import { adminToast, hideAdminToast } from "@/lib/admin-toast";
 import {
   activateLicenseKey,
   deactivateLicense,
+  updateLicenseSettings,
   validateLicense,
   type LicenseAdminStatus,
 } from "@/lib/api";
@@ -53,10 +54,45 @@ export default function AdminLicenseSettingsPage() {
   const [validating, setValidating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [replacingKey, setReplacingKey] = useState(false);
+  const [vendorApiUrl, setVendorApiUrl] = useState("");
+  const [vendorProductId, setVendorProductId] = useState("");
+  const [vendorWebsiteId, setVendorWebsiteId] = useState("");
+  const [vendorSiteSecret, setVendorSiteSecret] = useState("");
+  const [savingVendor, setSavingVendor] = useState(false);
 
   const hasSavedKey = Boolean(status?.licenseKeyMasked || status?.configured);
   const licenseActive = Boolean(status?.valid && !status?.devBypass);
   const showMaskedKey = hasSavedKey && !replacingKey;
+
+  useEffect(() => {
+    if (!status) return;
+    setVendorApiUrl((prev) => prev || status.apiUrl || "");
+    setVendorProductId((prev) => prev || status.productId || "");
+    setVendorWebsiteId((prev) => prev || status.websiteId || "");
+  }, [status]);
+
+  async function onSaveVendorConfig() {
+    setSavingVendor(true);
+    hideAdminToast();
+    try {
+      await updateLicenseSettings({
+        apiUrl: vendorApiUrl.trim() || undefined,
+        productId: vendorProductId.trim() || undefined,
+        websiteId: vendorWebsiteId.trim() || undefined,
+        ...(vendorSiteSecret.trim()
+          ? { siteSecret: vendorSiteSecret.trim() }
+          : {}),
+      });
+      setVendorSiteSecret("");
+      invalidateLicenseStatusCache();
+      await reload();
+      adminToast("Server license settings saved (MongoDB).", true);
+    } catch (err) {
+      adminToast(err instanceof Error ? err.message : "Could not save settings.", false);
+    } finally {
+      setSavingVendor(false);
+    }
+  }
 
   async function onActivate() {
     const key = licenseKey.trim();
@@ -180,9 +216,8 @@ export default function AdminLicenseSettingsPage() {
               >
                 {!status.serverReady && !status.devBypass ? (
                   <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
-                    Server vendor config is missing. Set site secret in{" "}
-                    <code className="text-xs">license.vendor-config.ts</code> before
-                    deploy.
+                    Save the vendor site secret below (stored in MongoDB — not in
+                    api.env), then activate your license key.
                   </div>
                 ) : null}
                 {status.devBypass ? (
@@ -212,6 +247,82 @@ export default function AdminLicenseSettingsPage() {
                 </dl>
               </ProductFormOrderCard>
             ) : null}
+
+            <ProductFormOrderCard
+              icon={<ShieldIcon className="h-4 w-4" />}
+              title="Server license settings"
+              subtitle="Stored in MongoDB on this server (not api.env)"
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className={labelCls} htmlFor="license-api-url">
+                    License API URL
+                  </label>
+                  <input
+                    id="license-api-url"
+                    className={inputCls}
+                    value={vendorApiUrl}
+                    onChange={(e) => setVendorApiUrl(e.target.value)}
+                    placeholder="https://license.amarpin.com/api"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className={labelCls} htmlFor="license-product-id">
+                      Product ID
+                    </label>
+                    <input
+                      id="license-product-id"
+                      className={inputCls}
+                      value={vendorProductId}
+                      onChange={(e) => setVendorProductId(e.target.value)}
+                      placeholder="amarpin-pro"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="license-website-id">
+                      Website ID
+                    </label>
+                    <input
+                      id="license-website-id"
+                      className={inputCls}
+                      value={vendorWebsiteId}
+                      onChange={(e) => setVendorWebsiteId(e.target.value)}
+                      placeholder="uniqbd.com"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls} htmlFor="license-site-secret">
+                    Site secret (from vendor)
+                  </label>
+                  <input
+                    id="license-site-secret"
+                    type="password"
+                    className={`font-mono ${inputCls}`}
+                    value={vendorSiteSecret}
+                    onChange={(e) => setVendorSiteSecret(e.target.value)}
+                    placeholder={
+                      status?.hasSiteSecret
+                        ? "Saved — paste only to replace"
+                        : "Paste site secret"
+                    }
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary btn-primary-sm"
+                  disabled={savingVendor || activating || validating || deactivating}
+                  onClick={() => void onSaveVendorConfig()}
+                >
+                  {savingVendor ? "Saving…" : "Save server settings"}
+                </button>
+              </div>
+            </ProductFormOrderCard>
 
             <ProductFormOrderCard
               icon={<KeyIcon className="h-4 w-4" />}

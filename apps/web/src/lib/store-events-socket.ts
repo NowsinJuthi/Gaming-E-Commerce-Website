@@ -17,12 +17,6 @@ import { getWsBase } from "@/lib/ws-base";
 let _socket: Socket | null = null;
 let _authChangeListenerAttached = false;
 
-function currentToken(): string | null {
-  return typeof window !== "undefined"
-    ? localStorage.getItem("accessToken")
-    : null;
-}
-
 /**
  * Returns the singleton /events socket, creating it on first call.
  *
@@ -32,12 +26,9 @@ function currentToken(): string | null {
 export function getStoreEventsSocket(): Socket {
   if (_socket) return _socket;
 
-  const token = currentToken();
-
   _socket = io(`${getWsBase()}/events`, {
-    // Pass token if available; omit key if anonymous so the server doesn't
-    // attempt to validate an empty string.
-    auth: token ? { token } : {},
+    withCredentials: true,
+    auth: {},
     // websocket-only avoids the HTTP polling round-trip on every navigation.
     transports: ["websocket"],
     autoConnect: true,
@@ -54,8 +45,7 @@ export function getStoreEventsSocket(): Socket {
     _authChangeListenerAttached = true;
     window.addEventListener("auth-change", () => {
       if (!_socket) return;
-      const nextToken = currentToken();
-      _socket.auth = nextToken ? { token: nextToken } : {};
+      _socket.auth = {};
       // Reconnect so the server validates the updated credentials.
       if (!_socket.connected) {
         _socket.connect();

@@ -1,4 +1,8 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  isSandboxIntegrationsAllowed,
+  requireConfiguredOrSandbox,
+} from '../../common/utils/sandbox-integrations';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { PaymentGateway } from '../../common/enums';
@@ -9,9 +13,15 @@ import {
   CreateChargeResult,
   NormalizedPaymentStatus,
   PaymentGatewayClient,
+  RefundChargeInput,
+  RefundChargeResult,
   VerifyResult,
   WebhookParseResult,
 } from './payment-gateway.interface';
+import {
+  gatewayRefundPath,
+  isConfirmedGatewayRefund,
+} from '../../modules/payments/payment-gateway-refund';
 
 type Json = Record<string, unknown>;
 
@@ -42,8 +52,8 @@ const HTTP_TIMEOUT_MS = 15_000;
 /**
  * Shared adapter behavior. Concrete gateways override config key, endpoint
  * paths, auth headers, and status mapping. When credentials are absent the
- * adapter degrades to a deterministic sandbox flow so the full payment
- * lifecycle is exercisable in development.
+ * adapter degrades to a deterministic sandbox flow only when
+ * ALLOW_SANDBOX_INTEGRATIONS=true outside production. Production fail-closes.
  */
 @Injectable()
 export abstract class BasePaymentGateway implements PaymentGatewayClient {
@@ -51,6 +61,7 @@ export abstract class BasePaymentGateway implements PaymentGatewayClient {
   protected abstract readonly cfgKey: string;
   protected readonly createPath: string = '/create';
   protected readonly verifyPath: string = '/verify';
+  protected readonly refundPath: string | null = null;
   protected readonly logger = new Logger(this.constructor.name);
 
   constructor(
@@ -111,6 +122,7 @@ export abstract class BasePaymentGateway implements PaymentGatewayClient {
   async createCharge(input: CreateChargeInput): Promise<CreateChargeResult> {
     const cfg = this.config();
     if (!this.isConfigured(cfg)) {
+      requireConfiguredOrSandbox(false, this.gateway);
       return this.sandboxCharge(input);
     }
     const body = this.buildCreateBody(input);
@@ -160,6 +172,61 @@ export abstract class BasePaymentGateway implements PaymentGatewayClient {
     };
   }
 
+  async refundCharge(input: RefundChargeInput): Promise<RefundChargeResult> {
+    const path = this.refundPath ?? gatewayRefundPath(this.gateway);
+    if (!path) {
+      return { supported: false };
+    }
+    const cfg = this.config();
+    if (!this.isConfigured(cfg)) {
+      if (isSandboxIntegrationsAllowed()) {
+        return {
+          supported: true,
+          ok: true,
+          refundRef: `sandbox-void:${input.gatewayRef}`,
+        };
+      }
+      return { supported: false };
+    }
+    try {
+      const json = await this.httpJson(`${cfg.baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          ...this.authHeaders(cfg),
+          'Idempotency-Key': input.idempotencyKey,
+        },
+        body: JSON.stringify(this.buildRefundBody(input)),
+      });
+      const rawStatus = firstString(json, [
+        'status',
+        'refundStatus',
+        'transactionStatus',
+      ]);
+      if (!isConfirmedGatewayRefund(rawStatus) && !isConfirmedGatewayRefund(this.mapStatus(rawStatus))) {
+        return {
+          supported: true,
+          ok: false,
+          error: 'Gateway did not confirm refund',
+          raw: json,
+        };
+      }
+      return {
+        supported: true,
+        ok: true,
+        refundRef:
+          firstString(json, ['id', 'refundId', 'refund_id', 'reference']) ??
+          input.idempotencyKey,
+        raw: json,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/\bHTTP 404\b|\bHTTP 405\b/.test(message)) {
+        return { supported: false };
+      }
+      return { supported: true, ok: false, error: message };
+    }
+  }
+
   parseWebhook(
     payload: unknown,
     signature: string | undefined,
@@ -207,6 +274,17 @@ export abstract class BasePaymentGateway implements PaymentGatewayClient {
     return { reference: gatewayRef, id: gatewayRef };
   }
 
+  protected buildRefundBody(input: RefundChargeInput): Json {
+    return {
+      reference: input.gatewayRef,
+      id: input.gatewayRef,
+      amount: input.amount,
+      currency: input.currency,
+      idempotencyKey: input.idempotencyKey,
+      reason: input.reason,
+    };
+  }
+
   // --- Internals ---
 
   protected verifySignature(raw: string, signature?: string): boolean {
@@ -215,7 +293,7 @@ export abstract class BasePaymentGateway implements PaymentGatewayClient {
       // Fail CLOSED in production: an unsigned webhook must never be allowed to
       // settle a payment when no secret is configured. Only the sandbox/dev
       // flow accepts unsigned webhooks for convenience.
-      if ((process.env.NODE_ENV ?? 'development') === 'production') {
+      if (!isSandboxIntegrationsAllowed()) {
         this.logger.error(
           `${this.gateway} webhook secret is not configured — rejecting webhook`,
         );

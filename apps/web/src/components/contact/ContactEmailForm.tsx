@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitContactForm } from "@/lib/api";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 import { CONTACT_EMAIL_CARD_CLASS } from "@/components/contact/contact-email-card";
 
 type ContactEmailFormProps = {
@@ -51,12 +52,16 @@ export function ContactEmailForm({
     setBusy(true);
     setError(null);
     try {
-      await submitContactForm({
-        name: name.trim(),
-        email: email.trim(),
-        subject: subject.trim(),
-        message: message.trim(),
-      });
+      const captcha = await getRecaptchaToken("contact");
+      await submitContactForm(
+        {
+          name: name.trim(),
+          email: email.trim(),
+          subject: subject.trim(),
+          message: message.trim(),
+        },
+        captcha,
+      );
       setSent(true);
       setName("");
       setEmail("");

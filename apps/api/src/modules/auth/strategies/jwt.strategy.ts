@@ -5,6 +5,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UserStatus } from '../../../common/enums';
 import { isEphemeralGuestUser } from '../../../common/utils/guest-user';
 import { UsersService } from '../../users/users.service';
+import { accessTokenVersionMatches } from '../access-token-version';
+import { ACCESS_COOKIE_NAME, readNamedCookie } from '../auth-cookies';
 import type { AuthenticatedUser, JwtPayload } from '../auth.types';
 
 @Injectable()
@@ -18,7 +20,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error('JWT access secret is not configured');
     }
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: { headers?: { cookie?: string } } | null) =>
+          readNamedCookie(req?.headers?.cookie, ACCESS_COOKIE_NAME) ?? null,
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
     });
@@ -45,6 +51,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       user.status === UserStatus.Suspended
     ) {
       throw new UnauthorizedException('Account is not active');
+    }
+    if (!accessTokenVersionMatches(payload.ver, user.tokenVersion)) {
+      throw new UnauthorizedException('Session is no longer valid');
     }
 
     const isGuest = isEphemeralGuestUser(user);

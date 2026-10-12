@@ -1,4 +1,5 @@
 "use client";
+import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -6,7 +7,6 @@ import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getCart, getMe, logoutUser } from "@/lib/api";
 import { useCanAccessAdminPanel } from "@/hooks/useAdminPermissions";
 import { getPrimaryRoleLabel } from "@/lib/admin-order-view";
-import { rolesFromAccessToken } from "@/lib/auth-roles";
 import {
   isGuestCheckoutSession,
   isRegisteredUserLoggedIn,
@@ -375,7 +375,7 @@ export function Header({
   // paint so the logged-in state is correct from the very first render.
   useIsomorphicLayoutEffect(() => {
     const sync = () => {
-      const token = !!localStorage.getItem("accessToken");
+      const token = hasAuthSession();
       const registered = isRegisteredUserLoggedIn();
       setLoggedIn(registered);
       if (!token || isGuestCheckoutSession()) {
@@ -387,8 +387,7 @@ export function Header({
         if (!token) return;
       }
       if (!registered) return;
-      const accessToken = localStorage.getItem("accessToken");
-      setRoleLabel(getPrimaryRoleLabel(rolesFromAccessToken(accessToken)));
+      setRoleLabel(getPrimaryRoleLabel(getSessionRoles()));
       getMe()
         .then((u) => {
           const name =
@@ -401,7 +400,7 @@ export function Header({
         })
         .catch(() => {
           setDisplayName("UniQbd");
-          setRoleLabel(getPrimaryRoleLabel(rolesFromAccessToken(accessToken)));
+          setRoleLabel(getPrimaryRoleLabel(getSessionRoles()));
         });
     };
     sync();
@@ -415,7 +414,7 @@ export function Header({
 
   useEffect(() => {
     const refresh = () => {
-      if (!localStorage.getItem("accessToken")) {
+      if (!hasAuthSession()) {
         setCartCount(0);
         return;
       }

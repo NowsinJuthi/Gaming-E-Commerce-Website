@@ -1,4 +1,5 @@
 "use client";
+import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,15 +26,12 @@ import type { ChatSupportAgent } from "@/lib/api";
 import { FabChatBubbleIcon } from "@/components/chat/FabChatBubbleIcon";
 import { canAccessLiveChat } from "@/lib/chat-access";
 import { useChatOverlayLock } from "@/hooks/useChatOverlayLock";
-import { rolesFromAccessToken } from "@/lib/auth-roles";
 
 type ChatLauncherRole = "guest" | "customer" | "staff";
 
 function resolveLauncherRole(): ChatLauncherRole {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-  if (!token) return "guest";
-  const roles = rolesFromAccessToken(token);
+  if (typeof window === "undefined" || !hasAuthSession()) return "guest";
+  const roles = getSessionRoles();
   if (roles.includes("admin") || roles.includes("support")) return "staff";
   return "customer";
 }
@@ -123,7 +121,11 @@ export function LiveChatLauncher({
     setGuestError(null);
     try {
       const result = await startGuestChatSession(guestName.trim());
-      setTokens(result.accessToken, result.refreshToken);
+      setTokens(result.accessToken, result.csrfToken ?? result.refreshToken, {
+        guest: true,
+        roles: result.user?.roles,
+        expiresIn: result.expiresIn,
+      });
       syncRole();
     } catch {
       setGuestError("Could not start chat. Please try again.");

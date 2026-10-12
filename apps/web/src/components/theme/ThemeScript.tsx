@@ -58,11 +58,14 @@ function buildThemeScript(defaults: Pick<SiteAppearance, "defaultTheme" | "accen
 
 export function ThemeScript({
   defaults,
+  nonce,
 }: {
   defaults: Pick<SiteAppearance, "defaultTheme" | "accent">;
+  nonce?: string;
 }) {
   return (
     <script
+      nonce={nonce}
       dangerouslySetInnerHTML={{ __html: buildThemeScript(defaults) }}
       suppressHydrationWarning
     />

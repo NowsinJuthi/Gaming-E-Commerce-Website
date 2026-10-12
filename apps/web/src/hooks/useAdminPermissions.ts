@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +18,7 @@ export function hasAdminPermission(
 export function useAdminPermissions() {
   const queryClient = useQueryClient();
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    typeof window !== "undefined" ? hasAuthSession() : false;
   const enabled = Boolean(token);
 
   const query = useQuery({

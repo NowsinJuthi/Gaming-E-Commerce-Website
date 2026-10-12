@@ -3,6 +3,7 @@ import Script from "next/script";
 type Props = {
   gtmId?: string;
   facebookPixelId?: string;
+  nonce?: string;
 };
 
 /**
@@ -28,8 +29,10 @@ const ADMIN_PATH_GUARD = `!/^\\/admin(\\/|$)/.test(location.pathname)`;
  */
 export function GaHeadScript({
   googleAnalyticsId,
+  nonce,
 }: {
   googleAnalyticsId?: string;
+  nonce?: string;
 }) {
   const id = googleAnalyticsId?.trim() ?? "";
   if (!GA_ID_RE.test(id)) return null;
@@ -46,9 +49,10 @@ export function GaHeadScript({
     <>
       <script
         async
+        nonce={nonce}
         src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`}
       />
-      <script dangerouslySetInnerHTML={{ __html: init }} />
+      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: init }} />
     </>
   );
 }
@@ -60,19 +64,19 @@ export function GaHeadScript({
  * (Google Analytics lives in {@link GaHeadScript} instead — Search Console
  * verification requires it inside <head>.)
  */
-export function SeoScripts({ gtmId, facebookPixelId }: Props) {
+export function SeoScripts({ gtmId, facebookPixelId, nonce }: Props) {
   const gtm = gtmId?.trim() ?? "";
   const pixel = facebookPixelId?.trim() ?? "";
   return (
     <>
       {GTM_ID_RE.test(gtm) ? (
-        <Script id="gtm-init" strategy="afterInteractive">
+        <Script id="gtm-init" strategy="afterInteractive" nonce={nonce}>
           {`if(${ADMIN_PATH_GUARD}){(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${gtm}');}`}
         </Script>
       ) : null}
 
       {FB_PIXEL_RE.test(pixel) ? (
-        <Script id="fb-pixel-init" strategy="afterInteractive">
+        <Script id="fb-pixel-init" strategy="afterInteractive" nonce={nonce}>
           {`if(${ADMIN_PATH_GUARD}){!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixel}');fbq('track','PageView');}`}
         </Script>
       ) : null}
@@ -82,11 +86,12 @@ export function SeoScripts({ gtmId, facebookPixelId }: Props) {
 
 /** GTM `<noscript>` fallback — must live at the top of <body>. */
 export function GtmNoScript({ gtmId }: { gtmId?: string }) {
-  if (!gtmId) return null;
+  const id = gtmId?.trim() ?? "";
+  if (!GTM_ID_RE.test(id)) return null;
   return (
     <noscript>
       <iframe
-        src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+        src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(id)}`}
         height="0"
         width="0"
         style={{ display: "none", visibility: "hidden" }}

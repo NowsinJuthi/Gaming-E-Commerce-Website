@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,7 +33,7 @@ export function CustomerPanelShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const sync = () => setLoggedIn(!!localStorage.getItem("accessToken"));
+    const sync = () => setLoggedIn(hasAuthSession());
     sync();
     window.addEventListener("auth-change", sync);
     void getCustomerPanelConfig().then(setConfig);

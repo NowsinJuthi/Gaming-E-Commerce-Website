@@ -1,7 +1,10 @@
 import { chromium } from "playwright";
 
-const email = "admin@uniqbd.com";
-const password = "Admin1234!";
+const email = process.env.TEST_ADMIN_EMAIL;
+const password = process.env.TEST_ADMIN_PASSWORD;
+if (!email || !password) {
+  throw new Error("Set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD");
+}
 
 let loginRequest = null;
 let consoleErrors = [];

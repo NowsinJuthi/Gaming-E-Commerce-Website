@@ -9,4 +9,5 @@ export class NagadGateway extends BasePaymentGateway {
   protected readonly cfgKey = 'nagad';
   protected override readonly createPath = '/api/dfs/check-out/initialize';
   protected override readonly verifyPath = '/api/dfs/verify/payment';
+  protected override readonly refundPath = '/api/dfs/refund';
 }

@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -120,7 +121,7 @@ export function MfsCheckoutView({ intentId }: Props) {
 
   const load = useCallback(async () => {
     try {
-      if (!localStorage.getItem("accessToken")) {
+      if (!hasAuthSession()) {
         await ensureShoppingSession();
       }
       const data = await getMfsCheckoutSession(intentId);
@@ -150,7 +151,7 @@ export function MfsCheckoutView({ intentId }: Props) {
 
   useEffect(() => {
     function onAuthChange() {
-      if (sessionExpired && localStorage.getItem("accessToken")) {
+      if (sessionExpired && hasAuthSession()) {
         setLoading(true);
         void load();
       }

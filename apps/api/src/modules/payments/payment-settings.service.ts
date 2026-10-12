@@ -9,7 +9,9 @@ import {
   PaymentSettings,
   PaymentSettingsDocument,
 } from '../../database/schemas/payment-settings.schema';
+import { isSandboxIntegrationsAllowed } from '../../common/utils/sandbox-integrations';
 import { UpdatePaymentSettingsDto } from './dto/update-payment-settings.dto';
+import { resolvePaymentGatewayMode } from './payment-gateway-mode';
 import {
   PAYMENT_GATEWAY_HINTS,
   PAYMENT_GATEWAY_LABELS,
@@ -39,7 +41,7 @@ export type PaymentGatewaySettingsView = {
   enabled: boolean;
   sandbox: boolean;
   configured: boolean;
-  mode: 'live' | 'sandbox' | 'disabled';
+  mode: 'live' | 'sandbox' | 'disabled' | 'misconfigured';
   baseUrl?: string;
   hasApiKey: boolean;
   hasApiSecret: boolean;
@@ -96,6 +98,9 @@ export class PaymentSettingsService implements OnModuleInit {
   }
 
   isSandbox(cfgKey: string): boolean {
+    if (!isSandboxIntegrationsAllowed()) {
+      return false;
+    }
     const gateway = cfgKey as PaymentGateway;
     const entry = this.getEffectiveSync().gateways[gateway];
     if (!entry?.enabled) return true;
@@ -266,11 +271,12 @@ export class PaymentSettingsService implements OnModuleInit {
     effective: EffectiveGateway,
   ): PaymentGatewaySettingsView {
     const env = this.config.get<GatewayConfig>(`payments.${id}`) ?? {};
-    const mode: PaymentGatewaySettingsView['mode'] = !effective.enabled
-      ? 'disabled'
-      : effective.sandbox || !effective.configured
-        ? 'sandbox'
-        : 'live';
+    const mode: PaymentGatewaySettingsView['mode'] = resolvePaymentGatewayMode({
+      enabled: effective.enabled,
+      configured: effective.configured,
+      sandbox: effective.sandbox,
+      sandboxAllowed: isSandboxIntegrationsAllowed(),
+    });
     return {
       id,
       label: PAYMENT_GATEWAY_LABELS[id],

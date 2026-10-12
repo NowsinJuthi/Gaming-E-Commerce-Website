@@ -1,3 +1,4 @@
+import { hasAuthSession } from "@/lib/access-token";
 import type { Route } from "next";
 import type { OrderDetail } from "@/lib/api";
 import { resolveOrderId } from "@/lib/api";
@@ -5,7 +6,7 @@ import { isRegisteredUserLoggedIn } from "@/lib/guest-checkout";
 
 export function isUserLoggedIn(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(localStorage.getItem("accessToken"));
+  return hasAuthSession();
 }
 
 type PostOrderOptions = {

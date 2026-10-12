@@ -5,8 +5,13 @@
 require('../apps/api/scripts/load-env.cjs').loadApiEnv();
 
 const API = (process.argv[2] || 'http://127.0.0.1:4000/api').replace(/\/$/, '');
-const ADMIN_EMAIL = process.argv[3] || 'admin@uniqbd.com';
-const ADMIN_PASSWORD = process.argv[4] || 'Admin1234!';
+const ADMIN_EMAIL = process.argv[3] || process.env.TEST_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.argv[4] || process.env.TEST_ADMIN_PASSWORD;
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  throw new Error(
+    'Pass admin email/password arguments or set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD',
+  );
+}
 const TEST_CUSTOMER_EMAIL =
   process.env.TEST_CUSTOMER_EMAIL || `uniqbd-email-test+${Date.now()}@gmail.com`;
 

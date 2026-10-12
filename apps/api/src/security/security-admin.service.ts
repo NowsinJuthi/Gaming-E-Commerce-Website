@@ -10,6 +10,8 @@ import {
   AuditLogDocument,
 } from '../database/schemas/audit-log.schema';
 import { CacheService } from '../shared/cache/cache.service';
+import { PlaintextSecretsService } from '../shared/crypto/plaintext-secrets.service';
+import { sumPlaintextCounts } from '../shared/crypto/plaintext-secrets';
 import { AccessBlockService } from './access-block.service';
 import { SecuritySettingsService } from './security-settings.service';
 
@@ -23,6 +25,7 @@ export class SecurityAdminService {
     @InjectModel(ActivityLog.name)
     private readonly activityModel: Model<ActivityLogDocument>,
     private readonly cache: CacheService,
+    private readonly plaintextSecrets: PlaintextSecretsService,
   ) {}
 
   async overview(): Promise<{
@@ -68,6 +71,14 @@ export class SecurityAdminService {
       estimatedMonthlyVisitors: string;
       recommendation: string;
     };
+    encryption: {
+      legacyPlaintext: {
+        inventoryItems: number;
+        orderDeliveredCodes: number;
+        resellerOrderCodes: number;
+        total: number;
+      };
+    };
   }> {
     const effective = await this.settings.getEffective();
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -80,6 +91,7 @@ export class SecurityAdminService {
       activity24h,
       redisPing,
       blockCounts,
+      legacyPlaintext,
     ] = await Promise.all([
       this.auditModel.countDocuments().exec(),
       this.auditModel.countDocuments({ createdAt: { $gte: since } }).exec(),
@@ -90,6 +102,7 @@ export class SecurityAdminService {
       this.activityModel.countDocuments({ createdAt: { $gte: since } }).exec(),
       this.cache.redis.ping().catch(() => null),
       this.blocks.counts(),
+      this.plaintextSecrets.countLegacyPlaintext(),
     ]);
 
     const samplePct = Math.round(effective.activity.sampleRate * 100);
@@ -143,6 +156,12 @@ export class SecurityAdminService {
             : samplePct === 100 && activity24h > 50_000
               ? 'Consider lowering activity sample rate (e.g. 0.25) to reduce DB writes.'
               : 'Redis-backed rate limiting active — suitable for multi-instance deployment.',
+      },
+      encryption: {
+        legacyPlaintext: {
+          ...legacyPlaintext,
+          total: sumPlaintextCounts(legacyPlaintext),
+        },
       },
     };
   }

@@ -69,6 +69,16 @@ import { LicenseModule } from './modules/license/license.module';
           'req.headers.cookie',
           'req.headers["x-api-key"]',
           'req.headers["x-recaptcha-token"]',
+          'req.headers["x-captcha-token"]',
+          'req.headers["x-csrf-token"]',
+          'req.headers["x-mfs-sms-token"]',
+          'req.body.password',
+          'req.body.refreshToken',
+          'req.body.code',
+          'req.body.otp',
+          'req.body.currentPassword',
+          'req.body.newPassword',
+          'req.body.confirmPassword',
         ],
         // Skip noisy health-probe access logs.
         autoLogging: {

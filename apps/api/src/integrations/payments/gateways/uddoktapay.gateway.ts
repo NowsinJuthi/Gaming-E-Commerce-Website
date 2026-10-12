@@ -17,6 +17,7 @@ export class UddoktapayGateway extends BasePaymentGateway {
   protected readonly cfgKey = 'uddoktapay';
   protected override readonly createPath = '/api/checkout-v2';
   protected override readonly verifyPath = '/api/verify-payment';
+  protected override readonly refundPath = '/api/refund-payment';
 
   protected override authHeaders(cfg: GatewayConfig): Record<string, string> {
     return {

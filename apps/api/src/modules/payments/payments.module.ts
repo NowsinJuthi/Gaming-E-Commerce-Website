@@ -17,6 +17,7 @@ import { PaymentController } from './payment.controller';
 import { PaymentProcessor } from './payment.processor';
 import { PaymentSettingsModule } from './payment-settings.module';
 import { PaymentService } from './payment.service';
+import { PaymentInvariantModule } from './payment-invariant.module';
 import { LicenseModule } from '../license/license.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { LicenseModule } from '../license/license.module';
     ]),
     BullModule.registerQueue({ name: PAYMENTS_QUEUE }),
     PaymentSettingsModule,
+    PaymentInvariantModule,
     LicenseModule,
     forwardRef(() => MfsModule),
     PaymentsIntegrationModule,
@@ -35,6 +37,6 @@ import { LicenseModule } from '../license/license.module';
   ],
   controllers: [PaymentController, PaymentAdminController],
   providers: [PaymentService, PaymentProcessor, PaymentAdminService],
-  exports: [PaymentService, PaymentSettingsModule],
+  exports: [PaymentService, PaymentSettingsModule, PaymentInvariantModule],
 })
 export class PaymentsModule {}

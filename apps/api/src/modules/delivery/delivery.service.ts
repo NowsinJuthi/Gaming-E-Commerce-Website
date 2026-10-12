@@ -8,6 +8,7 @@ import {
   ProductDocument,
 } from '../../database/schemas/product.schema';
 import { OrderService } from '../orders/order.service';
+import { CryptoService } from '../../shared/crypto/crypto.service';
 import { SupplierFulfillmentService } from '../suppliers/supplier-fulfillment.service';
 
 /**
@@ -27,6 +28,7 @@ export class DeliveryService {
     private readonly productModel: Model<ProductDocument>,
     private readonly orders: OrderService,
     private readonly suppliers: SupplierFulfillmentService,
+    private readonly crypto: CryptoService,
   ) {}
 
   async deliverOrder(orderId: string): Promise<void> {
@@ -83,11 +85,13 @@ export class DeliveryService {
       }
 
       // --- Delivery stage: attach codes + move stock reserved -> sold.
-      item.deliveredCodes = outcome.codes.map((c) => ({
-        code: c.code,
-        serial: c.serial,
-        pin: c.pin,
-      }));
+      item.deliveredCodes = outcome.codes.map((c) =>
+        this.crypto.sealDeliveredSecret({
+          code: c.code,
+          serial: c.serial,
+          pin: c.pin,
+        }),
+      );
       item.supplierOrderId = new Types.ObjectId(outcome.supplierOrderId);
       item.deliverySource = 'supplier';
       item.delivered = true;

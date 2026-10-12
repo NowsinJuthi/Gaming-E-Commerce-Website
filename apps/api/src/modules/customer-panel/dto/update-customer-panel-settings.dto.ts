@@ -17,11 +17,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/** Absolute http(s) URLs or site-relative paths (e.g. /, /products). */
-const MENU_HREF_PATTERN = /^https?:\/\/.+|^\/[^\s]*$/;
+/** Absolute http(s) URLs or site-relative paths. Protocol-relative `//host` is rejected. */
+const MENU_HREF_PATTERN = /^https?:\/\/[^\s/][^\s]*$|^\/(?!\/)[^\s]*$/;
 
-/** Absolute http(s) URLs or site-relative paths (e.g. /logo/..., /api/uploads/logos/...). */
-const LOGO_URL_PATTERN = /^https?:\/\/.+|^\/.+/;
+/** Absolute http(s) URLs or site-relative paths. Protocol-relative `//host` is rejected. */
+const LOGO_URL_PATTERN = /^https?:\/\/[^\s/][^\s]*$|^\/(?!\/).+/;
 
 class SiteMenuLinkDto {
   @IsString()

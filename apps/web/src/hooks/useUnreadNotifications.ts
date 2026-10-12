@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useCallback, useEffect, useState } from "react";
 import { getUnreadCount, type NotificationAudience } from "@/lib/api";
@@ -18,7 +19,7 @@ export function useUnreadNotifications(
   const [unread, setUnread] = useState(0);
 
   const refresh = useCallback(() => {
-    if (!enabled || !localStorage.getItem("accessToken")) {
+    if (!enabled || !hasAuthSession()) {
       setUnread(0);
       return;
     }

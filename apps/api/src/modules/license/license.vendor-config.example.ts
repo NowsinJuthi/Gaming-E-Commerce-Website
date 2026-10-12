@@ -1,7 +1,8 @@
 /**
- * Copy to `license.vendor-config.ts` before deploy.
- * Site secret and website ID ship with the application — not MongoDB or .env.
- * End admins only enter a license key in the admin panel.
+ * Example only. Real vendor credentials belong in server environment variables:
+ * LICENSE_SITE_SECRET, LICENSE_API_URL, LICENSE_PRODUCT_ID, LICENSE_WEBSITE_ID.
+ * Never commit a live site secret. Rotate any secret that previously lived in
+ * `license.vendor-config.ts`.
  */
 export type LicenseVendorConfig = {
   apiUrl: string;

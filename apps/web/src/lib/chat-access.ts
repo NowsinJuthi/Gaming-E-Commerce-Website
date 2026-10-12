@@ -1,4 +1,4 @@
-import { rolesFromAccessToken } from "@/lib/auth-roles";
+import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 import {
   isEphemeralGuestSession,
   isGuestFromAccessToken,
@@ -10,15 +10,14 @@ export { isGuestFromAccessToken };
 export function canAccessLiveChat(allowGuestChat: boolean): boolean {
   if (typeof window === "undefined") return false;
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) return false;
+  if (!hasAuthSession()) return false;
 
-  const roles = rolesFromAccessToken(token);
+  const roles = getSessionRoles();
   if (roles.includes("admin") || roles.includes("support")) {
     return true;
   }
 
-  if (isEphemeralGuestSession() || isGuestFromAccessToken(token)) {
+  if (isEphemeralGuestSession() || isGuestFromAccessToken(null)) {
     return allowGuestChat;
   }
 

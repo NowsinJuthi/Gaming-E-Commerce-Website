@@ -10,6 +10,8 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Public } from '../../common/decorators/public.decorator';
+import { socketIoCorsOptions } from '../../common/utils/cors-origins';
+import { extractAccessTokenFromHandshake } from '../../modules/auth/auth-cookies';
 import type { JwtPayload } from '../../modules/auth/auth.types';
 import { EventsService } from './events.service';
 
@@ -26,7 +28,7 @@ import { EventsService } from './events.service';
  * so other services can call EventsService.emit() from anywhere.
  */
 @Public()
-@WebSocketGateway({ namespace: '/events', cors: true })
+@WebSocketGateway({ namespace: '/events', cors: socketIoCorsOptions() })
 export class EventsGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
@@ -78,19 +80,15 @@ export class EventsGateway
 
   private extractToken(client: Socket): string | null {
     const auth = client.handshake.auth as Record<string, unknown>;
-    const tokenFromAuth = typeof auth?.token === 'string' ? auth.token : undefined;
-
-    const authHeader = client.handshake.headers?.authorization;
-    const tokenFromHeader =
-      typeof authHeader === 'string'
-        ? authHeader.replace(/^Bearer\s+/i, '')
-        : undefined;
-
-    const tokenFromQuery =
-      typeof client.handshake.query?.token === 'string'
-        ? (client.handshake.query.token as string)
-        : undefined;
-
-    return tokenFromAuth ?? tokenFromHeader ?? tokenFromQuery ?? null;
+    return (
+      extractAccessTokenFromHandshake({
+        authToken: typeof auth?.token === 'string' ? auth.token : undefined,
+        authorization:
+          typeof client.handshake.headers?.authorization === 'string'
+            ? client.handshake.headers.authorization
+            : undefined,
+        cookie: client.handshake.headers?.cookie,
+      }) ?? null
+    );
   }
 }

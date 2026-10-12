@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -26,6 +27,7 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   @Length(3, 3)
+  @IsIn(['BDT'])
   currency?: string;
 
   /** Required when {@link purpose} is `order`. */

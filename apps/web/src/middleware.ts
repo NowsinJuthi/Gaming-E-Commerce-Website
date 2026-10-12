@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { applySecurityHeaders } from "@/lib/security-headers";
+import {
+  applySecurityHeaders,
+  buildContentSecurityPolicy,
+} from "@/lib/security-headers";
+
+function createRequestNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
 /**
  * Edge middleware.
@@ -8,6 +19,12 @@ import { applySecurityHeaders } from "@/lib/security-headers";
  * (dashboard) and (admin) route groups will be implemented here.
  */
 export function middleware(request: NextRequest) {
+  const nonce = createRequestNonce();
+  const csp = buildContentSecurityPolicy(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+
   if (process.env.NODE_ENV === "production") {
     const host = request.nextUrl.hostname;
     const isLoopback = host === "127.0.0.1" || host === "localhost";
@@ -17,18 +34,27 @@ export function middleware(request: NextRequest) {
       const httpsUrl = request.nextUrl.clone();
       httpsUrl.protocol = "https:";
       const redirect = NextResponse.redirect(httpsUrl, 301);
-      applySecurityHeaders(redirect, { includeHsts: false });
+      applySecurityHeaders(redirect, {
+        includeHsts: false,
+        nonce,
+        includeCsp: true,
+      });
       return redirect;
     }
   }
 
-  const response = NextResponse.next();
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
   // HSTS is owned by aaPanel nginx (see deploy/deploy/aapanel/nginx/*.conf).
-  applySecurityHeaders(response, { includeHsts: false });
+  applySecurityHeaders(response, {
+    includeHsts: false,
+    nonce,
+    includeCsp: true,
+  });
 
   const path = request.nextUrl.pathname;
-  const isAppHtml =
-    !path.startsWith("/_next") && !path.includes(".");
+  const isAppHtml = !path.startsWith("/_next") && !path.includes(".");
 
   if (process.env.NODE_ENV === "development") {
     response.headers.set(

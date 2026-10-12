@@ -1,3 +1,5 @@
+import { isSafeMenuHref } from "./safe-href";
+
 export type SiteMenuLink = {
   label: string;
   href: string;
@@ -100,14 +102,14 @@ export function normalizeSiteMenus(
   value?: Partial<SiteMenusConfig> | null,
 ): SiteMenusConfig {
   const header = (value?.header ?? [])
-    .filter((item) => item.label?.trim() && item.href?.trim())
+    .filter((item) => item.label?.trim() && isSafeMenuHref(item.href))
     .map((item) => ({
       label: item.label.trim(),
       href: item.href.trim(),
     }));
   const rawHeaderOthers = value?.headerOthers;
   const headerOthers = (rawHeaderOthers ?? [])
-    .filter((item) => item.label?.trim() && item.href?.trim())
+    .filter((item) => item.label?.trim() && isSafeMenuHref(item.href))
     .map((item) => ({
       label: item.label.trim(),
       href: item.href.trim(),
@@ -117,7 +119,7 @@ export function normalizeSiteMenus(
     .map((column) => ({
       title: column.title.trim(),
       items: (column.items ?? [])
-        .filter((item) => item.label?.trim() && item.href?.trim())
+        .filter((item) => item.label?.trim() && isSafeMenuHref(item.href))
         .map((item) => ({
           label: item.label.trim(),
           href: item.href.trim(),

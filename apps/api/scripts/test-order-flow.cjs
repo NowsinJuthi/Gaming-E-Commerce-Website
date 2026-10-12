@@ -3,8 +3,11 @@ require('./load-env.cjs').loadApiEnv();
 const base = (process.env.API_PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 const API = base.endsWith('/api') ? base : `${base}/api`;
 
-const EMAIL = 'admin@uniqbd.com';
-const PASSWORD = 'Admin1234!';
+const EMAIL = process.env.TEST_ADMIN_EMAIL;
+const PASSWORD = process.env.TEST_ADMIN_PASSWORD;
+if (!EMAIL || !PASSWORD) {
+  throw new Error('Set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD');
+}
 
 const problems = [];
 

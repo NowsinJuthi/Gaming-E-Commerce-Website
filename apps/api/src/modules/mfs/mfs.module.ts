@@ -29,6 +29,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { OrdersModule } from '../orders/orders.module';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { MfsAdminController, MfsPaymentController } from './mfs.controller';
 import { MfsAppCompatController } from './mfs-app.controller';
 import { MfsGatewayService } from './mfs-gateway.service';
@@ -50,6 +51,7 @@ import { MfsVerificationService } from './mfs-verification.service';
     OrdersModule,
     AuthModule,
     UsersModule,
+    RolePermissionsModule,
   ],
   controllers: [MfsPaymentController, MfsAdminController, MfsAppCompatController],
   providers: [

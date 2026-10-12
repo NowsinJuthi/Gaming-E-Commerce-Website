@@ -36,6 +36,7 @@ export const PERMISSION_GROUPS = [
     permissions: [
       { key: "view_all_orders", label: "View all orders" },
       { key: "update_order_status", label: "Update order status" },
+      { key: "approve_mfs_payments", label: "Approve MFS payments" },
     ],
   },
   {

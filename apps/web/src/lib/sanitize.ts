@@ -44,13 +44,11 @@ const SANITIZE_OPTIONS: sanitizeHtmlLib.IOptions = {
     "kbd",
     "samp",
     "var",
-    "font",
   ],
   allowedAttributes: {
     a: ["href", "name", "target", "rel"],
     img: ["src", "alt", "width", "height"],
     span: ["style", "class"],
-    font: ["color", "class"],
     p: ["style", "class"],
     div: ["style", "class"],
     h1: ["style", "class"],
@@ -72,12 +70,28 @@ const SANITIZE_OPTIONS: sanitizeHtmlLib.IOptions = {
     },
   },
   allowedSchemes: ["http", "https", "mailto", "tel"],
+  allowProtocolRelative: false,
+  enforceHtmlBoundary: true,
   disallowedTagsMode: "discard",
   transformTags: {
     a: (tagName, attribs) => {
       const next = { ...attribs };
+      const href = next.href?.trim() ?? "";
+      if (/^(javascript|data|vbscript):/i.test(href)) {
+        delete next.href;
+      }
       if (next.target === "_blank") {
         next.rel = "noopener noreferrer";
+      }
+      return { tagName, attribs: next };
+    },
+    img: (tagName, attribs) => {
+      const next = { ...attribs };
+      const src = next.src?.trim() ?? "";
+      // Rich-text images must come from the controlled upload endpoint. This
+      // prevents stored content from loading arbitrary tracking resources.
+      if (!src.startsWith("/api/uploads/")) {
+        delete next.src;
       }
       return { tagName, attribs: next };
     },

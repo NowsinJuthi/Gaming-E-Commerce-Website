@@ -19,7 +19,7 @@ function readOriginsFromEnv(keys: string[]): string[] {
 export const HSTS_HEADER_VALUE =
   "max-age=63072000; includeSubDomains; preload";
 
-function buildContentSecurityPolicy(): string {
+export function buildContentSecurityPolicy(nonce?: string): string {
   const isDev = process.env.NODE_ENV === "development";
   const apiOrigins = readOriginsFromEnv([
     "NEXT_PUBLIC_API_URL",
@@ -30,33 +30,56 @@ function buildContentSecurityPolicy(): string {
 
   const scriptSrc = [
     "'self'",
-    "'unsafe-inline'",
+    ...(nonce ? [`'nonce-${nonce}'`] : isDev ? ["'unsafe-inline'"] : []),
     ...(isDev ? ["'unsafe-eval'"] : []),
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
+    "https://www.google.com",
+    "https://recaptcha.google.com",
+    "https://www.gstatic.com",
+    "https://www.recaptcha.net",
     "https://connect.facebook.net",
   ];
 
   const connectSrc = [
     "'self'",
-    "wss:",
     ...(isDev ? ["ws:", "http://localhost:*", "http://127.0.0.1:*"] : []),
     "https://www.google-analytics.com",
     "https://region1.google-analytics.com",
     "https://www.googletagmanager.com",
+    "https://www.google.com",
+    "https://recaptcha.google.com",
+    "https://www.gstatic.com",
+    "https://www.recaptcha.net",
     "https://connect.facebook.net",
     "https://www.facebook.com",
     ...apiOrigins,
+    ...apiOrigins.map((origin) => origin.replace(/^http/, "ws")),
+  ];
+
+  const styleSrc = [
+    "'self'",
+    ...(nonce ? [`'nonce-${nonce}'`] : isDev ? ["'unsafe-inline'"] : []),
   ];
 
   const directives = [
     "default-src 'self'",
     `script-src ${scriptSrc.join(" ")}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    `style-src ${styleSrc.join(" ")}`,
+    // Residual: React `style={{}}` attributes (charts, meters, email preview,
+    // OG images, animation delays). Removing this directive breaks those UIs.
+    "style-src-attr 'unsafe-inline'",
+    `img-src 'self' data: blob: ${apiOrigins.join(" ")}`.trim(),
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
-    "frame-src 'self' https://www.googletagmanager.com",
+    [
+      "frame-src 'self'",
+      "https://www.googletagmanager.com",
+      "https://www.google.com",
+      "https://recaptcha.google.com",
+      "https://www.gstatic.com",
+      "https://www.recaptcha.net",
+    ].join(" "),
     "media-src 'self' blob: data:",
     "worker-src 'self' blob:",
     "object-src 'none'",
@@ -74,12 +97,14 @@ function buildContentSecurityPolicy(): string {
 
 export function getSecurityHeaders(options?: {
   includeHsts?: boolean;
+  nonce?: string;
+  includeCsp?: boolean;
 }): { key: string; value: string }[] {
   const isProd = process.env.NODE_ENV === "production";
   const includeHsts = isProd && options?.includeHsts !== false;
+  const includeCsp = options?.includeCsp !== false;
 
   const headers: { key: string; value: string }[] = [
-    { key: "Content-Security-Policy", value: buildContentSecurityPolicy() },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -88,6 +113,13 @@ export function getSecurityHeaders(options?: {
       value: "camera=(), microphone=(), geolocation=(), payment=()",
     },
   ];
+
+  if (includeCsp) {
+    headers.unshift({
+      key: "Content-Security-Policy",
+      value: buildContentSecurityPolicy(options?.nonce),
+    });
+  }
 
   if (includeHsts) {
     headers.push({
@@ -102,7 +134,7 @@ export function getSecurityHeaders(options?: {
 /** Attach security headers to a Next.js middleware / route response. */
 export function applySecurityHeaders(
   response: Response,
-  options?: { includeHsts?: boolean },
+  options?: { includeHsts?: boolean; nonce?: string; includeCsp?: boolean },
 ): void {
   for (const { key, value } of getSecurityHeaders(options)) {
     response.headers.set(key, value);

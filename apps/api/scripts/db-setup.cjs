@@ -32,7 +32,7 @@ function runScript(name) {
   console.log(`CONNECTED: database "${db.databaseName}" (${cols.length} collections)`);
   await conn.close();
 
-  console.log('\nSeeding default login accounts…');
+  console.log('\nSeeding explicitly configured login accounts…');
   runScript('seed-users.cjs');
 
   if (withCatalog) {
@@ -41,8 +41,7 @@ function runScript(name) {
   }
 
   console.log('\nDB SETUP OK');
-  console.log('Admin login:  admin@uniqbd.com / Admin1234!');
-  console.log('Demo login:   demo@uniqbd.com / Demo1234!');
+  console.log('Credentials were read from SEED_ADMIN_* / optional SEED_DEMO_* variables.');
 })().catch((error) => {
   const message = error?.message ?? String(error);
   console.error('\nDB SETUP ERROR:', message);

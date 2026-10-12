@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -62,7 +63,7 @@ export function AdminTopbar({ pathname, adminName, adminRoleLabel = "Admin", onO
 
   useEffect(() => {
     function loadAvatar() {
-      const token = localStorage.getItem("accessToken");
+      const token = hasAuthSession();
       if (!token) {
         setAvatarUrl(null);
         return;

@@ -87,6 +87,10 @@ export class Product {
   @Prop({ type: Types.ObjectId, ref: 'Supplier', index: true })
   supplierId?: Types.ObjectId;
 
+  /** User who created this product. Suppliers may mutate only their own rows. */
+  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+  ownerUserId?: Types.ObjectId;
+
   @Prop({
     type: String,
     enum: Object.values(ProductType),

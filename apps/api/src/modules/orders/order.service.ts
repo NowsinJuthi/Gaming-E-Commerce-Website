@@ -1,6 +1,10 @@
 import { DEFAULT_CURRENCY } from '@uniqbd/types';
 import { escapeRegex } from '../../common/utils/escape-regex';
 import { isChatStaff } from '../../common/utils/role.utils';
+import {
+  assertCanReadCustomerOrder,
+  shouldRevealDeliveredCodes,
+} from '../../common/utils/order-access';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -26,6 +30,7 @@ import {
 import { PaginatedResult, PaginationDto } from '../../common/dto/pagination.dto';
 import { round2 } from '../../common/utils/money';
 import { PaymentIntentStatus } from '../../common/enums/payment-intent.enum';
+import type { ConfirmPaymentResult } from '../payments/payment-duplicate';
 import {
   InventoryItem,
   InventoryItemDocument,
@@ -76,6 +81,7 @@ import {
   ORDERS_QUEUE,
 } from '../../queues/queue.constants';
 import { AuthenticatedUser } from '../auth/auth.types';
+import { CryptoService } from '../../shared/crypto/crypto.service';
 import { resolveLineStock } from '../../common/utils/product-variation-stock';
 import {
   buildOrderOrigin,
@@ -147,6 +153,7 @@ export class OrderService {
     private readonly cache: CacheService,
     private readonly customerOrderMail: CustomerOrderMailService,
     private readonly telegramOrders: TelegramOrderNotifier,
+    private readonly crypto: CryptoService,
   ) {}
 
   // --- Public API ---
@@ -386,7 +393,7 @@ export class OrderService {
   async confirmPayment(
     orderId: string,
     paymentRef?: Types.ObjectId,
-  ): Promise<void> {
+  ): Promise<ConfirmPaymentResult> {
     const paidAt = new Date();
     const order = await this.orderModel
       .findOneAndUpdate(
@@ -407,12 +414,29 @@ export class OrderService {
         { new: true },
       )
       .exec();
-    if (!order) {
-      return;
+    if (order) {
+      void this.runPostPaymentSideEffects(order, String(order.userId));
+      void this.cache.del(CacheKeys.admin.dashboardOverview);
+      return {
+        outcome: 'claimed',
+        payerIntentId: paymentRef ? String(paymentRef) : undefined,
+      };
     }
 
-    void this.runPostPaymentSideEffects(order, String(order.userId));
-    void this.cache.del(CacheKeys.admin.dashboardOverview);
+    const current = await this.orderModel
+      .findById(orderId)
+      .select('status payment.transactionId')
+      .lean()
+      .exec();
+    if (!current) {
+      return { outcome: 'missing' };
+    }
+    const payer = (current as { payment?: { transactionId?: unknown } }).payment
+      ?.transactionId;
+    return {
+      outcome: 'already-paid',
+      payerIntentId: payer ? String(payer) : undefined,
+    };
   }
 
   /** Delivery, affiliate, and admin Telegram (paid) — must not fail the pay response. */
@@ -471,7 +495,14 @@ export class OrderService {
         .exec(),
       this.orderModel.countDocuments(filter).exec(),
     ]);
-    return { items: items as unknown as OrderDocument[], total, page, limit };
+    return {
+      items: items.map((item) =>
+        this.projectOrderSecrets(item, true),
+      ) as unknown as OrderDocument[],
+      total,
+      page,
+      limit,
+    };
   }
 
   async getCustomerStats(userId: string): Promise<{
@@ -543,11 +574,13 @@ export class OrderService {
           title: item.title,
           slug: item.slug,
           quantity: item.quantity,
-          codes: item.deliveredCodes.map((c) => ({
-            code: c.code,
-            serial: c.serial,
-            pin: c.pin,
-          })),
+          codes: item.deliveredCodes.map((c) =>
+            this.crypto.openDeliveredSecret({
+              code: c.code,
+              serial: c.serial,
+              pin: c.pin,
+            }),
+          ),
         });
       }
     }
@@ -561,8 +594,9 @@ export class OrderService {
     q?: string;
     page: number;
     limit: number;
+    user: AuthenticatedUser;
   }): Promise<PaginatedResult<OrderDocument>> {
-    const { status, q, page, limit } = filters;
+    const { status, q, page, limit, user } = filters;
     const filter: Record<string, unknown> = {};
     if (status) {
       filter.status = status;
@@ -584,7 +618,13 @@ export class OrderService {
         .exec(),
       this.orderModel.countDocuments(filter).exec(),
     ]);
-    return { items, total, page, limit };
+    const reveal = shouldRevealDeliveredCodes(user);
+    return {
+      items: items.map((item) => this.presentOrderSecrets(item, reveal)) as unknown as OrderDocument[],
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -731,29 +771,64 @@ export class OrderService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+    assertCanReadCustomerOrder(user, order);
     const isStaff = isChatStaff(user.roles);
-    if (!isStaff && String(order.userId) !== user.id) {
-      throw new ForbiddenException('Access denied');
-    }
-    if (!isStaff && order.status === OrderStatus.Failed) {
-      throw new NotFoundException('Order not found');
-    }
+    const isAdmin = shouldRevealDeliveredCodes(user);
     if (!isStaff) {
-      return order;
+      return this.presentOrderSecrets(order, true) as OrderDocument;
+    }
+
+    const plain = this.presentOrderSecrets(order, isAdmin) as OrderDocument & {
+      payment?: Record<string, unknown>;
+    };
+    if (!isAdmin) {
+      return plain as OrderDocument;
     }
 
     const mfs = await this.resolveMfsPaymentDetails(
       String(order._id),
       order.contact?.mobile,
     );
-    const plain = order.toObject();
     return {
       ...plain,
       payment: {
-        ...plain.payment,
+        ...(plain.payment ?? {}),
         ...(mfs ? { mfs } : {}),
       },
     } as OrderDocument;
+  }
+
+  private presentOrderSecrets(order: OrderDocument, revealCodes: boolean) {
+    return this.projectOrderSecrets(order.toObject(), revealCodes);
+  }
+
+  private projectOrderSecrets<
+    T extends {
+      items?: Array<{ deliveredCodes?: Array<{ code: string; serial?: string; pin?: string }> }>;
+      manualGiftCards?: Array<{ code: string }>;
+    },
+  >(plain: T, revealCodes: boolean): T {
+    return {
+      ...plain,
+      items: (plain.items ?? []).map((item) => ({
+        ...item,
+        deliveredCodes: (item.deliveredCodes ?? []).map((code) =>
+          revealCodes
+            ? this.crypto.openDeliveredSecret(code)
+            : this.crypto.redactDeliveredSecret(),
+        ),
+      })),
+      ...(plain.manualGiftCards
+        ? {
+            manualGiftCards: plain.manualGiftCards.map((card) => ({
+              ...card,
+              code: revealCodes
+                ? this.crypto.openDeliveredSecret({ code: card.code }).code
+                : '••••',
+            })),
+          }
+        : {}),
+    };
   }
 
   /** MFS checkout verification fields for admin order view (Sender, TrxID, Amount). */
@@ -1622,7 +1697,9 @@ export class OrderService {
     if (
       intent.status === PaymentIntentStatus.Succeeded ||
       intent.status === PaymentIntentStatus.Failed ||
-      intent.status === PaymentIntentStatus.Expired
+      intent.status === PaymentIntentStatus.Expired ||
+      intent.status === PaymentIntentStatus.Unmatched ||
+      intent.status === PaymentIntentStatus.Superseded
     ) {
       throw new BadRequestException('Payment is already finalized');
     }
@@ -1704,6 +1781,9 @@ export class OrderService {
               PaymentIntentStatus.Succeeded,
               PaymentIntentStatus.Failed,
               PaymentIntentStatus.Expired,
+              PaymentIntentStatus.Unmatched,
+              PaymentIntentStatus.Superseded,
+              PaymentIntentStatus.Initializing,
             ],
           },
         },
@@ -1725,15 +1805,44 @@ export class OrderService {
       .updateMany(
         {
           orderId,
-          status: {
-            $nin: [
-              PaymentIntentStatus.Succeeded,
-              PaymentIntentStatus.Failed,
-              PaymentIntentStatus.Expired,
-            ],
-          },
+          $or: [
+            {
+              status: {
+                $in: [
+                  PaymentIntentStatus.Pending,
+                  PaymentIntentStatus.Initializing,
+                ],
+              },
+            },
+            {
+              status: PaymentIntentStatus.Created,
+              gatewayRef: { $exists: true, $nin: [null, ''] },
+            },
+            {
+              status: PaymentIntentStatus.Created,
+              chargeLeaseUntil: { $exists: true, $ne: null },
+            },
+          ],
         },
-        { $set: { status: PaymentIntentStatus.Expired } },
+        {
+          $set: {
+            status: PaymentIntentStatus.Superseded,
+            lastError: 'Order cancelled or replaced',
+          },
+          $unset: { activeOrderSlot: 1, expiresAt: 1, chargeLeaseUntil: 1 },
+        },
+      )
+      .exec();
+    await this.paymentIntentModel
+      .updateMany(
+        {
+          orderId,
+          status: PaymentIntentStatus.Created,
+        },
+        {
+          $set: { status: PaymentIntentStatus.Expired },
+          $unset: { activeOrderSlot: 1 },
+        },
       )
       .exec();
   }
@@ -2098,7 +2207,11 @@ export class OrderService {
           .select('+value')
           .exec();
         if (item.deliveredCodes.length === 0) {
-          item.deliveredCodes = units.map((unit) => ({ code: unit.value }));
+          item.deliveredCodes = units.map((unit) =>
+            this.crypto.sealDeliveredSecret({
+              code: this.crypto.openInventoryValue(unit.value),
+            }),
+          );
         }
         await this.inventoryModel
           .updateMany(
@@ -2324,7 +2437,7 @@ export class OrderService {
     }>,
   ): void {
     order.manualGiftCards = giftCards.map((card) => ({
-      code: card.code,
+      code: this.crypto.sealDeliveredSecret({ code: card.code }).code,
       amount: card.amount,
       fieldLabel: card.fieldLabel,
       inventoryItemId: card.inventoryItemId
@@ -2336,9 +2449,9 @@ export class OrderService {
       order.items.find((item) => !item.delivered) ?? order.items[0];
     if (!target) return;
 
-    target.deliveredCodes = giftCards.map((card) => ({
-      code: card.code,
-    }));
+    target.deliveredCodes = giftCards.map((card) =>
+      this.crypto.sealDeliveredSecret({ code: card.code }),
+    );
     target.delivered = true;
   }
 
@@ -2380,7 +2493,9 @@ export class OrderService {
     for (const item of order.items) {
       if (item.delivered && item.deliveredCodes?.length > 0) {
         const label = (item.title ?? 'Item').trim();
-        const lines = item.deliveredCodes.map((c) => c.code);
+        const lines = item.deliveredCodes.map(
+          (c) => this.crypto.openDeliveredSecret(c).code,
+        );
         parts.push(`${label}:\n${lines.join('\n')}`);
       }
     }
@@ -2389,7 +2504,8 @@ export class OrderService {
     if (order.manualGiftCards?.length) {
       const lines = order.manualGiftCards.map((card) => {
         const amountSuffix = card.amount ? ` (${card.amount})` : '';
-        return `${card.code}${amountSuffix}`;
+        const code = this.crypto.openDeliveredSecret({ code: card.code }).code;
+        return `${code}${amountSuffix}`;
       });
       parts.push(`Delivery codes:\n${lines.join('\n')}`);
     }

@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
 import { ContactInquiryService } from '../../modules/contact-inquiries/contact-inquiry.service';
+import { RecaptchaGuard } from '../../security/recaptcha.guard';
 import { ContactMessageDto } from './dto/contact-message.dto';
 import { MailerService } from './mailer.service';
 
@@ -17,6 +19,7 @@ export class ContactController {
   ) {}
 
   @Public()
+  @UseGuards(RecaptchaGuard)
   @Post()
   async submit(@Body() dto: ContactMessageDto): Promise<{ success: true }> {
     const payload = {

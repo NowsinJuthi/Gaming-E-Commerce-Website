@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { useEffect, useState } from "react";
 import { getMe } from "@/lib/api";
@@ -11,7 +12,7 @@ export function useAutoDeliveryAccess() {
     // Skip the API round-trip entirely when no session token exists.
     // This prevents a wasted 401 call for every unauthenticated visitor and
     // eliminates the layout shift caused by products appearing after the fetch.
-    if (!localStorage.getItem("accessToken")) {
+    if (!hasAuthSession()) {
       setLoaded(true);
       return;
     }

@@ -1,3 +1,4 @@
+import { hasAuthSession } from "@/lib/access-token";
 import { attachAffiliateReferral, trackAffiliateClick } from "@/lib/api";
 
 const STORAGE_KEY = "uniqbd_ref";
@@ -34,7 +35,7 @@ export async function captureReferralFromUrl(): Promise<void> {
 
 export async function attachStoredReferral(): Promise<void> {
   const code = getStoredReferralCode();
-  if (!code || !localStorage.getItem("accessToken")) return;
+  if (!code || !hasAuthSession()) return;
   try {
     await attachAffiliateReferral(code);
     clearStoredReferralCode();

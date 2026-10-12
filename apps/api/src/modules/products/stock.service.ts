@@ -6,8 +6,15 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { InventoryStatus, ProductStatus } from '../../common/enums';
-import { escapeRegex } from '../../common/utils/escape-regex';
+import {
+  assertCanMutateProduct,
+  assertCanReadProductAdmin,
+  maskInventoryValue,
+  shouldRedactInventoryValues,
+} from '../../common/utils/product-access';
 import { variationUsesInventoryPackage } from '../../common/utils/product-variation-stock';
+import { CryptoService } from '../../shared/crypto/crypto.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   InventoryItem,
   InventoryItemDocument,
@@ -72,6 +79,7 @@ export class StockService {
     @InjectModel(InventoryItem.name)
     private readonly inventoryModel: Model<InventoryItemDocument>,
     private readonly cache: CacheService,
+    private readonly crypto: CryptoService,
   ) {}
 
   private async invalidateProductCache(slug?: string): Promise<void> {
@@ -88,11 +96,9 @@ export class StockService {
     values: string[],
     cost?: number,
     variationValueId?: string,
+    user?: AuthenticatedUser,
   ): Promise<AddInventoryResult> {
-    const product = await this.productModel.findById(productId).exec();
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
+    const product = await this.requireWritableProduct(productId, user);
 
     let normalizedVariationId = variationValueId?.trim() || undefined;
     if (normalizedVariationId) {
@@ -131,15 +137,19 @@ export class StockService {
       (value) => !existingValues.has(value),
     );
 
-    const docs = valuesToInsert.map((value) => ({
-      productId: productObjectId,
-      value,
-      cost,
-      status: InventoryStatus.Available,
-      ...(normalizedVariationId
-        ? { variationValueId: normalizedVariationId }
-        : {}),
-    }));
+    const docs = valuesToInsert.map((value) => {
+      const sealed = this.crypto.sealInventoryValue(value);
+      return {
+        productId: productObjectId,
+        value: sealed.value,
+        valueHash: sealed.valueHash,
+        cost,
+        status: InventoryStatus.Available,
+        ...(normalizedVariationId
+          ? { variationValueId: normalizedVariationId }
+          : {}),
+      };
+    });
 
     let insertedCount = 0;
     if (docs.length > 0) {
@@ -209,26 +219,43 @@ export class StockService {
       return new Set();
     }
 
-    const rows = await this.inventoryModel.aggregate<{ _id: string }>([
-      { $match: { productId } },
-      {
-        $project: {
-          value: {
-            $trim: {
-              input: { $ifNull: ['$value', ''] },
+    const hashToPlain = new Map(
+      candidates.map((value) => [this.crypto.inventoryValueHash(value), value]),
+    );
+    const hashes = [...hashToPlain.keys()];
+
+    const [hashedRows, legacyRows] = await Promise.all([
+      this.inventoryModel
+        .find({ productId, valueHash: { $in: hashes } })
+        .select('+valueHash')
+        .lean()
+        .exec(),
+      this.inventoryModel.aggregate<{ _id: string }>([
+        { $match: { productId, valueHash: { $exists: false } } },
+        {
+          $project: {
+            value: {
+              $trim: {
+                input: { $ifNull: ['$value', ''] },
+              },
             },
           },
         },
-      },
-      { $match: { value: { $in: candidates } } },
-      { $group: { _id: '$value' } },
+        { $match: { value: { $in: candidates } } },
+        { $group: { _id: '$value' } },
+      ]),
     ]);
 
-    return new Set(
-      rows
-        .map((row) => this.normalizeInventoryValue(String(row._id ?? '')))
-        .filter(Boolean),
-    );
+    const found = new Set<string>();
+    for (const row of hashedRows) {
+      const plain = hashToPlain.get(String(row.valueHash ?? ''));
+      if (plain) found.add(plain);
+    }
+    for (const row of legacyRows) {
+      const normalized = this.normalizeInventoryValue(String(row._id ?? ''));
+      if (normalized) found.add(normalized);
+    }
+    return found;
   }
 
   private async assertInventoryValueAvailable(
@@ -241,28 +268,19 @@ export class StockService {
       throw new BadRequestException('Code value is required');
     }
 
-    const matchStage: FilterQuery<InventoryItemDocument> = { productId };
+    const matchStage: FilterQuery<InventoryItemDocument> = {
+      productId,
+      $or: [
+        { valueHash: this.crypto.inventoryValueHash(normalized) },
+        { valueHash: { $exists: false }, value: normalized },
+      ],
+    };
     if (excludeItemId) {
       matchStage._id = { $ne: excludeItemId };
     }
 
-    const rows = await this.inventoryModel.aggregate<{ _id: Types.ObjectId }>([
-      { $match: matchStage },
-      {
-        $project: {
-          value: {
-            $trim: {
-              input: { $ifNull: ['$value', ''] },
-            },
-          },
-        },
-      },
-      { $match: { value: normalized } },
-      { $limit: 1 },
-      { $project: { _id: 1 } },
-    ]);
-
-    if (rows.length > 0) {
+    const existing = await this.inventoryModel.exists(matchStage).exec();
+    if (existing) {
       throw new BadRequestException(
         'This code already exists in product inventory',
       );
@@ -274,6 +292,27 @@ export class StockService {
     if (!product) {
       throw new NotFoundException('Product not found');
     }
+    return product;
+  }
+
+  private async requireReadableProduct(
+    productId: string,
+    user: AuthenticatedUser,
+  ): Promise<ProductDocument> {
+    const product = await this.requireProduct(productId);
+    assertCanReadProductAdmin(user, product.ownerUserId);
+    return product;
+  }
+
+  private async requireWritableProduct(
+    productId: string,
+    user?: AuthenticatedUser,
+  ): Promise<ProductDocument> {
+    const product = await this.requireProduct(productId);
+    if (!user) {
+      throw new NotFoundException('Product not found');
+    }
+    assertCanMutateProduct(user, product.ownerUserId);
     return product;
   }
 
@@ -427,8 +466,9 @@ export class StockService {
       variationValueId?: string;
       search?: string;
     },
+    user: AuthenticatedUser,
   ): Promise<InventoryListResult> {
-    const product = await this.requireProduct(productId);
+    const product = await this.requireReadableProduct(productId, user);
     const packages = this.inventoryPackages(product);
     const requestedVariationId = query.variationValueId?.trim();
     const productObjectId = new Types.ObjectId(productId);
@@ -464,10 +504,11 @@ export class StockService {
 
     const searchTerm = query.search?.trim();
     if (searchTerm) {
-      filter.value = {
-        $regex: escapeRegex(searchTerm),
-        $options: 'i',
-      };
+      const normalizedSearch = this.normalizeInventoryValue(searchTerm);
+      filter.$or = [
+        { valueHash: this.crypto.inventoryValueHash(normalizedSearch) },
+        { valueHash: { $exists: false }, value: normalizedSearch },
+      ];
     } else if (
       query.status &&
       Object.values(InventoryStatus).includes(query.status as InventoryStatus)
@@ -482,7 +523,7 @@ export class StockService {
     const [rows, total] = await Promise.all([
       this.inventoryModel
         .find(filter)
-        .select('+value')
+        .select('+value +valueHash')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -491,10 +532,13 @@ export class StockService {
       this.inventoryModel.countDocuments(filter).exec(),
     ]);
 
+    const redact = shouldRedactInventoryValues(user);
     return {
       items: rows.map((row) => ({
         id: String(row._id),
-        value: row.value,
+        value: redact
+          ? maskInventoryValue()
+          : this.crypto.openInventoryValue(row.value),
         status: row.status,
         cost: row.cost,
         createdAt: row.createdAt,
@@ -510,15 +554,16 @@ export class StockService {
     productId: string,
     itemId: string,
     dto: { value?: string; cost?: number },
+    user: AuthenticatedUser,
   ): Promise<InventoryListItem> {
-    const product = await this.requireProduct(productId);
+    const product = await this.requireWritableProduct(productId, user);
     if (!Types.ObjectId.isValid(itemId)) {
       throw new NotFoundException('Inventory item not found');
     }
 
     const item = await this.inventoryModel
       .findOne({ _id: itemId, productId: product._id })
-      .select('+value')
+      .select('+value +valueHash')
       .exec();
     if (!item) {
       throw new NotFoundException('Inventory item not found');
@@ -531,14 +576,17 @@ export class StockService {
 
     if (dto.value !== undefined) {
       const nextValue = this.normalizeInventoryValue(dto.value);
-      if (nextValue !== this.normalizeInventoryValue(item.value)) {
+      const currentPlain = this.crypto.openInventoryValue(item.value);
+      if (nextValue !== this.normalizeInventoryValue(currentPlain)) {
         await this.assertInventoryValueAvailable(
           product._id as Types.ObjectId,
           nextValue,
           item._id as Types.ObjectId,
         );
       }
-      item.value = nextValue;
+      const sealed = this.crypto.sealInventoryValue(nextValue);
+      item.value = sealed.value;
+      item.valueHash = sealed.valueHash;
     }
     if (dto.cost !== undefined) {
       item.cost = dto.cost;
@@ -548,7 +596,7 @@ export class StockService {
 
     return {
       id: String(item._id),
-      value: item.value,
+      value: this.crypto.openInventoryValue(item.value),
       status: item.status,
       cost: item.cost,
       createdAt: item.createdAt,
@@ -558,8 +606,9 @@ export class StockService {
   async deleteInventoryItem(
     productId: string,
     itemId: string,
+    user: AuthenticatedUser,
   ): Promise<StockOverview> {
-    const product = await this.requireProduct(productId);
+    const product = await this.requireWritableProduct(productId, user);
     if (!Types.ObjectId.isValid(itemId)) {
       throw new NotFoundException('Inventory item not found');
     }
@@ -593,8 +642,9 @@ export class StockService {
 
   async deleteUnassignedInventory(
     productId: string,
+    user: AuthenticatedUser,
   ): Promise<{ deleted: number } & StockOverview> {
-    const product = await this.requireProduct(productId);
+    const product = await this.requireWritableProduct(productId, user);
     const packages = this.inventoryPackages(product);
     if (packages.length === 0) {
       throw new BadRequestException(
@@ -620,12 +670,10 @@ export class StockService {
 
   async getStock(
     productId: string,
-    variationValueId?: string,
+    variationValueId: string | undefined,
+    user: AuthenticatedUser,
   ): Promise<StockDetail> {
-    const product = await this.productModel.findById(productId).exec();
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
+    const product = await this.requireReadableProduct(productId, user);
 
     const packages = this.inventoryPackages(product);
     const productObjectId = new Types.ObjectId(productId);

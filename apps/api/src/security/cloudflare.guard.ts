@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { hasCloudflareRay } from './cloudflare-edge';
 import { SecuritySettingsService } from './security-settings.service';
 import { RequestWithContext } from './security.types';
 
@@ -30,8 +31,7 @@ export class CloudflareGuard implements CanActivate {
       return true;
     }
 
-    const cfIp = req.headers['cf-connecting-ip'];
-    if (!cfIp) {
+    if (!hasCloudflareRay(req.headers)) {
       throw new ForbiddenException(
         'Direct access is not allowed. Use the Cloudflare-protected domain.',
       );

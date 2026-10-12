@@ -16,11 +16,13 @@ export const PAYMENTS_QUEUE = 'payments';
 export enum PaymentJob {
   /** Poll the gateway to settle a still-pending intent (retry workflow). */
   Verify = 'verify',
+  /** Apply wallet/order side effects after a Succeeded claim. */
+  Settle = 'settle',
 }
 
 export interface PaymentJobData {
   intentId: string;
-  attempt: number;
+  attempt?: number;
 }
 
 export const DELIVERY_QUEUE = 'delivery';

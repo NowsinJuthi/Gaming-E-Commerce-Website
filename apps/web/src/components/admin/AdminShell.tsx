@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import type { Route } from "next";
 import Link from "next/link";
@@ -10,7 +11,7 @@ import { AdminLicenseWarningBanner } from "@/components/admin/AdminLicenseWarnin
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { Header } from "@/components/Header";
 import { CustomerPanelShell } from "@/components/customer/CustomerPanelShell";
-import { ApiError, clearTokens, getCustomerPanelConfig, getMe, getMyAdminPermissions, refreshSession } from "@/lib/api";
+import { ApiError, clearTokens, getCustomerPanelConfig, getMe, getMyAdminPermissions, hasRefreshToken, refreshSession } from "@/lib/api";
 import { getCustomerDisplayName, getPrimaryRoleLabel } from "@/lib/admin-order-view";
 import { hasAdminRole, hasBlogWorkspaceRole } from "@/lib/auth-roles";
 import { mapAdminBlogPathToCustomer } from "@/lib/blog-workspace";
@@ -64,7 +65,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function checkAuth() {
-      const token = localStorage.getItem("accessToken");
+      const token = hasAuthSession();
       if (!token) {
         const next = encodeURIComponent(pathname ?? "/admin");
         router.replace(`/login?next=${next}`);
@@ -76,7 +77,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         const perms = await getMyAdminPermissions();
         if (cancelled) return;
 
-        if (perms.admin_panel_access || hasAdminRole(me.roles, token)) {
+        if (perms.admin_panel_access || hasAdminRole(me.roles)) {
           setName(getCustomerDisplayName(me));
           setRoleLabel(getPrimaryRoleLabel(me.roles) ?? "Admin");
           setShellMode("admin");
@@ -84,7 +85,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (hasBlogWorkspaceRole(me.roles, token)) {
+        if (hasBlogWorkspaceRole(me.roles)) {
           const blogAccess =
             perms.view_blog_overview ||
             perms.view_blog_posts ||
@@ -96,7 +97,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           if (blogAccess && onBlogRoute) {
             if (
               !perms.admin_panel_access &&
-              !hasAdminRole(me.roles, token) &&
+              !hasAdminRole(me.roles) &&
               currentPath.startsWith("/admin/blogs")
             ) {
               const customerPath = mapAdminBlogPathToCustomer(currentPath);
@@ -110,7 +111,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             setShellMode(
               currentPath.startsWith("/dashboard/blogs")
                 ? "customer-blog"
-                : perms.admin_panel_access || hasAdminRole(me.roles, token)
+                : perms.admin_panel_access || hasAdminRole(me.roles)
                   ? "admin"
                   : "customer-blog",
             );
@@ -130,7 +131,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          const hasRefresh = !!localStorage.getItem("refreshToken");
+          const hasRefresh = hasRefreshToken();
           if (!hasRefresh) {
             clearTokens();
             const next = encodeURIComponent(pathname ?? "/admin");
@@ -142,7 +143,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           if (refreshed) {
             return checkAuth();
           }
-          if (!localStorage.getItem("refreshToken")) {
+          if (!hasRefreshToken()) {
             clearTokens();
             const next = encodeURIComponent(pathname ?? "/admin");
             router.replace(`/login?next=${next}`);
@@ -177,7 +178,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     // Re-check when another tab logs in/out. Skip silent token refresh events
     // while already authenticated — they don't require a full getMe() round-trip.
     const onAuthChange = () => {
-      const token = localStorage.getItem("accessToken");
+      const token = hasAuthSession();
       if (!token || authStateRef.current !== "ok") {
         void checkAuth();
       }

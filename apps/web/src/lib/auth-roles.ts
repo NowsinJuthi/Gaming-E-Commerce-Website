@@ -1,3 +1,5 @@
+import { getSessionRoles } from "@/lib/access-token";
+
 export function rolesFromAccessToken(token: string | null): string[] {
   if (!token) return [];
   try {
@@ -28,12 +30,9 @@ export function hasBlogWorkspaceRole(
 ): boolean {
   const resolved =
     roles ??
-    rolesFromAccessToken(
-      accessToken ??
-        (typeof window !== "undefined"
-          ? localStorage.getItem("accessToken")
-          : null),
-    );
+    (accessToken
+      ? rolesFromAccessToken(accessToken)
+      : getSessionRoles());
   return resolved.some((r) =>
     BLOG_WORKSPACE_ROLES.includes(r as (typeof BLOG_WORKSPACE_ROLES)[number]),
   );
@@ -44,12 +43,9 @@ export function hasAdminRole(
   accessToken?: string | null,
 ): boolean {
   if (roles?.some((r) => STAFF_ROLES.includes(r as (typeof STAFF_ROLES)[number]))) return true;
-  const token =
-    accessToken ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("accessToken")
-      : null);
-  const tokenRoles = rolesFromAccessToken(token);
+  const tokenRoles = accessToken
+    ? rolesFromAccessToken(accessToken)
+    : getSessionRoles();
   return tokenRoles.some((r) => STAFF_ROLES.includes(r as (typeof STAFF_ROLES)[number]));
 }
 
@@ -62,25 +58,34 @@ export function hasStrictAdminRole(
   accessToken?: string | null,
 ): boolean {
   if (roles?.includes("administrator") || roles?.includes("admin")) return true;
-  const token =
-    accessToken ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("accessToken")
-      : null);
+  const tokenRoles = accessToken
+    ? rolesFromAccessToken(accessToken)
+    : getSessionRoles();
   return (
-    rolesFromAccessToken(token).includes("administrator") ||
-    rolesFromAccessToken(token).includes("admin")
+    tokenRoles.includes("administrator") || tokenRoles.includes("admin")
   );
 }
 
-function isSafeRedirectPath(path: string | null | undefined): path is string {
-  return (
-    !!path &&
-    path.startsWith("/") &&
-    !path.startsWith("//") &&
-    !path.startsWith("/login") &&
-    !path.startsWith("/register")
-  );
+export function isSafeRedirectPath(
+  path: string | null | undefined,
+): path is string {
+  if (!path) return false;
+  let decoded = path;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    return false;
+  }
+  if (!decoded.startsWith("/")) return false;
+  if (decoded.startsWith("//") || decoded.startsWith("/\\")) return false;
+  if (decoded.includes("://") || decoded.includes("\\")) return false;
+  for (let i = 0; i < decoded.length; i += 1) {
+    if ((decoded.charCodeAt(i) ?? 32) < 32) return false;
+  }
+  if (decoded.startsWith("/login") || decoded.startsWith("/register")) {
+    return false;
+  }
+  return true;
 }
 
 /** Where to send the user right after a successful login. */

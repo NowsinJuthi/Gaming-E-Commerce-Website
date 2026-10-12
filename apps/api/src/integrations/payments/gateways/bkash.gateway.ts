@@ -13,6 +13,8 @@ export class BkashGateway extends BasePaymentGateway {
   protected readonly cfgKey = 'bkash';
   protected override readonly createPath = '/tokenized/checkout/create';
   protected override readonly verifyPath = '/tokenized/checkout/payment/status';
+  protected override readonly refundPath =
+    '/tokenized/checkout/payment/refund';
 
   protected override authHeaders(cfg: GatewayConfig): Record<string, string> {
     return {

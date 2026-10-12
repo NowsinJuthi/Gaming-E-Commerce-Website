@@ -1119,6 +1119,21 @@ export default function AdminSecurityPage() {
                       </div>
                       <div className="admin-security-info-card">
                         <p className="admin-security-info-label">
+                          Legacy plaintext codes
+                        </p>
+                        <p className="admin-security-info-value">
+                          {overview.encryption?.legacyPlaintext.total ?? 0}{" "}
+                          documents
+                        </p>
+                        <p className="admin-security-info-hint">
+                          Inventory {overview.encryption?.legacyPlaintext.inventoryItems ?? 0} ·
+                          Orders {overview.encryption?.legacyPlaintext.orderDeliveredCodes ?? 0} ·
+                          Reseller {overview.encryption?.legacyPlaintext.resellerOrderCodes ?? 0}
+                          {" "}(counts only)
+                        </p>
+                      </div>
+                      <div className="admin-security-info-card">
+                        <p className="admin-security-info-label">
                           Helmet protections
                         </p>
                         <p className="admin-security-info-value">

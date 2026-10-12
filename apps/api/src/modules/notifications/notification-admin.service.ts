@@ -22,6 +22,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { EmailSettingsService } from '../../integrations/mail/email-settings.service';
 import { MailerService } from '../../integrations/mail/mailer.service';
 import { createGuestOrderAccessToken } from '../../common/utils/guest-order-access';
+import { resolveGuestOrderAccessSecret } from '../../common/utils/guest-order-secret';
 import { buildCustomerOrderEmailPath } from '../../common/utils/guest-order-url';
 import { isEphemeralGuestUser } from '../../common/utils/guest-user';
 import { buildEmailOrderItemsFromOrder } from '../orders/order-email-items.util';
@@ -53,10 +54,7 @@ export class NotificationAdminService {
     private readonly emailSettings: EmailSettingsService,
     private readonly telegramSettings: TelegramSettingsService,
   ) {
-    this.accessSecret =
-      config.get<string>('jwt.accessSecret') ??
-      config.get<string>('JWT_ACCESS_SECRET') ??
-      'guest-order-access-fallback';
+    this.accessSecret = resolveGuestOrderAccessSecret(this.config);
   }
 
   async overview(): Promise<{

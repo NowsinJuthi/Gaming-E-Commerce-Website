@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { NotificationChannel, NotificationEvent, OrderStatus } from '../../../common/enums';
 import { createGuestOrderAccessToken } from '../../../common/utils/guest-order-access';
+import { resolveGuestOrderAccessSecret } from '../../../common/utils/guest-order-secret';
 import { buildCustomerOrderEmailPath } from '../../../common/utils/guest-order-url';
 import { isEphemeralGuestUser } from '../../../common/utils/guest-user';
 import { Order, OrderDocument } from '../../../database/schemas/order.schema';
@@ -44,10 +45,7 @@ export class EmailChannel extends BaseChannel {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {
     super(config);
-    this.accessSecret =
-      config.get<string>('jwt.accessSecret') ??
-      config.get<string>('JWT_ACCESS_SECRET') ??
-      'guest-order-access-fallback';
+    this.accessSecret = resolveGuestOrderAccessSecret(config);
   }
 
   protected isConfigured(): boolean {

@@ -16,6 +16,7 @@ import {
 import { RegionIcon } from "@/components/ui/RegionIcon";
 import { hasProductHtmlContent } from "@/lib/product-page";
 import { ProductDetailReviewsPanel } from "@/components/product/ProductDetailReviewsPanel";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export type ProductInfoTabId = "description" | "reviews" | "shipping";
 
@@ -60,6 +61,7 @@ export function ProductDetailInfoTabs({
   tab,
   onTabChange,
 }: Props) {
+  const safeProductDescription = sanitizeHtml(productDescription);
   const [reviews, setReviews] = useState<PublicProductReview[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ProductReviewsSummary>({
     avg: ratings?.avg ?? 0,
@@ -174,10 +176,12 @@ export function ProductDetailInfoTabs({
                     Digital product
                   </span>
                 </div>
-                {hasProductHtmlContent(productDescription) ? (
+                {hasProductHtmlContent(safeProductDescription) ? (
                   <div
                     className="rich-editor-body product-pdp-prose"
-                    dangerouslySetInnerHTML={{ __html: productDescription }}
+                    dangerouslySetInnerHTML={{
+                      __html: safeProductDescription,
+                    }}
                   />
                 ) : (
                   <div className="product-pdp-description-empty dashboard-pro-empty py-8">

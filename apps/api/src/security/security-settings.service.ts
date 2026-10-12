@@ -256,7 +256,12 @@ export class SecuritySettingsService {
       process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() ||
       process.env.RECAPTCHA_SITE_KEY?.trim();
 
-    const recaptchaEnabled = doc.recaptcha.enabled && Boolean(secret);
+    const isProduction = this.config.get<string>('app.env') === 'production';
+    // Production authentication must never silently lose bot protection due
+    // to an admin toggle or a partially configured key pair.
+    const recaptchaEnabled = isProduction
+      ? Boolean(secret && siteKey)
+      : doc.recaptcha.enabled && Boolean(secret);
 
     return {
       throttle: {

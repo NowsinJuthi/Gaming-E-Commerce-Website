@@ -16,10 +16,12 @@ import {
   MaxFileSizeValidator,
   ParseFilePipe,
 } from '@nestjs/common/pipes';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/enums';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { AddInventoryDto } from './dto/add-inventory.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -67,12 +69,16 @@ export class ProductController {
   @Roles(Role.Admin, Role.Supplier, Role.Support)
   @Get('admin/list')
   adminList(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('categoryId') categoryId?: string,
     @Query('brandId') brandId?: string,
   ) {
-    return this.products.adminList({ search, status, categoryId, brandId });
+    return this.products.adminList(
+      { search, status, categoryId, brandId },
+      user,
+    );
   }
 
   @UseGuards(RolesGuard)
@@ -110,29 +116,33 @@ export class ProductController {
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier, Role.Support)
   @Get('admin/:id')
-  adminById(@Param('id') id: string) {
-    return this.products.findByIdAdmin(id);
+  adminById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.products.findByIdAdmin(id, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier)
   @Post()
-  create(@Body() dto: CreateProductDto) {
-    return this.products.create(dto);
+  create(@Body() dto: CreateProductDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.products.create(dto, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.products.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.products.update(id, dto, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.products.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.products.remove(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -140,30 +150,40 @@ export class ProductController {
   @Get(':id/inventory')
   listInventory(
     @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('variationValueId') variationValueId?: string,
     @Query('search') search?: string,
   ) {
-    return this.stock.listInventory(id, {
-      status,
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-      variationValueId,
-      search,
-    });
+    return this.stock.listInventory(
+      id,
+      {
+        status,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        variationValueId,
+        search,
+      },
+      user,
+    );
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier)
   @Post(':id/inventory')
-  addInventory(@Param('id') id: string, @Body() dto: AddInventoryDto) {
+  addInventory(
+    @Param('id') id: string,
+    @Body() dto: AddInventoryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.stock.addInventory(
       id,
       dto.values,
       dto.cost,
       dto.variationValueId,
+      user,
     );
   }
 
@@ -174,15 +194,19 @@ export class ProductController {
     @Param('id') id: string,
     @Param('itemId') itemId: string,
     @Body() dto: UpdateInventoryItemDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.stock.updateInventoryItem(id, itemId, dto);
+    return this.stock.updateInventoryItem(id, itemId, dto, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Supplier)
   @Delete(':id/inventory/unassigned')
-  deleteUnassignedInventory(@Param('id') id: string) {
-    return this.stock.deleteUnassignedInventory(id);
+  deleteUnassignedInventory(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.stock.deleteUnassignedInventory(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -191,8 +215,9 @@ export class ProductController {
   deleteInventoryItem(
     @Param('id') id: string,
     @Param('itemId') itemId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.stock.deleteInventoryItem(id, itemId);
+    return this.stock.deleteInventoryItem(id, itemId, user);
   }
 
   @UseGuards(RolesGuard)
@@ -200,9 +225,10 @@ export class ProductController {
   @Get(':id/stock')
   getStock(
     @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('variationValueId') variationValueId?: string,
   ) {
-    return this.stock.getStock(id, variationValueId);
+    return this.stock.getStock(id, variationValueId, user);
   }
 
   @Public()

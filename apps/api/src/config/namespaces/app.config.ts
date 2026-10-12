@@ -18,7 +18,7 @@ export function parseCorsOrigins(
 }
 
 export const appConfig = registerAs('app', () => ({
-  env: process.env.NODE_ENV ?? 'development',
+  env: process.env.NODE_ENV,
   host:
     process.env.API_HOST ??
     (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0'),

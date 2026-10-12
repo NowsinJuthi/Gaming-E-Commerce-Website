@@ -1,12 +1,17 @@
 const API = "http://localhost:4000/api";
+const email = process.env.TEST_ADMIN_EMAIL;
+const password = process.env.TEST_ADMIN_PASSWORD;
+if (!email || !password) {
+  throw new Error("Set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD");
+}
 
 async function login() {
   const res = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      email: "admin@uniqbd.com",
-      password: "Admin1234!",
+      email,
+      password,
     }),
   });
   const data = await res.json();

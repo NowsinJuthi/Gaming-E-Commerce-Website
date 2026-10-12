@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getMe, submitProductRequest } from "@/lib/api";
-import { isGuestFromAccessToken } from "@/lib/chat-access";
 import { isRegisteredUserLoggedIn } from "@/lib/guest-checkout";
 
 type AuthState = "checking" | "authed";
@@ -40,8 +39,7 @@ export function ProductRequestForm() {
 
   // Login gate: guests are redirected to the login page.
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!isRegisteredUserLoggedIn() || isGuestFromAccessToken(token)) {
+    if (!isRegisteredUserLoggedIn()) {
       router.replace(`/login?next=${encodeURIComponent("/request-product")}`);
       return;
     }

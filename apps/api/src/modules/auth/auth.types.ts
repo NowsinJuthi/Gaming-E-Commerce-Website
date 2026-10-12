@@ -5,6 +5,7 @@ export interface JwtPayload {
   email: string;
   roles: Role[];
   isGuest?: boolean;
+  ver?: number;
 }
 
 export interface AuthenticatedUser {
@@ -44,10 +45,9 @@ export interface RegisterResult {
   email: string;
 }
 
-/** Returned by requestOtp() — includes whether the email is registered. */
+/** Enumeration-safe response returned by requestOtp(). */
 export interface OtpRequestResult {
   message: string;
-  accountExists: boolean;
 }
 
 export interface PasswordResetRequestResult {

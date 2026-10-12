@@ -1,4 +1,5 @@
 "use client";
+import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,7 +9,6 @@ import { BellIcon, ChevronIcon, MenuIcon, SearchIcon } from "@/components/admin/
 import { SiteUserMenu } from "@/components/SiteUserMenu";
 import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 import { getMe, logoutUser } from "@/lib/api";
-import { rolesFromAccessToken } from "@/lib/auth-roles";
 import { useCanAccessAdminPanel } from "@/hooks/useAdminPermissions";
 import {
   getCustomerDisplayName,
@@ -37,7 +37,7 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
   useEffect(() => {
     function loadUser() {
       setUserOpen(false);
-      const token = localStorage.getItem("accessToken");
+      const token = hasAuthSession();
       setLoggedIn(!!token);
       if (!token) {
         setDisplayName("Account");
@@ -45,7 +45,7 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
         setRoleLabel(null);
         return;
       }
-      setRoleLabel(getPrimaryRoleLabel(rolesFromAccessToken(token)));
+      setRoleLabel(getPrimaryRoleLabel(getSessionRoles()));
       getMe()
         .then((u) => {
           setDisplayName(getCustomerDisplayName(u));
@@ -55,7 +55,7 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
         .catch(() => {
           setDisplayName("Account");
           setAvatarUrl(null);
-          setRoleLabel(getPrimaryRoleLabel(rolesFromAccessToken(token)));
+          setRoleLabel(getPrimaryRoleLabel(getSessionRoles()));
         });
     }
 

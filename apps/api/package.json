@@ -19,7 +19,9 @@
     "db:setup:full": "node scripts/db-setup.cjs --with-catalog",
     "seed:mfs": "node scripts/seed-mfs-gateways.cjs",
     "seed:game-topup": "node scripts/seed-game-topup.cjs",
-    "seed:blog-categories": "node scripts/seed-blog-categories.cjs"
+    "seed:blog-categories": "node scripts/seed-blog-categories.cjs",
+    "migrate:encrypt-codes": "node scripts/encrypt-delivered-codes.cjs",
+    "migrate:recover-superseded": "node scripts/recover-superseded-payments.cjs"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.0",
@@ -43,9 +45,9 @@
     "express": "^5.2.1",
     "helmet": "^8.0.0",
     "ioredis": "^5.4.1",
-    "joi": "^17.13.3",
-    "mongoose": "^8.7.0",
-    "multer": "^2.1.1",
+    "joi": "^17.13.8",
+    "mongoose": "8.24.1",
+    "multer": "^2.3.0",
     "nestjs-pino": "^4.1.0",
     "nodemailer": "^8.0.11",
     "passport": "^0.7.0",
@@ -53,7 +55,7 @@
     "pino-http": "^10.3.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "sharp": "^0.35.1",
+    "sharp": "^0.35.5",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {
@@ -72,7 +74,21 @@
     "source-map-support": "^0.5.21",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.1",
+    "mongodb-memory-server": "^10.2.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.2"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "testEnvironment": "node"
   }
 }

@@ -1,6 +1,4 @@
-import { Logger, UsePipes, ValidationPipe } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { JwtService } from "@nestjs/jwt";
+import { Inject, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
 import {
   ConnectedSocket,
   MessageBody,
@@ -14,10 +12,15 @@ import {
 import { Server, Socket } from "socket.io";
 import { Public } from "../../common/decorators/public.decorator";
 import { ChatRoomType } from "../../common/enums";
-import { isEphemeralGuestUser } from "../../common/utils/guest-user";
+import { socketIoCorsOptions } from "../../common/utils/cors-origins";
+import { RedisSlidingWindowLimiter } from "../../common/utils/redis-sliding-window";
 import { isChatStaff } from "../../common/utils/role.utils";
+import { isProductionNodeEnv } from "../../config/production-env";
+import { REDIS_CLIENT } from "../../shared/cache/redis.constants";
+import type { Redis } from "ioredis";
 import type { ChatRoomDocument } from "../../database/schemas/chat-room.schema";
-import type { AuthenticatedUser, JwtPayload } from "../auth/auth.types";
+import type { AuthenticatedUser } from "../auth/auth.types";
+import { extractAccessTokenFromHandshake } from "../auth/auth-cookies";
 import { AuthService } from "../auth/auth.service";
 import { ChatService } from "./chat.service";
 import { PresenceService } from "./presence.service";
@@ -50,21 +53,52 @@ const isStaff = (user: AuthenticatedUser): boolean => isChatStaff(user.roles);
  * - Tracks online status + typing in Redis (PresenceService).
  */
 @Public()
-@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-@WebSocketGateway({ namespace: "/chat", cors: true })
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
+@WebSocketGateway({ namespace: "/chat", cors: socketIoCorsOptions() })
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() private readonly server!: Server;
   private readonly logger = new Logger(ChatGateway.name);
+  private readonly sendLimiter: RedisSlidingWindowLimiter;
+  private readonly typingLimiter: RedisSlidingWindowLimiter;
+  private readonly heartbeatLimiter: RedisSlidingWindowLimiter;
 
   constructor(
     private readonly chat: ChatService,
     private readonly presence: PresenceService,
-    private readonly jwt: JwtService,
-    private readonly config: ConfigService,
     private readonly auth: AuthService,
-  ) {}
+    @Inject(REDIS_CLIENT) redis: Redis,
+  ) {
+    const failClosed = isProductionNodeEnv(process.env.NODE_ENV);
+    this.sendLimiter = new RedisSlidingWindowLimiter(
+      redis,
+      30,
+      60_000,
+      "ws:chat:send",
+      failClosed,
+    );
+    this.typingLimiter = new RedisSlidingWindowLimiter(
+      redis,
+      20,
+      60_000,
+      "ws:chat:typing",
+      failClosed,
+    );
+    this.heartbeatLimiter = new RedisSlidingWindowLimiter(
+      redis,
+      60,
+      60_000,
+      "ws:chat:heartbeat",
+      failClosed,
+    );
+  }
 
   afterInit(server: Server): void {
     // Namespace middleware finishes authentication and room membership before
@@ -164,6 +198,9 @@ export class ChatGateway
     @MessageBody() dto: SendMessageDto,
   ) {
     const user = this.user(client);
+    if (!(await this.sendLimiter.allow(user.id))) {
+      return { ok: false, error: "Too many messages" };
+    }
     try {
       const config = await this.auth.getPanelConfig();
       const { payload, room } = await this.chat.sendRoomMessage(
@@ -222,6 +259,9 @@ export class ChatGateway
     @MessageBody() dto: TypingDto,
   ) {
     const user = this.user(client);
+    if (!(await this.typingLimiter.allow(user.id))) {
+      return { ok: false, error: "Too many typing events" };
+    }
     try {
       const room = await this.chat.getAccessibleRoom(user, dto.roomId);
       const notifyRoom = await this.chat.ensureStaffParticipants(room);
@@ -259,12 +299,19 @@ export class ChatGateway
   @SubscribeMessage("presence:heartbeat")
   async presenceHeartbeat(@ConnectedSocket() client: Socket) {
     const user = this.user(client);
+    if (!(await this.heartbeatLimiter.allow(user.id))) {
+      return { ok: false, error: "Too many heartbeats" };
+    }
     await this.presence.touchAlive(user.id, client.id);
     return { ok: true };
   }
 
   @SubscribeMessage("presence:list")
-  async presenceList() {
+  async presenceList(@ConnectedSocket() client: Socket) {
+    const user = this.user(client);
+    if (!isStaff(user)) {
+      return { ok: false, error: "Forbidden" };
+    }
     const online = await this.presence.listOnline();
     return { ok: true, online };
   }
@@ -328,30 +375,18 @@ export class ChatGateway
 
   private async authenticate(client: Socket): Promise<AuthenticatedUser> {
     const auth = client.handshake.auth as { token?: string } | undefined;
-    const header = client.handshake.headers.authorization;
-    const query = client.handshake.query?.token;
-    const token =
-      auth?.token ??
-      (typeof header === "string"
-        ? header.replace(/^Bearer\s+/i, "")
-        : undefined) ??
-      (typeof query === "string" ? query : undefined);
+    const token = extractAccessTokenFromHandshake({
+      authToken: auth?.token,
+      authorization:
+        typeof client.handshake.headers.authorization === "string"
+          ? client.handshake.headers.authorization
+          : undefined,
+      cookie: client.handshake.headers.cookie,
+    });
     if (!token) {
       throw new Error("Missing token");
     }
-    const secret = this.config.get<string>("jwt.accessSecret");
-    const payload = await this.jwt.verifyAsync<JwtPayload>(token, { secret });
-    if (!payload?.sub) {
-      throw new Error("Invalid token");
-    }
-    return {
-      id: payload.sub,
-      email: payload.email,
-      roles: payload.roles,
-      ...(payload.isGuest || isEphemeralGuestUser({ email: payload.email })
-        ? { isGuest: true }
-        : {}),
-    };
+    return this.auth.authenticateAccessToken(token);
   }
 
   private serializeRoom(room: ChatRoomDocument): Record<string, unknown> {

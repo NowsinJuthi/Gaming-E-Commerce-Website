@@ -20,6 +20,7 @@ export interface CreateChargeResult {
 export interface VerifyResult {
   status: NormalizedPaymentStatus;
   amount?: number;
+  currency?: string;
   raw?: unknown;
 }
 
@@ -27,9 +28,23 @@ export interface WebhookParseResult {
   gatewayRef: string;
   status: NormalizedPaymentStatus;
   amount?: number;
+  currency?: string;
   signatureValid: boolean;
   raw?: unknown;
 }
+
+export interface RefundChargeInput {
+  gatewayRef: string;
+  amount: number;
+  currency: string;
+  idempotencyKey: string;
+  reason?: string;
+}
+
+export type RefundChargeResult =
+  | { supported: true; ok: true; refundRef?: string; raw?: unknown }
+  | { supported: true; ok: false; error: string; raw?: unknown }
+  | { supported: false };
 
 /**
  * Anti-corruption layer: every payment provider is normalized behind this
@@ -44,4 +59,5 @@ export interface PaymentGatewayClient {
     signature: string | undefined,
     rawBody?: Buffer,
   ): WebhookParseResult;
+  refundCharge?(input: RefundChargeInput): Promise<RefundChargeResult>;
 }

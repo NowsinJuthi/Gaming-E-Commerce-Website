@@ -13,6 +13,7 @@ import {
   NotificationAudience,
   Role,
 } from "../../common/enums";
+import { isValidChatImageUrl } from "../../common/utils/chat-image-url";
 import { isEphemeralGuestUser } from "../../common/utils/guest-user";
 import {
   CHAT_STAFF_ROLES,
@@ -124,8 +125,7 @@ export class ChatService {
   }
 
   private assertValidChatImageUrl(imageUrl: string, roomId: string): void {
-    const marker = `/uploads/live-chat/${roomId}/`;
-    if (!imageUrl.includes(marker)) {
+    if (!isValidChatImageUrl(imageUrl, roomId)) {
       throw new BadRequestException("Invalid chat image URL");
     }
   }

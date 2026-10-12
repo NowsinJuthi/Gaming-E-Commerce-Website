@@ -46,13 +46,7 @@ import {
 
 } from './license.constants';
 
-import {
-
-  isLicenseVendorReady,
-
-  LICENSE_VENDOR_CONFIG,
-
-} from './license.vendor-config';
+import { getLicenseVendorConfig } from './license.vendor-config';
 
 
 
@@ -196,13 +190,13 @@ export class LicenseService implements OnModuleInit {
 
   async getAdminStatus(): Promise<LicenseAdminStatus> {
 
-    const doc = await this.getSettings();
+    const doc = await this.getSettingsWithLegacySecret();
 
     const hasKey = Boolean(doc.licenseKey?.trim());
 
     const hasSecret = this.hasSiteSecret(doc);
 
-    const serverReady = isLicenseVendorReady();
+    const serverReady = hasSecret;
 
     const configured = hasKey && serverReady;
 
@@ -406,7 +400,7 @@ export class LicenseService implements OnModuleInit {
 
     }
 
-    this.ensureServerReady();
+    await this.ensureServerReady();
 
     await this.saveSettings({ licenseKey: key });
 
@@ -426,7 +420,7 @@ export class LicenseService implements OnModuleInit {
 
     }
 
-    this.ensureServerReady();
+    await this.ensureServerReady();
 
     const client = await this.createClient();
 
@@ -618,11 +612,35 @@ export class LicenseService implements OnModuleInit {
 
   private async saveSettings(dto: UpdateLicenseSettingsDto): Promise<void> {
 
-    const doc = await this.getSettings();
+    const doc = await this.getSettingsWithLegacySecret();
 
     if (dto.licenseKey !== undefined) {
 
       doc.licenseKey = dto.licenseKey.trim();
+
+    }
+
+    if (dto.productId !== undefined) {
+
+      doc.productId = dto.productId.trim();
+
+    }
+
+    if (dto.websiteId !== undefined) {
+
+      doc.websiteId = dto.websiteId.trim();
+
+    }
+
+    if (dto.apiUrl !== undefined) {
+
+      doc.apiUrl = dto.apiUrl.trim();
+
+    }
+
+    if (dto.siteSecret !== undefined && dto.siteSecret.trim()) {
+
+      doc.siteSecret = dto.siteSecret.trim();
 
     }
 
@@ -806,6 +824,12 @@ export class LicenseService implements OnModuleInit {
 
         licenseKey: '',
 
+        apiUrl: 'https://license.amarpin.com/api',
+
+        productId: 'amarpin-pro',
+
+        websiteId: '',
+
       });
 
       if (withLegacySecret) {
@@ -842,13 +866,15 @@ export class LicenseService implements OnModuleInit {
 
 
 
-  private ensureServerReady(): void {
+  private async ensureServerReady(): Promise<void> {
 
-    if (!isLicenseVendorReady()) {
+    const doc = await this.getSettingsWithLegacySecret();
+
+    if (!this.hasSiteSecret(doc)) {
 
       throw new ForbiddenException(
 
-        'Server vendor config is missing. Set site secret in license.vendor-config.ts before deploy.',
+        'Server vendor config is missing. Save the site secret under Admin → Settings → License (stored in MongoDB).',
 
       );
 
@@ -862,7 +888,7 @@ export class LicenseService implements OnModuleInit {
 
   private async bootstrapStoredLicense(): Promise<void> {
 
-    const doc = await this.getSettings();
+    const doc = await this.getSettingsWithLegacySecret();
 
     if (!this.isFullyConfigured(doc)) {
 
@@ -906,7 +932,7 @@ export class LicenseService implements OnModuleInit {
 
   private normalizeApiUrl(raw?: string): string {
 
-    const fallback = LICENSE_VENDOR_CONFIG.apiUrl.trim() || 'https://license.amarpin.com/api';
+    const fallback = getLicenseVendorConfig().apiUrl.trim() || 'https://license.amarpin.com/api';
 
     let url = (raw ?? fallback).trim();
 
@@ -938,7 +964,15 @@ export class LicenseService implements OnModuleInit {
 
   private resolveApiUrl(doc?: LicenseSettingsDocument): string {
 
-    const vendor = LICENSE_VENDOR_CONFIG.apiUrl?.trim();
+    const fromDoc = doc?.apiUrl?.trim();
+
+    if (fromDoc) {
+
+      return this.normalizeApiUrl(fromDoc);
+
+    }
+
+    const vendor = getLicenseVendorConfig().apiUrl?.trim();
 
     if (vendor) {
 
@@ -946,7 +980,7 @@ export class LicenseService implements OnModuleInit {
 
     }
 
-    return this.normalizeApiUrl(doc?.apiUrl);
+    return this.normalizeApiUrl('https://license.amarpin.com/api');
 
   }
 
@@ -956,9 +990,9 @@ export class LicenseService implements OnModuleInit {
 
     return (
 
-      LICENSE_VENDOR_CONFIG.productId?.trim() ||
-
       doc?.productId?.trim() ||
+
+      getLicenseVendorConfig().productId?.trim() ||
 
       'amarpin-pro'
 
@@ -972,7 +1006,11 @@ export class LicenseService implements OnModuleInit {
 
     return (
 
-      LICENSE_VENDOR_CONFIG.websiteId?.trim() || doc?.websiteId?.trim() || ''
+      doc?.websiteId?.trim() ||
+
+      getLicenseVendorConfig().websiteId?.trim() ||
+
+      ''
 
     );
 
@@ -982,15 +1020,15 @@ export class LicenseService implements OnModuleInit {
 
   private resolveSiteSecret(doc?: LicenseSettingsDocument): string {
 
-    const vendor = LICENSE_VENDOR_CONFIG.siteSecret?.trim();
+    return (
 
-    if (vendor) {
+      doc?.siteSecret?.trim() ||
 
-      return vendor;
+      getLicenseVendorConfig().siteSecret?.trim() ||
 
-    }
+      ''
 
-    return doc?.siteSecret?.trim() || '';
+    );
 
   }
 
@@ -1006,7 +1044,7 @@ export class LicenseService implements OnModuleInit {
 
   private isFullyConfigured(doc: LicenseSettingsDocument): boolean {
 
-    return Boolean(doc.licenseKey?.trim() && isLicenseVendorReady());
+    return Boolean(doc.licenseKey?.trim() && this.hasSiteSecret(doc));
 
   }
 
@@ -1046,7 +1084,7 @@ export class LicenseService implements OnModuleInit {
 
     if (!serverReady) {
 
-      return 'Server vendor config is missing. Set site secret in license.vendor-config.ts before deploy.';
+      return 'Server vendor config is missing. Save the site secret in Admin → License (MongoDB), not in api.env.';
 
     }
 

@@ -17,6 +17,11 @@ import { realIpMiddleware } from './security/real-ip.middleware';
 import { REDIS_CLIENT } from './shared/cache/redis.constants';
 import { RedisIoAdapter } from './shared/ws/redis-io.adapter';
 import { resolveUploadsRoot } from './shared/uploads/uploads-root';
+import {
+  isAllowedCorsOrigin,
+  parseCorsOrigins,
+} from './common/utils/cors-origins';
+import { assertProductionEnvironment } from './config/production-env';
 
 installOptionalRedisDevSilencer();
 
@@ -30,6 +35,10 @@ async function bootstrap(): Promise<void> {
   app.useLogger(app.get(Logger));
   const config = app.get(ConfigService);
   const isProduction = config.get<string>('app.env') === 'production';
+  assertProductionEnvironment({
+    ...process.env,
+    NODE_ENV: config.get<string>('app.env') ?? process.env.NODE_ENV,
+  });
 
   // Behind Cloudflare/load balancer: trust the proxy chain so req.ip and the
   // rate limiter resolve the real visitor IP from X-Forwarded-For.
@@ -54,9 +63,28 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  const allowedOrigins = parseCorsOrigins(
+    config.get<string>('app.corsOrigin') ?? 'http://localhost:3000',
+  );
   app.enableCors({
-    origin: config.get<string>('app.corsOrigin') ?? 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Non-browser clients do not send Origin. Browser origins must match the
+      // configured scheme, host and port exactly; "null" is never accepted.
+      return isAllowedCorsOrigin(origin, allowedOrigins)
+        ? callback(null, true)
+        : callback(null, false);
+    },
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'X-API-Key',
+      'X-Recaptcha-Token',
+      'X-Captcha-Token',
+      'X-CSRF-Token',
+      'X-MFS-SMS-Token',
+    ],
   });
   const globalPrefix = config.get<string>('app.globalPrefix') ?? 'api';
   app.setGlobalPrefix(globalPrefix);
@@ -68,6 +96,17 @@ async function bootstrap(): Promise<void> {
     express.static(uploadsDir, {
       maxAge: config.get<string>('app.env') === 'production' ? '7d' : 0,
       fallthrough: true,
+      dotfiles: 'deny',
+      index: false,
+      redirect: false,
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader(
+          'Content-Security-Policy',
+          "default-src 'none'; sandbox",
+        );
+        res.setHeader('Content-Disposition', 'inline');
+      },
     }),
   );
   app.useGlobalPipes(

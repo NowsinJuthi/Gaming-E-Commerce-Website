@@ -1,4 +1,5 @@
 "use client";
+import { hasAuthSession } from "@/lib/access-token";
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -80,7 +81,7 @@ export default function AccountClientLayout({
           return;
         }
 
-        const token = localStorage.getItem("accessToken");
+        const token = hasAuthSession();
         if (!token) {
           router.replace(`/login?next=${encodeURIComponent(path)}`);
           return;

@@ -29,9 +29,6 @@ logs/
 !**/*.env.example
 !**/*.env.*.example
 
-# Amarpin vendor secret (real values — never commit)
-apps/api/src/modules/license/license.vendor-config.ts
-
 # User uploads (product images, logos)
 uploads/
 

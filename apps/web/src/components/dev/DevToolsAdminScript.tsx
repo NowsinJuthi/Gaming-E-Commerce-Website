@@ -2,7 +2,9 @@ const script = `
 (function() {
   function isAdmin() {
     try {
-      var token = localStorage.getItem('accessToken');
+      var token = typeof window.__UNIQBD_GET_ACCESS_TOKEN === 'function'
+        ? window.__UNIQBD_GET_ACCESS_TOKEN()
+        : null;
       if (!token) return false;
       var payload = token.split('.')[1];
       if (!payload) return false;
@@ -21,9 +23,10 @@ const script = `
 })();
 `.trim();
 
-export function DevToolsAdminScript() {
+export function DevToolsAdminScript({ nonce }: { nonce?: string }) {
   return (
     <script
+      nonce={nonce}
       dangerouslySetInnerHTML={{ __html: script }}
       suppressHydrationWarning
     />

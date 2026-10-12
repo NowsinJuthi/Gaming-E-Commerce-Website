@@ -269,6 +269,7 @@ export class UsersService {
     await this.userModel
       .updateOne({ _id: userId }, { $set: { passwordHash } })
       .exec();
+    await this.invalidateAccessSessions(userId);
 
     void this.dispatcher.dispatch(
       NotificationEvent.PasswordChanged,
@@ -292,7 +293,7 @@ export class UsersService {
     await this.userModel
       .updateOne({ _id: userId }, { $set: { passwordHash } })
       .exec();
-    await this.devices.revokeAll(userId);
+    await this.invalidateAccessSessions(userId);
 
     void this.dispatcher.dispatch(
       NotificationEvent.PasswordChanged,
@@ -301,6 +302,13 @@ export class UsersService {
     );
 
     return { success: true };
+  }
+
+  private async invalidateAccessSessions(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } })
+      .exec();
+    await this.devices.revokeAll(userId);
   }
 
   async markEmailVerified(userId: Types.ObjectId): Promise<void> {
@@ -501,6 +509,7 @@ export class UsersService {
     await this.userModel
       .updateOne({ _id: userId }, { $set: { passwordHash } })
       .exec();
+    await this.invalidateAccessSessions(userId);
 
     void this.dispatcher.dispatch(
       NotificationEvent.PasswordChanged,

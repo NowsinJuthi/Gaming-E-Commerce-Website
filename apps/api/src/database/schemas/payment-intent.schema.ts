@@ -27,6 +27,17 @@ export class PaymentIntent {
   @Prop({ type: Types.ObjectId, ref: 'Order', index: true })
   orderId?: Types.ObjectId;
 
+  /**
+   * Occupies the sparse unique (orderId, activeOrderSlot) slot while the
+   * intent is created/initializing/pending so two checkouts cannot both stay live.
+   */
+  @Prop()
+  activeOrderSlot?: number;
+
+  /** Exclusive lease while createCharge() is in flight for a Created intent. */
+  @Prop()
+  chargeLeaseUntil?: Date;
+
   @Prop({ required: true, min: 0 })
   amount!: number;
 
@@ -64,6 +75,25 @@ export class PaymentIntent {
   paidAt?: Date;
 
   /**
+   * Outbox for money-moving side effects. Succeeded + pending means the
+   * gateway paid but order/wallet apply may still be in flight and is retryable.
+   */
+  @Prop({ trim: true, index: true })
+  settlementState?:
+    | 'pending'
+    | 'applied'
+    | 'unmatched'
+    | 'unmatched_applied'
+    | 'unmatched_manual';
+
+  /** Gateway refund/void reference after a duplicate or superseded capture. */
+  @Prop({ trim: true })
+  gatewayRefundRef?: string;
+
+  @Prop()
+  settlementLeaseUntil?: Date;
+
+  /**
    * TTL anchor: abandoned intents are removed once this passes. Cleared on
    * success so settled payments are retained. `expires: 0` deletes the doc
    * when the stored date is reached.
@@ -94,3 +124,7 @@ export const PaymentIntentSchema = SchemaFactory.createForClass(PaymentIntent);
 PaymentIntentSchema.index({ gateway: 1, gatewayRef: 1 });
 PaymentIntentSchema.index({ userId: 1, createdAt: -1 });
 PaymentIntentSchema.index({ status: 1, createdAt: -1 });
+PaymentIntentSchema.index(
+  { orderId: 1, activeOrderSlot: 1 },
+  { unique: true, sparse: true, name: 'uniq_active_order_payment_slot' },
+);

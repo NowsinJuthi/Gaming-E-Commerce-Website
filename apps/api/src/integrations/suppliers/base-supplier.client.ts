@@ -1,5 +1,6 @@
 import { DEFAULT_CURRENCY } from '@uniqbd/types';
 import { Injectable, Logger } from '@nestjs/common';
+import { requireConfiguredOrSandbox } from '../../common/utils/sandbox-integrations';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
 import { SupplierCode } from '../../common/enums';
@@ -41,8 +42,8 @@ const HTTP_TIMEOUT_MS = 20_000;
 
 /**
  * Shared supplier-adapter behavior: HTTP, config resolution, status mapping,
- * code extraction, and a sandbox mode that synthesizes codes when credentials
- * are absent. Concrete suppliers override endpoints / auth / mappings.
+ * code extraction, and a sandbox mode that synthesizes codes only when
+ * ALLOW_SANDBOX_INTEGRATIONS=true outside production. Production fail-closes.
  */
 @Injectable()
 export abstract class BaseSupplierClient implements SupplierClient {
@@ -76,6 +77,7 @@ export abstract class BaseSupplierClient implements SupplierClient {
   async getBalance(): Promise<SupplierBalance> {
     const cfg = this.config();
     if (!this.isConfigured(cfg)) {
+      requireConfiguredOrSandbox(false, this.code);
       return {
         balance: Number.POSITIVE_INFINITY,
         currency: DEFAULT_CURRENCY,
@@ -96,6 +98,7 @@ export abstract class BaseSupplierClient implements SupplierClient {
   async fulfill(input: SupplierFulfillInput): Promise<SupplierFulfillResult> {
     const cfg = this.config();
     if (!this.isConfigured(cfg)) {
+      requireConfiguredOrSandbox(false, this.code);
       return this.sandboxFulfill(input);
     }
     const json = await this.httpJson(`${cfg.baseUrl}${this.fulfillPath}`, {
@@ -109,6 +112,7 @@ export abstract class BaseSupplierClient implements SupplierClient {
   async checkStatus(externalOrderId: string): Promise<SupplierFulfillResult> {
     const cfg = this.config();
     if (!this.isConfigured(cfg)) {
+      requireConfiguredOrSandbox(false, this.code);
       return { status: 'success', externalOrderId };
     }
     const json = await this.httpJson(

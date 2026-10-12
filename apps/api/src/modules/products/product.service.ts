@@ -28,10 +28,18 @@ import {
   Product,
   ProductDocument,
 } from '../../database/schemas/product.schema';
+import {
+  assertCanMutateProduct,
+  assertCanReadProductAdmin,
+  isProductAdministrator,
+  isProductSupplier,
+  isProductSupport,
+} from '../../common/utils/product-access';
 import { CacheKeys } from '../../shared/cache/cache-keys';
 import { CacheService } from '../../shared/cache/cache.service';
 import { EventsService } from '../../shared/events/events.service';
 import { AppEvent } from '../../shared/events/events.types';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { BrandService } from '../brands/brand.service';
 import { CategoryService } from '../categories/category.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -64,7 +72,11 @@ const LIST_PROJECT_FIELDS: Record<string, 1> = {
 };
 
 /** Fields that must never be exposed in public product API responses. */
-const INTERNAL_PRODUCT_FIELDS = ['supplierId', 'titleNormalized'] as const;
+const INTERNAL_PRODUCT_FIELDS = [
+  'supplierId',
+  'ownerUserId',
+  'titleNormalized',
+] as const;
 const INTERNAL_PRICING_FIELDS = ['cost'] as const;
 
 function stripInternalProductFields(obj: Record<string, unknown>): void {
@@ -127,7 +139,10 @@ export class ProductService {
     throw new BadRequestException('At least one category is required');
   }
 
-  async create(dto: CreateProductDto): Promise<ProductDocument> {
+  async create(
+    dto: CreateProductDto,
+    user: AuthenticatedUser,
+  ): Promise<ProductDocument> {
     if (dto.brandId) {
       await this.brands.assertExists(dto.brandId);
     }
@@ -160,6 +175,9 @@ export class ProductService {
       seo: dto.seo,
       status: dto.status ?? ProductStatus.Draft,
       featured: dto.featured ?? false,
+      ...(isProductAdministrator(user)
+        ? {}
+        : { ownerUserId: new Types.ObjectId(user.id) }),
       ...(dto.stock?.available !== undefined
         ? { stock: { available: dto.stock.available, reserved: 0, sold: 0 } }
         : {}),
@@ -173,7 +191,13 @@ export class ProductService {
     return created;
   }
 
-  async update(id: string, dto: UpdateProductDto): Promise<ProductDocument> {
+  async update(
+    id: string,
+    dto: UpdateProductDto,
+    user: AuthenticatedUser,
+  ): Promise<ProductDocument> {
+    const existing = await this.requireProduct(id);
+    assertCanMutateProduct(user, existing.ownerUserId);
     const update: Record<string, unknown> = {};
 
     if (dto.title !== undefined) {
@@ -218,8 +242,7 @@ export class ProductService {
     if (dto.stock?.available !== undefined) {
       update['stock.available'] = dto.stock.available;
       if (dto.stock.available > 0) {
-        const existing = await this.productModel.findById(id).exec();
-        if (existing?.status === ProductStatus.OutOfStock) {
+        if (existing.status === ProductStatus.OutOfStock) {
           update.status = ProductStatus.Active;
         }
       }
@@ -245,15 +268,11 @@ export class ProductService {
    */
   async remove(
     id: string,
+    user: AuthenticatedUser,
   ): Promise<{ success: boolean; mode: 'deleted' | 'archived' }> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new NotFoundException('Product not found');
-    }
-    const productId = new Types.ObjectId(id);
-    const product = await this.productModel.findById(productId).exec();
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
+    const product = await this.requireProduct(id);
+    assertCanMutateProduct(user, product.ownerUserId);
+    const productId = product._id as Types.ObjectId;
 
     const linkedToOrders = await this.orderModel.exists({
       'items.productId': productId,
@@ -363,14 +382,24 @@ export class ProductService {
   }
 
   /** Admin/supplier listing across all statuses (drafts, archived, etc.). */
-  async adminList(query: {
-    search?: string;
-    status?: string;
-    categoryId?: string;
-    brandId?: string;
-    limit?: number;
-  }): Promise<{ items: unknown[] }> {
+  async adminList(
+    query: {
+      search?: string;
+      status?: string;
+      categoryId?: string;
+      brandId?: string;
+      limit?: number;
+    },
+    user: AuthenticatedUser,
+  ): Promise<{ items: unknown[] }> {
     const filter: FilterQuery<ProductDocument> = {};
+    if (
+      isProductSupplier(user) &&
+      !isProductAdministrator(user) &&
+      !isProductSupport(user)
+    ) {
+      filter.ownerUserId = new Types.ObjectId(user.id);
+    }
     if (query.status === 'all') {
       /* include every status */
     } else if (query.status) {
@@ -447,16 +476,35 @@ export class ProductService {
     });
   }
 
-  async findByIdAdmin(id: string): Promise<Record<string, unknown>> {
+  async findByIdAdmin(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const product = await this.requireProduct(id);
+    assertCanReadProductAdmin(user, product.ownerUserId);
+    const lean = product.toObject() as unknown as Record<string, unknown>;
+    const enriched = await this.enrichAdminListStock([lean]);
+    return enriched[0] ?? lean;
+  }
+
+  async requireProduct(id: string): Promise<ProductDocument> {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Product not found');
     }
-    const product = await this.productModel.findById(id).lean().exec();
+    const product = await this.productModel.findById(id).exec();
     if (!product) {
       throw new NotFoundException('Product not found');
     }
-    const enriched = await this.enrichAdminListStock([product]);
-    return enriched[0] ?? product;
+    return product;
+  }
+
+  async requireWritableProduct(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<ProductDocument> {
+    const product = await this.requireProduct(id);
+    assertCanMutateProduct(user, product.ownerUserId);
+    return product;
   }
 
   async list(query: QueryProductDto): Promise<ProductListResult> {

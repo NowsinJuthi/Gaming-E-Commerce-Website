@@ -9,4 +9,5 @@ export class RocketGateway extends BasePaymentGateway {
   protected readonly cfgKey = 'rocket';
   protected override readonly createPath = '/payment/create';
   protected override readonly verifyPath = '/payment/verify';
+  protected override readonly refundPath = '/payment/refund';
 }

@@ -24,6 +24,7 @@ import {
   logoUploadMulterOptions,
   validateLogoUploadFile,
 } from '../../shared/uploads/logo-upload.multer';
+import { processLogoImageUpload } from '../../shared/uploads/logo-image.processor';
 import { BANNER_UPLOAD_MAX_BYTES } from '../../shared/uploads/banner-upload.constants';
 import {
   bannerUploadMulterOptions,
@@ -101,11 +102,15 @@ export class CustomerPanelAdminController {
       );
     }
     validateLogoUploadFile(file, variant as LogoUploadVariant);
-    const url = this.uploads.buildLogoPublicUrl(file.filename);
+    const filename = await processLogoImageUpload(
+      file,
+      variant as LogoUploadVariant,
+    );
+    const url = this.uploads.buildLogoPublicUrl(filename);
     return {
       url,
       variant: variant as LogoUploadVariant,
-      filename: file.filename,
+      filename,
     };
   }
 

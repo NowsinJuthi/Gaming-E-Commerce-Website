@@ -10,6 +10,8 @@ import {
   PAYMENT_GATEWAY_LABELS,
   PAYMENT_GATEWAY_ORDER,
 } from './payment-settings.constants';
+import { isSandboxIntegrationsAllowed } from '../../common/utils/sandbox-integrations';
+import { resolvePaymentGatewayMode } from './payment-gateway-mode';
 import { PaymentSettingsService } from './payment-settings.service';
 
 @Injectable()
@@ -41,11 +43,12 @@ export class PaymentAdminService {
 
     const gateways = PAYMENT_GATEWAY_ORDER.map((id) => {
       const entry = effective.gateways[id];
-      const mode = !entry.enabled
-        ? 'disabled'
-        : entry.sandbox || !entry.configured
-          ? 'sandbox'
-          : 'live';
+      const mode = resolvePaymentGatewayMode({
+        enabled: entry.enabled,
+        configured: entry.configured,
+        sandbox: entry.sandbox,
+        sandboxAllowed: isSandboxIntegrationsAllowed(),
+      });
       return {
         id,
         label: PAYMENT_GATEWAY_LABELS[id],

@@ -28,7 +28,10 @@ export class PaymentProcessor extends WorkerHost {
 
     switch (job.name) {
       case PaymentJob.Verify:
-        await this.payments.pollVerify(intentId, attempt);
+        await this.payments.pollVerify(intentId, attempt ?? 1);
+        break;
+      case PaymentJob.Settle:
+        await this.payments.applyPendingSettlement(intentId);
         break;
       default:
         this.logger.warn(`Unknown job ${job.name}`);

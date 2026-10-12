@@ -12,13 +12,10 @@ import {
 } from "@/lib/api";
 import { getPostLoginRedirect } from "@/lib/auth-roles";
 import {
-  AUTH_NO_ACCOUNT_MESSAGE,
   AUTH_WRONG_PASSWORD_MESSAGE,
-  isAuthNoAccountError,
   isAuthWrongPasswordError,
 } from "@/lib/auth-messages";
 import { getRecaptchaToken, warmupRecaptcha } from "@/lib/recaptcha";
-import { LoginNoAccountModal } from "@/components/auth/LoginNoAccountModal";
 import { LoginWrongPasswordModal } from "@/components/auth/LoginWrongPasswordModal";
 import {
   LoginFieldCodeIcon,
@@ -73,8 +70,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
 
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [noAccountOpen, setNoAccountOpen] = useState(false);
-  const [noAccountMessage, setNoAccountMessage] = useState<string | null>(null);
   const [wrongPasswordOpen, setWrongPasswordOpen] = useState(false);
   const [wrongPasswordMessage, setWrongPasswordMessage] = useState<
     string | null
@@ -111,17 +106,8 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
   function resetMessages() {
     setError(null);
     setInfo(null);
-    setNoAccountOpen(false);
-    setNoAccountMessage(null);
     setWrongPasswordOpen(false);
     setWrongPasswordMessage(null);
-  }
-
-  function openNoAccountModal(message?: string | null) {
-    const text = message?.trim() || AUTH_NO_ACCOUNT_MESSAGE;
-    setNoAccountMessage(text);
-    setNoAccountOpen(true);
-    setError(text);
   }
 
   function closeWrongPasswordModal() {
@@ -151,11 +137,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
     warmupRecaptcha();
   }
 
-  function closeNoAccountModal() {
-    setNoAccountOpen(false);
-    setNoAccountMessage(null);
-  }
-
   async function submitPasswordLogin() {
     if (loading) return;
 
@@ -169,7 +150,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
       return;
     }
 
-    setNoAccountOpen(false);
     setWrongPasswordOpen(false);
     setError(null);
     setLoading(true);
@@ -177,10 +157,13 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
     try {
       const captcha = await getRecaptchaToken("login");
       const res = await loginUser(trimmedEmail, password, captcha);
-      setTokens(res.accessToken, res.refreshToken);
+      setTokens(res.accessToken, res.csrfToken ?? res.refreshToken, {
+        roles: res.user.roles,
+        expiresIn: res.expiresIn,
+      });
       await attachStoredReferral();
       window.location.assign(
-        getPostLoginRedirect(res.user.roles, res.accessToken, nextPath),
+        getPostLoginRedirect(res.user.roles, null, nextPath),
       );
     } catch (err: unknown) {
       const apiErr = toApiError(err);
@@ -199,10 +182,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
         return;
       }
 
-      if (isAuthNoAccountError(err)) {
-        openNoAccountModal(message || AUTH_NO_ACCOUNT_MESSAGE);
-        return;
-      }
       if (isAuthWrongPasswordError(err)) {
         openWrongPasswordModal(message || AUTH_WRONG_PASSWORD_MESSAGE);
         return;
@@ -227,11 +206,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
     try {
       const captcha = await getRecaptchaToken("otp_request");
       const res = await requestOtp(trimmedEmail, captcha);
-      if (!res.accountExists) {
-        openNoAccountModal(res.message);
-        setOtpSent(false);
-        return;
-      }
       setOtpSent(true);
       setInfo(res.message);
       setResendCooldown(120);
@@ -260,10 +234,13 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
     setLoading(true);
     try {
       const res = await verifyOtp(trimmedEmail, code.trim());
-      setTokens(res.accessToken, res.refreshToken);
+      setTokens(res.accessToken, res.csrfToken ?? res.refreshToken, {
+        roles: res.user.roles,
+        expiresIn: res.expiresIn,
+      });
       await attachStoredReferral();
       window.location.assign(
-        getPostLoginRedirect(res.user.roles, res.accessToken, nextPath),
+        getPostLoginRedirect(res.user.roles, null, nextPath),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid code");
@@ -578,13 +555,6 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
           </div>
         </div>
       </main>
-
-      <LoginNoAccountModal
-        open={noAccountOpen}
-        email={email}
-        message={noAccountMessage ?? undefined}
-        onClose={closeNoAccountModal}
-      />
 
       <LoginWrongPasswordModal
         open={wrongPasswordOpen}

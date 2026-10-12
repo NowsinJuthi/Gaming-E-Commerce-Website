@@ -122,7 +122,10 @@ pnpm db:setup:full     # indexes + sample catalog
 pnpm seed:users        # default admin account
 ```
 
-Default admin: `admin@example.com` / `Admin1234!`
+`seed:users` does not contain default credentials. Set `SEED_ADMIN_EMAIL` and
+`SEED_ADMIN_PASSWORD` (at least 14 characters) in the command environment.
+Optionally set `SEED_DEMO_EMAIL` and `SEED_DEMO_PASSWORD` for a local demo user.
+Never reuse these values in production or commit them.
 
 ### 5. Run
 
@@ -291,7 +294,7 @@ pnpm typecheck        # TypeScript check
 pnpm db:setup         # MongoDB indexes
 pnpm db:setup:full    # Indexes + sample catalog
 pnpm seed             # Seed catalog data
-pnpm seed:users       # Default admin + test users
+pnpm seed:users       # Explicitly configured admin / optional demo user
 ```
 
 ---

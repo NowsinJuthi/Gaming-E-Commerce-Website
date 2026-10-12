@@ -12,18 +12,21 @@ import {
   Put,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { Role } from '../../common/enums';
+import { CHAT_STAFF_ROLES } from '../../common/utils/role.utils';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { LIVE_CHAT_UPLOAD_MAX_BYTES } from '../../shared/uploads/live-chat-upload.constants';
 import { processLiveChatImageUpload } from '../../shared/uploads/live-chat-image.processor';
@@ -33,6 +36,13 @@ import {
 } from '../../shared/uploads/live-chat-upload.multer';
 import { UploadsService } from '../../shared/uploads/uploads.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import {
+  ACCESS_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  accessCookieOptions,
+  omitSecretsFromBrowserSession,
+  refreshCookieOptions,
+} from '../auth/auth-cookies';
 import { AuthService } from '../auth/auth.service';
 import { RequiresLicenseFeature } from '../license/decorators/requires-license-feature.decorator';
 import { LicenseFeatureGuard } from '../license/guards/license-feature.guard';
@@ -70,6 +80,7 @@ export class ChatController {
     private readonly presence: PresenceService,
     private readonly uploads: UploadsService,
     private readonly auth: AuthService,
+    private readonly config: ConfigService,
   ) {}
 
   private async isGuestChatAllowed(): Promise<boolean> {
@@ -85,11 +96,42 @@ export class ChatController {
   /** Public endpoint — issues a short-lived guest JWT for anonymous chat. */
   @Public()
   @Post('guest-session')
-  guestChatSession(@Body() dto: GuestChatSessionDto, @Req() req: Request) {
+  async guestChatSession(
+    @Body() dto: GuestChatSessionDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const rawIp: string = req.ip ?? (req.socket as { remoteAddress?: string })?.remoteAddress ?? '';
     const ip = (rawIp.split(',')[0] ?? '').trim();
     const userAgent = req.headers['user-agent'] ?? '';
-    return this.auth.guestChatSession(dto.name ?? 'Guest', { ip, userAgent });
+    const result = await this.auth.guestChatSession(
+      dto.name ?? 'Guest',
+      { ip, userAgent },
+    );
+    const csrfToken = await this.auth.protectBrowserSession(
+      result.refreshToken,
+    );
+    const production = this.config.get<string>('app.env') === 'production';
+    const prefix = this.config.get<string>('app.globalPrefix') ?? 'api';
+    res.cookie(
+      ACCESS_COOKIE_NAME,
+      result.accessToken,
+      accessCookieOptions({
+        production,
+        maxAgeSeconds: this.config.get<number>('jwt.accessTtl') ?? 900,
+      }),
+    );
+    res.cookie(
+      REFRESH_COOKIE_NAME,
+      result.refreshToken,
+      refreshCookieOptions({
+        production,
+        path: `/${prefix.replace(/^\/+|\/+$/g, '')}/auth`,
+        maxAgeSeconds:
+          this.config.get<number>('jwt.guestRefreshTtl') ?? 86_400,
+      }),
+    );
+    return omitSecretsFromBrowserSession({ ...result, csrfToken });
   }
 
   @Get('rooms')
@@ -195,6 +237,8 @@ export class ChatController {
     return this.chat.markRead(user, id);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(...CHAT_STAFF_ROLES)
   @Get('online')
   online() {
     return this.presence.listOnline();

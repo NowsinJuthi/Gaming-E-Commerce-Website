@@ -13,6 +13,14 @@ import {
   type WebsitePricingPackage,
 } from "@/lib/website-page-settings";
 import type { AccentColor, ThemePreference } from "@/lib/theme";
+import {
+  clearBrowserSession,
+  getAccessExpiresAt,
+  getAccessToken,
+  hasAuthSession,
+  persistBrowserSession,
+  setAccessToken,
+} from "@/lib/access-token";
 
 export type { BlogPageFeatures, BlogPageSettings };
 export type { WebsitePageSettings, WebsitePricingPackage };
@@ -502,13 +510,19 @@ export interface AuthResult {
     status: string;
     isGuest?: boolean;
   };
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  /** Browser sessions use this CSRF value with an HttpOnly refresh cookie. */
+  csrfToken?: string;
+  /** Legacy non-browser clients may still receive an opaque refresh token. */
+  refreshToken?: string;
   expiresIn: number;
 }
 
 function getStored(key: "accessToken" | "refreshToken"): string | null {
-  return typeof window !== "undefined" ? localStorage.getItem(key) : null;
+  if (typeof window === "undefined") return null;
+  return key === "refreshToken"
+    ? localStorage.getItem("authSession")
+    : getAccessToken();
 }
 
 // ── Proactive token refresh ──────────────────────────────────────────────────
@@ -517,20 +531,7 @@ function getStored(key: "accessToken" | "refreshToken"): string | null {
 // next request or a WebSocket disconnect due to an expired token.
 
 function getAccessTokenExpiry(): number | null {
-  if (typeof window === "undefined") return null;
-  const token = localStorage.getItem("accessToken");
-  if (!token) return null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const encodedPayload = parts[1];
-    if (!encodedPayload) return null;
-    const b64 = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(b64)) as Record<string, unknown>;
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
+  return getAccessExpiresAt();
 }
 
 let _proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -595,44 +596,56 @@ async function waitForPeerRefresh(
   return false;
 }
 
-async function performRefreshOnce(refreshToken: string): Promise<boolean> {
+async function performRefreshOnce(csrfToken: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: "{}",
     });
     if (!res.ok) {
       const currentToken = getStored("refreshToken");
-      if (currentToken && currentToken !== refreshToken) {
+      if (currentToken && currentToken !== csrfToken) {
         return true;
       }
       if (res.status === 401 || res.status === 403) {
         await new Promise((resolve) => setTimeout(resolve, REFRESH_GRACE_RETRY_MS));
         const tokenAfterWait = getStored("refreshToken");
-        if (tokenAfterWait && tokenAfterWait !== refreshToken) {
+        if (tokenAfterWait && tokenAfterWait !== csrfToken) {
           return true;
         }
         const retryRes = await fetch(`${API_BASE}/auth/refresh`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            refreshToken: tokenAfterWait ?? refreshToken,
-          }),
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": tokenAfterWait ?? csrfToken,
+          },
+          body: "{}",
         });
         if (retryRes.ok) {
           const data = (await retryRes.json()) as {
-            accessToken: string;
-            refreshToken: string;
+            accessToken?: string;
+            csrfToken: string;
+            user?: { roles?: string[]; isGuest?: boolean };
+            expiresIn?: number;
           };
-          localStorage.setItem("accessToken", data.accessToken);
-          localStorage.setItem("refreshToken", data.refreshToken);
+          persistBrowserSession({
+            csrfToken: data.csrfToken,
+            roles: data.user?.roles,
+            isGuest: data.user?.isGuest,
+            expiresIn: data.expiresIn,
+          });
           window.dispatchEvent(new Event("auth-change"));
           scheduleProactiveRefresh();
           return true;
         }
         const tokenAfterRetry = getStored("refreshToken");
-        if (tokenAfterRetry && tokenAfterRetry !== refreshToken) {
+        if (tokenAfterRetry && tokenAfterRetry !== csrfToken) {
           return true;
         }
         clearTokens();
@@ -640,11 +653,48 @@ async function performRefreshOnce(refreshToken: string): Promise<boolean> {
       return false;
     }
     const data = (await res.json()) as {
-      accessToken: string;
-      refreshToken: string;
+      accessToken?: string;
+      csrfToken: string;
+      user?: { roles?: string[]; isGuest?: boolean };
+      expiresIn?: number;
     };
-    localStorage.setItem("accessToken", data.accessToken);
-    localStorage.setItem("refreshToken", data.refreshToken);
+    persistBrowserSession({
+      csrfToken: data.csrfToken,
+      roles: data.user?.roles,
+      isGuest: data.user?.isGuest,
+      expiresIn: data.expiresIn,
+    });
+    window.dispatchEvent(new Event("auth-change"));
+    scheduleProactiveRefresh();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function migrateLegacyRefreshToken(
+  legacyRefreshToken: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: legacyRefreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as {
+      accessToken?: string;
+      csrfToken: string;
+      user?: { roles?: string[]; isGuest?: boolean };
+      expiresIn?: number;
+    };
+    persistBrowserSession({
+      csrfToken: data.csrfToken,
+      roles: data.user?.roles,
+      isGuest: data.user?.isGuest,
+      expiresIn: data.expiresIn,
+    });
     window.dispatchEvent(new Event("auth-change"));
     scheduleProactiveRefresh();
     return true;
@@ -701,12 +751,19 @@ function scheduleProactiveRefresh(): void {
 }
 
 export function setTokens(
-  accessToken: string,
-  refreshToken: string,
-  options?: { guest?: boolean },
+  _accessToken: string | undefined,
+  sessionToken?: string,
+  options?: { guest?: boolean; roles?: string[]; expiresIn?: number },
 ): void {
-  localStorage.setItem("accessToken", accessToken);
-  localStorage.setItem("refreshToken", refreshToken);
+  setAccessToken(null);
+  if (sessionToken) {
+    persistBrowserSession({
+      csrfToken: sessionToken,
+      roles: options?.roles,
+      isGuest: options?.guest,
+      expiresIn: options?.expiresIn,
+    });
+  }
   if (options?.guest) {
     localStorage.setItem("guestCheckout", "1");
   } else {
@@ -722,8 +779,7 @@ export function clearTokens(): void {
     clearTimeout(_proactiveRefreshTimer);
     _proactiveRefreshTimer = null;
   }
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
+  clearBrowserSession();
   localStorage.removeItem("guestCheckout");
   window.dispatchEvent(new Event("auth-change"));
 }
@@ -764,6 +820,7 @@ export async function postJson<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...extraHeaders,
@@ -780,7 +837,13 @@ function recaptchaHeaders(token?: string): Record<string, string> | undefined {
 
 async function tryRefresh(): Promise<boolean> {
   const refreshToken = getStored("refreshToken");
-  if (!refreshToken) return false;
+  if (!refreshToken) {
+    const legacy =
+      typeof window !== "undefined"
+        ? localStorage.getItem("refreshToken")
+        : null;
+    return legacy ? migrateLegacyRefreshToken(legacy) : false;
+  }
   if (!refreshPromise) {
     refreshPromise = (async () => {
       if (!acquireRefreshLock(TAB_ID)) {
@@ -836,7 +899,13 @@ async function fetchWithAuthRetry(
 
 // Kick off proactive refresh on page load if a valid token is already stored.
 if (typeof window !== "undefined") {
-  scheduleProactiveRefresh();
+  if (getStored("refreshToken") && !hasAuthSession()) {
+    void tryRefresh().then((ok) => {
+      if (ok) scheduleProactiveRefresh();
+    });
+  } else {
+    scheduleProactiveRefresh();
+  }
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
@@ -860,7 +929,11 @@ if (typeof window !== "undefined") {
   });
 
   window.addEventListener("storage", (event) => {
-    if (event.key === "accessToken" || event.key === "refreshToken") {
+    if (
+      event.key === "accessToken" ||
+      event.key === "authSession" ||
+      event.key === "refreshToken"
+    ) {
       scheduleProactiveRefresh();
     }
   });
@@ -871,15 +944,18 @@ async function authRequestRaw<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const run = () => {
-    const token = getStored("accessToken");
     const headers: Record<string, string> = {
       ...(init.headers as Record<string, string> | undefined),
     };
-    if (token) headers.Authorization = `Bearer ${token}`;
     if (init.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
-    return fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
+    return fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      credentials: "include",
+    });
   };
   const res = await fetchWithAuthRetry(run);
   if (!res.ok) await throwApiError(res);
@@ -938,7 +1014,7 @@ export function loginUser(
 export function requestOtp(
   email: string,
   recaptchaToken?: string,
-): Promise<{ message: string; accountExists: boolean }> {
+): Promise<{ message: string }> {
   return postJson(
     "/auth/otp/request",
     { email },
@@ -992,10 +1068,14 @@ export function resetPasswordWithCode(
 }
 
 export async function logoutUser(): Promise<void> {
-  const refreshToken = getStored("refreshToken");
-  if (refreshToken) {
+  const csrfToken = getStored("refreshToken");
+  if (csrfToken) {
     try {
-      await postJson("/auth/logout", { refreshToken });
+      await postJson(
+        "/auth/logout",
+        {},
+        { "X-CSRF-Token": csrfToken },
+      );
     } catch {
       /* best effort */
     }
@@ -1207,17 +1287,13 @@ export async function uploadProfileAvatar(file: File): Promise<UserProfile> {
   const form = new FormData();
   form.append("file", file);
 
-  const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return fetch(`${API_BASE}/users/me/avatar-upload`, {
+  const run = () =>
+    fetch(`${API_BASE}/users/me/avatar-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
-  };
 
   const res = await fetchWithAuthRetry(run);
   if (!res.ok) await throwApiError(res);
@@ -1891,6 +1967,14 @@ export interface SecurityAdminOverview {
     estimatedMonthlyVisitors: string;
     recommendation: string;
   };
+  encryption?: {
+    legacyPlaintext: {
+      inventoryItems: number;
+      orderDeliveredCodes: number;
+      resellerOrderCodes: number;
+      total: number;
+    };
+  };
 }
 
 export interface SecuritySettings {
@@ -2262,6 +2346,7 @@ export async function revalidateStorefront(): Promise<boolean> {
     const res = await fetch("/api/revalidate-homepage", {
       method: "POST",
       cache: "no-store",
+      credentials: "include",
     });
     return res.ok;
   } catch {
@@ -2273,7 +2358,10 @@ export async function revalidateWebsitePage(): Promise<boolean> {
   try {
     const res = await fetch("/api/revalidate-homepage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ scope: "website" }),
       cache: "no-store",
     });
@@ -2635,13 +2723,16 @@ export function getEmailTemplatePreviewHtml(
   );
 }
 
-export function submitContactForm(input: {
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-}): Promise<{ success: boolean }> {
-  return postJson("/contact", input);
+export function submitContactForm(
+  input: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  },
+  recaptchaToken?: string,
+): Promise<{ success: boolean }> {
+  return postJson("/contact", input, recaptchaHeaders(recaptchaToken));
 }
 
 // --- Contact inbox (email messages) -----------------------------------------
@@ -3052,16 +3143,13 @@ export async function uploadSiteLogo(
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(
       `${API_BASE}/customer-panel/admin/logo-upload?variant=${encodeURIComponent(variant)}`,
       {
         method: "POST",
-        headers,
         body: form,
         cache: "no-store",
+        credentials: "include",
       },
     );
   };
@@ -3110,14 +3198,11 @@ export async function uploadProductImage(
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}/products/admin/image-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
   };
 
@@ -3163,14 +3248,11 @@ export async function uploadHomepageBanner(
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}/customer-panel/admin/banner-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
   };
 
@@ -4376,10 +4458,13 @@ export type PaymentPurposeValue = "order" | "wallet_topup";
 
 export type PaymentIntentStatusValue =
   | "created"
+  | "initializing"
   | "pending"
   | "succeeded"
   | "failed"
-  | "expired";
+  | "expired"
+  | "superseded"
+  | "unmatched";
 
 export interface PaymentIntentResult {
   intentId: string;
@@ -4610,14 +4695,11 @@ export function uploadMfsQrCode(file: File): Promise<{ url: string }> {
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}/payments/admin/mfs/gateways/qr-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
   };
 
@@ -4697,10 +4779,11 @@ export function listAdminMfsIntents(status?: string): Promise<
 
 export function approveAdminMfsIntent(
   id: string,
+  reason: string,
 ): Promise<MfsCheckoutSession> {
   return authRequest<MfsCheckoutSession>(
     `/payments/admin/mfs/intents/${id}/approve`,
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify({ reason }) },
   );
 }
 
@@ -5210,7 +5293,7 @@ export type PaymentGatewayId =
   | "upay"
   | "uddoktapay";
 
-export type PaymentGatewayMode = "live" | "sandbox" | "disabled";
+export type PaymentGatewayMode = "live" | "sandbox" | "disabled" | "misconfigured";
 
 export interface PaymentGatewaySettingsView {
   id: PaymentGatewayId;
@@ -5374,7 +5457,8 @@ export function openSupportRoom(): Promise<ChatRoom> {
 
 export function startGuestChatSession(name?: string): Promise<{
   accessToken: string;
-  refreshToken: string;
+  csrfToken?: string;
+  refreshToken?: string;
   expiresIn: number;
   user: { id: string; email: string; roles: string[]; isGuest: boolean };
 }> {
@@ -5383,6 +5467,7 @@ export function startGuestChatSession(name?: string): Promise<{
     null as never,
     {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name ?? "Guest" }),
       cache: "no-store",
@@ -5451,14 +5536,11 @@ export async function uploadChatImage(
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}/chat/rooms/${roomId}/image-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
   };
 
@@ -6594,14 +6676,11 @@ export async function uploadBlogImage(
   form.append("file", file);
 
   const run = () => {
-    const token = getStored("accessToken");
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}/admin/blogs/image-upload`, {
       method: "POST",
-      headers,
       body: form,
       cache: "no-store",
+      credentials: "include",
     });
   };
 

@@ -222,7 +222,7 @@ export class MailerService {
 
   /** Pre-flight for login OTP + email verification (same SMTP path as admin Default test). */
   async getAuthEmailReadiness(): Promise<{ ready: boolean; message?: string }> {
-    const env = process.env.NODE_ENV ?? 'development';
+    const env = process.env.NODE_ENV;
     const effective = await this.settings.getEffective();
     if (!effective.enabled) {
       return {

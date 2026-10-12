@@ -1,11 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   createHash,
   randomBytes,
+  randomInt,
   scrypt as scryptCallback,
   timingSafeEqual,
 } from 'node:crypto';
 import { promisify } from 'node:util';
+import {
+  openDeliveredSecret,
+  redactDeliveredSecret,
+  sealDeliveredSecret,
+  type DeliveredSecretFields,
+} from './delivered-secrets';
+import {
+  decryptSecretAtRest,
+  hashSecretAtRest,
+  parseEncryptionKey,
+  sealSecretAtRest,
+} from './secret-at-rest';
 
 const scrypt = promisify(scryptCallback) as unknown as (
   password: string | Buffer,
@@ -20,6 +34,37 @@ const scrypt = promisify(scryptCallback) as unknown as (
 @Injectable()
 export class CryptoService {
   private readonly keyLength = 64;
+
+  constructor(@Optional() private readonly config?: ConfigService) {}
+
+  private dataEncryptionKey(): Buffer | undefined {
+    return parseEncryptionKey(this.config?.get<string>('DATA_ENCRYPTION_KEY'));
+  }
+
+  /** Persist a gift code: ciphertext in production, plaintext in local dev without a key. */
+  sealInventoryValue(plaintext: string): { value: string; valueHash: string } {
+    return sealSecretAtRest(plaintext, this.dataEncryptionKey());
+  }
+
+  openInventoryValue(stored: string): string {
+    return decryptSecretAtRest(stored, this.dataEncryptionKey());
+  }
+
+  inventoryValueHash(plaintext: string): string {
+    return hashSecretAtRest(plaintext);
+  }
+
+  sealDeliveredSecret(plain: DeliveredSecretFields): DeliveredSecretFields {
+    return sealDeliveredSecret(plain, this.dataEncryptionKey());
+  }
+
+  openDeliveredSecret(stored: DeliveredSecretFields): DeliveredSecretFields {
+    return openDeliveredSecret(stored, this.dataEncryptionKey());
+  }
+
+  redactDeliveredSecret(): DeliveredSecretFields {
+    return redactDeliveredSecret();
+  }
 
   async hashPassword(password: string): Promise<string> {
     const salt = randomBytes(16).toString('hex');
@@ -45,6 +90,17 @@ export class CryptoService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  equalHashes(left: string, right: string): boolean {
+    try {
+      const a = Buffer.from(left);
+      const b = Buffer.from(right);
+      if (a.length !== b.length) return false;
+      return timingSafeEqual(a, b);
+    } catch {
+      return false;
+    }
+  }
+
   /** Cryptographically strong, URL-safe opaque token. */
   generateToken(byteLength = 48): string {
     return randomBytes(byteLength).toString('base64url');
@@ -53,7 +109,6 @@ export class CryptoService {
   /** Numeric OTP code of the requested length (default 6 digits). */
   generateOtp(length = 6): string {
     const max = 10 ** length;
-    const value = parseInt(randomBytes(4).toString('hex'), 16) % max;
-    return value.toString().padStart(length, '0');
+    return randomInt(0, max).toString().padStart(length, '0');
   }
 }

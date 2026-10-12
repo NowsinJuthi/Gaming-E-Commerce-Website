@@ -115,6 +115,13 @@ reachable. The app and Redis bind to loopback:
 There is no local MongoDB listener when Atlas is used. If UFW is active, keep
 3000, 4000, 6379, and 27017 denied from public ingress.
 
+Set `TRUST_PROXY_HOPS=1` in `/etc/uniqbd/api.env`. Nginx must include
+`deploy/deploy/aapanel/nginx/cloudflare-real-ip.conf` so `$remote_addr` is the
+Cloudflare visitor, not the edge. After orange-clouding, enable
+`cloudflare-origin-allow.conf` (or Authenticated Origin Pulls) so attackers
+cannot hit origin with a fake `CF-Connecting-IP`. See
+[`../aapanel/README.md`](../aapanel/README.md).
+
 ## 6. Health checks
 
 ```bash

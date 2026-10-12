@@ -106,21 +106,13 @@ export function useOrderLock(
         acquiredRef.current = false;
         // Best-effort release: use sendBeacon so it fires even on tab close.
         const url = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/orders/${orderIdRef.current}/lock`;
-        const token =
-          typeof window !== "undefined"
-            ? localStorage.getItem("accessToken")
-            : null;
-        if (token) {
-          // sendBeacon does not support custom headers, so use fetch with
-          // keepalive for the token-authenticated DELETE.
-          void fetch(url, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-            keepalive: true,
-          }).catch(() => {});
-        } else {
+        void fetch(url, {
+          method: "DELETE",
+          credentials: "include",
+          keepalive: true,
+        }).catch(() => {
           void releaseOrderLock(orderIdRef.current).catch(() => {});
-        }
+        });
       }
     };
   }, [orderId, enabled, acquire, stopHeartbeat]);

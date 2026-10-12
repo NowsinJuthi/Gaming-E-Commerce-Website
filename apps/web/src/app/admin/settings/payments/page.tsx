@@ -315,13 +315,16 @@ function effectiveMode(
   meta: PaymentGatewaySettingsView | undefined,
 ): PaymentGatewayMode {
   if (!form.enabled) return "disabled";
-  if (form.sandbox || meta?.sandbox) return "sandbox";
-  return meta?.mode ?? "sandbox";
+  if (meta?.mode === "misconfigured") return "misconfigured";
+  if (meta?.mode) return meta.mode;
+  if (form.sandbox) return "sandbox";
+  return "live";
 }
 
 function modeStatusClass(mode: PaymentGatewayMode) {
   if (mode === "live") return "dashboard-pro-status dashboard-pro-status--green";
   if (mode === "sandbox") return "dashboard-pro-status dashboard-pro-status--amber";
+  if (mode === "misconfigured") return "dashboard-pro-status text-red-400";
   return "dashboard-pro-status";
 }
 
@@ -1294,8 +1297,9 @@ export default function AdminPaymentGatewaysPage() {
               <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
                 <dt>Sandbox mode</dt>
                 <dd className="text-sm text-foreground-muted">
-                  When sandbox is forced or credentials are missing, checkout uses
-                  deterministic sandbox charges for end-to-end testing.
+                  Sandbox charges exist only in development/test with
+                  ALLOW_SANDBOX_INTEGRATIONS=true. Production returns a
+                  configuration error instead of a fake checkout URL.
                 </dd>
               </div>
               <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">

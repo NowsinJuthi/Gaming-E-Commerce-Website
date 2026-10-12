@@ -27,6 +27,7 @@ export const PERMISSION_KEYS = [
   'gift_card_inventory',
   'view_all_orders',
   'update_order_status',
+  'approve_mfs_payments',
   'view_customers',
   'edit_customers_wallet',
   'auto_delivery',
@@ -160,6 +161,12 @@ export const PERMISSION_GROUPS: Array<{
         key: 'update_order_status',
         label: 'Update order status',
         description: 'Change fulfillment and delivery status',
+      },
+      {
+        key: 'approve_mfs_payments',
+        label: 'Approve MFS payments',
+        description:
+          'Manually settle bKash/Nagad/Rocket/Upay intents. Support and Editor cannot hold this grant.',
       },
     ],
   },

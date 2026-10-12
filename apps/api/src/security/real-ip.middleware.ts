@@ -1,5 +1,5 @@
 import type { NextFunction, Response } from 'express';
-import { RequestWithContext, resolveClientIp } from './security.types';
+import { RequestWithContext } from './security.types';
 
 const headerValue = (
   value: string | string[] | undefined,
@@ -16,7 +16,7 @@ export function realIpMiddleware(
   _res: Response,
   next: NextFunction,
 ): void {
-  req.realIp = resolveClientIp(req);
+  req.realIp = req.ip;
   req.cfCountry = headerValue(req.headers['cf-ipcountry']);
   req.cfRay = headerValue(req.headers['cf-ray']);
   next();

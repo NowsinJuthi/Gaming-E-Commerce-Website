@@ -6,11 +6,20 @@ import { Connection } from 'mongoose';
 import { Public } from '../../common/decorators/public.decorator';
 import { CacheService } from '../../shared/cache/cache.service';
 import { isRedisOptional } from '../../shared/cache/redis-options';
+import { isProductionNodeEnv } from '../../config/production-env';
+import { PaymentInvariantService } from '../payments/payment-invariant.service';
+import {
+  publicLivenessBody,
+  publicReadinessOkBody,
+  publicReadinessRequiresPayments,
+  publicReadinessUnavailableBody,
+  type PublicHealthBody,
+} from './health-public';
 
 /**
  * Unauthenticated probes for load balancers / orchestrators.
  * `GET /api/health`        -> liveness (process is up)
- * `GET /api/health/ready`  -> readiness (Mongo + Redis reachable, 503 if not)
+ * `GET /api/health/ready`  -> readiness (Mongo + Redis + payment index in production)
  */
 @Public()
 @SkipThrottle()
@@ -20,24 +29,32 @@ export class HealthController {
     @InjectConnection() private readonly connection: Connection,
     private readonly cache: CacheService,
     private readonly config: ConfigService,
+    private readonly payments: PaymentInvariantService,
   ) {}
 
   @Get()
-  liveness(): { status: string; uptime: number } {
-    return { status: 'ok', uptime: Math.round(process.uptime()) };
+  liveness(): PublicHealthBody {
+    return publicLivenessBody();
   }
 
   @Get('ready')
-  async readiness(): Promise<{ status: string; db: boolean; redis: boolean }> {
+  async readiness(): Promise<PublicHealthBody> {
     const redisOptional = isRedisOptional(this.config);
     const [db, redis] = await Promise.all([
       this.checkDb(),
       this.checkRedis(),
     ]);
-    if (!db || (!redisOptional && !redis)) {
-      throw new ServiceUnavailableException({ status: 'unavailable', db, redis });
+    const production = isProductionNodeEnv(
+      this.config.get<string>('app.env') ?? process.env.NODE_ENV,
+    );
+    const paymentsReady = publicReadinessRequiresPayments({
+      production,
+      paymentsReady: this.payments.isReady(),
+    });
+    if (!db || (!redisOptional && !redis) || !paymentsReady) {
+      throw new ServiceUnavailableException(publicReadinessUnavailableBody());
     }
-    return { status: 'ok', db, redis };
+    return publicReadinessOkBody();
   }
 
   private async checkDb(): Promise<boolean> {

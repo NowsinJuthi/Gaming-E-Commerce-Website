@@ -75,6 +75,10 @@ export class User {
   @Prop({ trim: true, maxlength: 4000 })
   adminNote?: string;
 
+  /** Incremented on password change/reset so outstanding access JWTs die immediately. */
+  @Prop({ default: 0 })
+  tokenVersion?: number;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

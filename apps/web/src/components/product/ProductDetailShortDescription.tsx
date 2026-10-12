@@ -1,6 +1,7 @@
 "use client";
 
 import { ProductFormOrderCard } from "@/components/admin/product-form-section";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 const SHORT_DESC_ICON = (
   <svg
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export function ProductDetailShortDescription({ html }: Props) {
+  const safeHtml = sanitizeHtml(html);
   return (
     <div className="customer-panel min-w-0">
       <ProductFormOrderCard
@@ -29,7 +31,7 @@ export function ProductDetailShortDescription({ html }: Props) {
       >
         <div
           className="rich-editor-body product-pdp-short-body"
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: safeHtml }}
         />
       </ProductFormOrderCard>
     </div>

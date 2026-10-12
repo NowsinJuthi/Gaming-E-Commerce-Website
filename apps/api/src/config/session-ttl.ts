@@ -1,5 +1,5 @@
-/** Registered admin/customer/mobile sessions — until explicit logout. */
-export const LONG_SESSION_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
+/** Registered admin/customer sessions — bounded even when explicit logout is missed. */
+export const LONG_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /** Ephemeral guest checkout/chat — short-lived, separate from registered users. */
 export const GUEST_SESSION_TTL_SECONDS = 24 * 60 * 60;

@@ -45,7 +45,8 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     context: ExecutionContext,
   ): Promise<boolean> {
     const settings = await this.securitySettings.getEffective();
-    if (!settings.throttle.enabled) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!settings.throttle.enabled && !isProduction) {
       return true;
     }
 
@@ -102,7 +103,7 @@ export class AppThrottlerGuard extends ThrottlerGuard {
         blockDuration: block,
       };
     }
-    if (path.endsWith('/auth/login')) {
+    if (path.endsWith('/auth/login') || path.endsWith('/app/login')) {
       return {
         limit: settings.throttle.loginLimit,
         ttl: authTtl,
@@ -111,7 +112,8 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     }
     if (
       path.endsWith('/auth/otp/request') ||
-      path.endsWith('/auth/resend-verification')
+      path.endsWith('/auth/resend-verification') ||
+      path.endsWith('/auth/password-reset/request')
     ) {
       return {
         limit: settings.throttle.otpLimit,
@@ -119,9 +121,43 @@ export class AppThrottlerGuard extends ThrottlerGuard {
         blockDuration: block,
       };
     }
-    if (path.endsWith('/auth/otp/verify')) {
+    if (
+      path.endsWith('/auth/otp/verify') ||
+      path.endsWith('/auth/verify-email') ||
+      path.endsWith('/auth/password-reset/confirm')
+    ) {
       return {
         limit: settings.throttle.loginLimit,
+        ttl: authTtl,
+        blockDuration: block,
+      };
+    }
+    if (path.endsWith('/affiliate/track')) {
+      return {
+        limit: settings.throttle.otpLimit,
+        ttl: authTtl,
+        blockDuration: block,
+      };
+    }
+    if (
+      path.endsWith('/contact') ||
+      path.endsWith('/auth/guest') ||
+      path.endsWith('/chat/guest-session')
+    ) {
+      return {
+        limit: settings.throttle.registerLimit,
+        ttl: authTtl,
+        blockDuration: block,
+      };
+    }
+    if (
+      path.endsWith('/auth/refresh') ||
+      path.endsWith('/auth/logout') ||
+      path.endsWith('/app/refresh') ||
+      path.endsWith('/app/logout')
+    ) {
+      return {
+        limit: settings.throttle.loginLimit * 3,
         ttl: authTtl,
         blockDuration: block,
       };
