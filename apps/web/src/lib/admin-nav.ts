@@ -273,6 +273,18 @@ export const ADMIN_NAV: NavSection[] = [
             keywords: ["folder", "scan", "movies", "tv"],
           },
           {
+            href: "/admin/collections",
+            label: "Movie collections",
+            icon: BoxIcon,
+            keywords: ["movies", "catalog", "publish", "featured"],
+          },
+          {
+            href: "/admin/series-collections",
+            label: "Series collections",
+            icon: LayersIcon,
+            keywords: ["series", "tv", "seasons", "catalog"],
+          },
+          {
             href: "/admin/file-manager",
             label: "Samba file manager",
             icon: BoxIcon,
