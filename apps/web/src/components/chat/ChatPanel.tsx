@@ -37,7 +37,7 @@ import {
   deleteChatRoom,
   getChatAdminOverview,
   fetchFullChatHistory,
-  getChatHistory,
+  fetchFullCustomerSupportHistory,
   getCustomerPanelConfig,
   getMe,
   getOnlineUsers,
@@ -743,11 +743,8 @@ export function ChatPanel({
       }
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
-      const fullyLoaded =
-        adminMode && historyFullyLoadedRef.current.has(id);
-      const cacheHit = adminMode
-        ? fullyLoaded && cached !== undefined
-        : cached !== undefined;
+      const fullyLoaded = historyFullyLoadedRef.current.has(id);
+      const cacheHit = fullyLoaded && cached !== undefined;
       if (roomJoinRetryTimerRef.current) {
         clearTimeout(roomJoinRetryTimerRef.current);
         roomJoinRetryTimerRef.current = null;
@@ -779,16 +776,21 @@ export function ChatPanel({
         return;
       }
 
-      setMessages(adminMode && cached?.length ? cached : []);
+      setMessages(cached?.length ? cached : []);
       setHistoryLoading(true);
-      if (adminMode) {
-        historyFullyLoadedRef.current.delete(id);
-      }
+      historyFullyLoadedRef.current.delete(id);
 
       try {
-        const hist = adminMode
-          ? await fetchFullChatHistory(id)
-          : await getChatHistory(id, 1, 100);
+        let hist: Awaited<ReturnType<typeof fetchFullChatHistory>>;
+        if (adminMode) {
+          hist = await fetchFullChatHistory(id);
+        } else {
+          try {
+            hist = await fetchFullCustomerSupportHistory();
+          } catch {
+            hist = await fetchFullChatHistory(id);
+          }
+        }
         if (
           historyLoadSeqRef.current !== loadSeq ||
           activeIdRef.current !== id
@@ -806,9 +808,7 @@ export function ChatPanel({
           historyCacheRef.current.get(id) ?? [],
         );
         historyCacheRef.current.set(id, merged);
-        if (adminMode) {
-          historyFullyLoadedRef.current.add(id);
-        }
+        historyFullyLoadedRef.current.add(id);
         setMessages(merged);
         await markRoomRead(id);
         joinActiveSocketRoom(id);
@@ -818,9 +818,7 @@ export function ChatPanel({
           historyLoadSeqRef.current === loadSeq &&
           activeIdRef.current === id
         ) {
-          if (adminMode) {
-            historyFullyLoadedRef.current.delete(id);
-          }
+          historyFullyLoadedRef.current.delete(id);
           setMessages([]);
           setError("Failed to load messages for this room.");
         }
@@ -843,9 +841,16 @@ export function ChatPanel({
     const rid = activeIdRef.current;
     if (!rid) return;
     try {
-      const hist = isAdminRef.current
-        ? await fetchFullChatHistory(rid)
-        : await getChatHistory(rid, 1, 100);
+      let hist: Awaited<ReturnType<typeof fetchFullChatHistory>>;
+      if (isAdminRef.current) {
+        hist = await fetchFullChatHistory(rid);
+      } else {
+        try {
+          hist = await fetchFullCustomerSupportHistory();
+        } catch {
+          hist = await fetchFullChatHistory(rid);
+        }
+      }
       const normalized = hist.items.map((m) => ({
         ...m,
         id: m.id ?? m._id,
@@ -1289,16 +1294,7 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [
-    isAdmin,
-    messenger,
-    initialRoomId,
-    onOverviewChange,
-    refreshOverview,
-    showConfig,
-    loadRooms,
-    applySupportAgents,
-  ]);
+  }, [isAdmin, messenger, initialRoomId]);
 
   useEffect(() => {
     if (!messenger || !onMessengerMobileViewChange || !isMobileMessenger)

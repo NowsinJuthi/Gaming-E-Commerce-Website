@@ -62,6 +62,7 @@ export function LiveChatLauncher({
   const [guestError, setGuestError] = useState<string | null>(null);
   const [refreshingChat, setRefreshingChat] = useState(false);
   const [supportAgents, setSupportAgents] = useState<ChatSupportAgent[]>([]);
+  const [chatPanelGeneration, setChatPanelGeneration] = useState(0);
   const chatRefreshRef = useRef<(() => Promise<void>) | null>(null);
 
   const onChatRefreshReady = useCallback(
@@ -141,6 +142,12 @@ export function LiveChatLauncher({
 
   useEffect(() => {
     if (!open) setMobileThreadOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setChatPanelGeneration((generation) => generation + 1);
+    }
   }, [open]);
 
   useChatOverlayLock(open);
@@ -359,6 +366,7 @@ export function LiveChatLauncher({
                   />
                 ) : (
                   <ChatPanel
+                    key={chatPanelGeneration}
                     embedded
                     messenger
                     onMessengerMobileViewChange={(view) =>
