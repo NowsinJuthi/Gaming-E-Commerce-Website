@@ -845,9 +845,10 @@ export function ChatPanel({
         socket.emit("presence:heartbeat", {});
       }
 
-      const onlineUsers = await getOnlineUsers().catch(() => [] as string[]);
-      setOnline(onlineUsers);
-      if (!isAdmin) {
+      if (isAdmin) {
+        const onlineUsers = await getOnlineUsers().catch(() => [] as string[]);
+        setOnline(onlineUsers);
+      } else {
         await refreshSupportAgents();
       }
 
@@ -948,15 +949,12 @@ export function ChatPanel({
       void syncActiveRoomMessagesRef.current();
       if (isAdminRef.current) {
         void loadRoomsRef.current().catch(() => undefined);
+        getOnlineUsers()
+          .then((ids) => setOnline(ids))
+          .catch(() => undefined);
+      } else {
+        void refreshSupportAgentsRef.current();
       }
-      getOnlineUsers()
-        .then((ids) => {
-          setOnline(ids);
-          if (!isAdminRef.current) {
-            void refreshSupportAgentsRef.current();
-          }
-        })
-        .catch(() => undefined);
       const rid = activeIdRef.current || pendingRoomJoinRef.current;
       if (rid) {
         roomJoinRetryRef.current = { roomId: rid, attempts: 0 };
@@ -1099,14 +1097,13 @@ export function ChatPanel({
     }
 
     const refreshOnline = () => {
-      getOnlineUsers()
-        .then((ids) => {
-          setOnline(ids);
-          if (!isAdminRef.current) {
-            void refreshSupportAgentsRef.current();
-          }
-        })
-        .catch(() => undefined);
+      if (isAdminRef.current) {
+        getOnlineUsers()
+          .then((ids) => setOnline(ids))
+          .catch(() => undefined);
+      } else {
+        void refreshSupportAgentsRef.current();
+      }
     };
     const heartbeat = window.setInterval(() => {
       if (socket.connected) {
@@ -1170,8 +1167,8 @@ export function ChatPanel({
         setMeId(me.id);
 
         const [on, list] = await Promise.all([
-          getOnlineUsers(),
-          isAdmin ? loadRooms() : [],
+          isAdmin ? getOnlineUsers() : Promise.resolve([] as string[]),
+          isAdmin ? loadRooms() : Promise.resolve([] as ChatRoom[]),
         ]);
         if (cancelled) return;
         setOnline(on);
