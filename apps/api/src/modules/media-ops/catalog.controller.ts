@@ -13,6 +13,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -79,6 +80,13 @@ class UpdateBody {
 @Roles(Role.Administrator, Role.Admin)
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
+
+  @Public()
+  @Roles()
+  @Get('media/home')
+  home() {
+    return this.catalog.publicHome();
+  }
 
   @Get('admin/movie-collections')
   listMovies(@Query('q') q?: string) {

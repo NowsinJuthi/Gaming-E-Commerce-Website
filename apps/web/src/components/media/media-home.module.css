@@ -1,0 +1,328 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 18rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(var(--brand) / 0.22);
+  background:
+    radial-gradient(circle at 80% 20%, rgb(var(--brand) / 0.45), transparent 42%),
+    linear-gradient(115deg, #041816 0%, rgb(var(--brand) / 0.55) 48%, #020617 100%);
+}
+
+@media (min-width: 768px) {
+  .hero {
+    min-height: 26rem;
+  }
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.7s ease;
+}
+
+.slideImage {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 24 22 / 0.92) 0%, rgb(4 24 22 / 0.55) 46%, transparent 78%),
+    linear-gradient(180deg, transparent 40%, rgb(4 24 22 / 0.88) 100%);
+}
+
+.heroCopy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 18rem;
+  max-width: 40rem;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.25rem 1.1rem 1.35rem;
+}
+
+@media (min-width: 768px) {
+  .heroCopy {
+    min-height: 26rem;
+    padding: 2rem 2.25rem 2.4rem;
+  }
+}
+
+.kicker {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--brand-foreground, 255 255 255) / 0.9);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.meta {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  color: rgb(255 255 255 / 0.78);
+}
+
+.summary {
+  margin: 0.7rem 0 0;
+  max-width: 36rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.82);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.play,
+.info {
+  display: inline-flex;
+  align-items: center;
+  height: 2.6rem;
+  border-radius: 0.8rem;
+  padding: 0 1.05rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.play {
+  border: 0;
+  background: #fff;
+  color: #04211e;
+}
+
+.info {
+  border: 1px solid rgb(255 255 255 / 0.28);
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+.dots {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.dot {
+  height: 0.4rem;
+  width: 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.4);
+  cursor: pointer;
+}
+
+.dotActive {
+  width: 1.1rem;
+  background: rgb(var(--brand));
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  margin-top: 1.5rem;
+}
+
+.rowHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.scrollerWrap {
+  position: relative;
+}
+
+.scroller {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.35rem;
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  width: 9.2rem;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .card {
+    width: 11rem;
+  }
+}
+
+.poster {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid rgb(var(--brand) / 0.16);
+  background: linear-gradient(160deg, rgb(var(--brand) / 0.28), #041816);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.18);
+}
+
+.poster img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.fallback {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cardName {
+  display: block;
+  margin-top: 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.cardMeta {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: var(--muted-foreground, rgb(255 255 255 / 0.62));
+}
+
+.scrollBtn {
+  position: absolute;
+  top: 32%;
+  z-index: 1;
+  display: none;
+  height: 2.4rem;
+  width: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(var(--brand) / 0.3);
+  border-radius: 999px;
+  background: rgb(4 24 22 / 0.72);
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .scrollBtn {
+    display: inline-flex;
+  }
+}
+
+.scrollLeft {
+  left: 0.2rem;
+}
+
+.scrollRight {
+  right: 0.2rem;
+}
+
+.empty {
+  margin-top: 1.25rem;
+  border-radius: 1rem;
+  border: 1px dashed rgb(var(--brand) / 0.28);
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--muted-foreground, rgb(255 255 255 / 0.7));
+}
+
+.dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.55);
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dialog {
+    align-items: center;
+  }
+}
+
+.dialogCard {
+  width: min(32rem, 100%);
+  overflow: hidden;
+  border-radius: 1.1rem;
+  border: 1px solid rgb(var(--brand) / 0.25);
+  background: #071412;
+  color: #fff;
+}
+
+.dialogPoster {
+  height: 11rem;
+  background: linear-gradient(115deg, #041816, rgb(var(--brand) / 0.55));
+}
+
+.dialogPoster img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.dialogBody {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.dialogBody h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.dialogBody p {
+  margin: 0.4rem 0 0;
+  color: var(--muted-foreground, rgb(255 255 255 / 0.7));
+}

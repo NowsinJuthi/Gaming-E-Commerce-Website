@@ -48,6 +48,38 @@ export class CatalogService {
     return { items: rows.map(serialize), total: rows.length };
   }
 
+  async publicHome() {
+    const rows = await this.titles
+      .find({ published: true, availability: 'available' })
+      .sort({ featured: -1, trending: -1, updatedAt: -1 })
+      .limit(80)
+      .exec();
+    const items = rows.map((doc) => ({
+      id: String(doc._id),
+      title: doc.title,
+      year: doc.year,
+      kind: doc.kind,
+      posterUrl: doc.posterUrl ?? null,
+      featured: doc.featured,
+      trending: doc.trending,
+      seasonCount: doc.seasonCount ?? null,
+    }));
+    const featured = items.filter((item) => item.featured);
+    const movies = items.filter((item) => item.kind === 'movie');
+    const series = items.filter((item) => item.kind === 'series');
+    const trending = items.filter((item) => item.trending);
+    const shelves = [
+      { id: 'featured', title: 'Featured', items: featured },
+      { id: 'movies', title: 'Movies', items: movies },
+      { id: 'series', title: 'Series', items: series },
+      { id: 'trending', title: 'Trending', items: trending },
+    ].filter((row) => row.items.length > 0);
+    return {
+      hero: (featured.length > 0 ? featured : items).slice(0, 6),
+      rows: shelves,
+    };
+  }
+
   async bulk(kind: CatalogKind, ids: string[], action: CatalogBulkAction) {
     const objectIds = ids.filter((id) => Types.ObjectId.isValid(id));
     if (!objectIds.length) {

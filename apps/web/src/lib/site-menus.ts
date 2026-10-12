@@ -61,6 +61,7 @@ export const DEFAULT_SITE_MENUS: SiteMenusConfig = {
   header: [
     { label: "Home", href: "/" },
     { label: "Shop", href: "/products" },
+    { label: "Media", href: "/media" },
     { label: "Contact us", href: "/support" },
   ],
   headerOthers: DEFAULT_HEADER_OTHERS_ITEMS,
@@ -98,6 +99,16 @@ export const DEFAULT_SITE_MENUS: SiteMenusConfig = {
   ],
 };
 
+function ensureMediaNav(header: SiteMenuLink[]): SiteMenuLink[] {
+  if (header.some((item) => item.href.split("?")[0] === "/media")) return header;
+  const shopIndex = header.findIndex((item) => item.href.split("?")[0] === "/products");
+  const next = [...header];
+  const link = { label: "Media", href: "/media" };
+  if (shopIndex >= 0) next.splice(shopIndex + 1, 0, link);
+  else next.push(link);
+  return next;
+}
+
 export function normalizeSiteMenus(
   value?: Partial<SiteMenusConfig> | null,
 ): SiteMenusConfig {
@@ -127,8 +138,9 @@ export function normalizeSiteMenus(
     }))
     .filter((column) => column.items.length > 0);
 
+  const resolvedHeader = header.length > 0 ? header : DEFAULT_SITE_MENUS.header;
   return {
-    header: header.length > 0 ? header : DEFAULT_SITE_MENUS.header,
+    header: ensureMediaNav(resolvedHeader),
     headerOthers:
       rawHeaderOthers !== undefined
         ? headerOthers
