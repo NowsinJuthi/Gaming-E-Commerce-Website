@@ -5455,6 +5455,10 @@ export function startGuestChatSession(name?: string): Promise<{
   );
 }
 
+/** API pagination caps limit at 100; load older pages for long threads. */
+const CHAT_HISTORY_PAGE_SIZE = 100;
+const CHAT_HISTORY_MAX_PAGES = 15;
+
 export function getChatHistory(
   roomId: string,
   page = 1,
@@ -5463,6 +5467,24 @@ export function getChatHistory(
   return authRequest<ChatHistory>(
     `/chat/rooms/${roomId}/messages?page=${page}&limit=${limit}`,
   );
+}
+
+export async function fetchFullChatHistory(roomId: string): Promise<ChatHistory> {
+  const limit = CHAT_HISTORY_PAGE_SIZE;
+  const pageBatches: ChatMessage[][] = [];
+  let total = 0;
+  let page = 1;
+  while (page <= CHAT_HISTORY_MAX_PAGES) {
+    const hist = await getChatHistory(roomId, page, limit);
+    total = hist.total;
+    pageBatches.push(hist.items);
+    if (page * limit >= total || hist.items.length < limit) {
+      break;
+    }
+    page += 1;
+  }
+  const items = pageBatches.reverse().flat();
+  return { items, total, page: 1, limit: items.length };
 }
 
 export function sendChatMessage(

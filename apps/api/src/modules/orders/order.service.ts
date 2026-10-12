@@ -497,7 +497,7 @@ export class OrderService {
     ]);
     return {
       items: items.map((item) =>
-        this.projectOrderSecrets(item, true),
+        this.projectOrderSecrets(item, false),
       ) as unknown as OrderDocument[],
       total,
       page,
@@ -618,9 +618,10 @@ export class OrderService {
         .exec(),
       this.orderModel.countDocuments(filter).exec(),
     ]);
-    const reveal = shouldRevealDeliveredCodes(user);
     return {
-      items: items.map((item) => this.presentOrderSecrets(item, reveal)) as unknown as OrderDocument[],
+      items: items.map((item) =>
+        this.presentOrderSecrets(item, false),
+      ) as unknown as OrderDocument[],
       total,
       page,
       limit,
@@ -802,6 +803,20 @@ export class OrderService {
     return this.projectOrderSecrets(order.toObject(), revealCodes);
   }
 
+  /** Avoid failing entire order APIs when legacy ciphertext cannot be opened. */
+  private safeOpenDeliveredSecret(
+    stored: { code: string; serial?: string; pin?: string },
+  ): { code: string; serial?: string; pin?: string } {
+    try {
+      return this.crypto.openDeliveredSecret(stored);
+    } catch (err) {
+      this.logger.warn(
+        `Delivered secret could not be opened (${err instanceof Error ? err.message : 'unknown'})`,
+      );
+      return this.crypto.redactDeliveredSecret();
+    }
+  }
+
   private projectOrderSecrets<
     T extends {
       items?: Array<{ deliveredCodes?: Array<{ code: string; serial?: string; pin?: string }> }>;
@@ -814,7 +829,7 @@ export class OrderService {
         ...item,
         deliveredCodes: (item.deliveredCodes ?? []).map((code) =>
           revealCodes
-            ? this.crypto.openDeliveredSecret(code)
+            ? this.safeOpenDeliveredSecret(code)
             : this.crypto.redactDeliveredSecret(),
         ),
       })),
@@ -823,7 +838,7 @@ export class OrderService {
             manualGiftCards: plain.manualGiftCards.map((card) => ({
               ...card,
               code: revealCodes
-                ? this.crypto.openDeliveredSecret({ code: card.code }).code
+                ? this.safeOpenDeliveredSecret({ code: card.code }).code
                 : '••••',
             })),
           }

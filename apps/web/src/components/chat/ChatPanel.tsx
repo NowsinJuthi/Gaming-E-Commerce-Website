@@ -35,7 +35,7 @@ import { notifyUnreadCountChanged } from "@/hooks/useUnreadNotifications";
 import {
   deleteChatRoom,
   getChatAdminOverview,
-  getChatHistory,
+  fetchFullChatHistory,
   getCustomerPanelConfig,
   getMe,
   getOnlineUsers,
@@ -549,7 +549,7 @@ export function ChatPanel({
   roomSearchRef.current = roomSearch;
 
   const loadRooms = useCallback(async () => {
-    const list = await listChatRooms(1, 50, roomSearchRef.current);
+    const list = await listChatRooms(1, 100, roomSearchRef.current);
     setRooms(list);
     return list;
   }, []);
@@ -741,7 +741,7 @@ export function ChatPanel({
       setHistoryLoading(true);
 
       try {
-        const hist = await getChatHistory(id, 1, 100);
+        const hist = await fetchFullChatHistory(id);
         if (
           historyLoadSeqRef.current !== loadSeq ||
           activeIdRef.current !== id
@@ -787,7 +787,7 @@ export function ChatPanel({
     const rid = activeIdRef.current;
     if (!rid) return;
     try {
-      const hist = await getChatHistory(rid, 1, 100);
+      const hist = await fetchFullChatHistory(rid);
       const normalized = hist.items.map((m) => ({
         ...m,
         id: m.id ?? m._id,
