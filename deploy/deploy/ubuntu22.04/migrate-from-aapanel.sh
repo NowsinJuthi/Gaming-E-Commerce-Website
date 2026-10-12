@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo $0 [source-directory]" >&2; exit 1; }
 SOURCE_DIR="$(readlink -f "${1:-$(pwd)}")"
-TARGET_DIR=/opt/uniqbd/current
+TARGET_DIR=/opt/uniqbd.com
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 [[ -f "$SOURCE_DIR/package.json" ]] || {
@@ -14,9 +14,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/install-prerequisites.sh"
 
 echo "==> Migrating application files to $TARGET_DIR"
+API_ENV="$TARGET_DIR/apps/api/.env"
+WEB_ENV="$TARGET_DIR/apps/web/.env.local"
+LEGACY_API_ENV=/etc/uniqbd/api.env
+LEGACY_WEB_ENV=/etc/uniqbd/web.env
+
 rsync -a --delete \
   --exclude='.git/' \
   --exclude='.env' \
+  --exclude='apps/api/.env' \
+  --exclude='apps/web/.env.local' \
+  --exclude='apps/web/.env.production' \
   --exclude='apps/web/.env.production.local' \
   --exclude='node_modules/' \
   --exclude='.next/' \
@@ -26,22 +34,31 @@ rsync -a --delete \
   "$SOURCE_DIR/" "$TARGET_DIR/"
 chown -R uniqbd:uniqbd "$TARGET_DIR"
 
-install -d -o root -g uniqbd -m 0750 /etc/uniqbd
-if [[ ! -f /etc/uniqbd/api.env ]]; then
-  if [[ -f "$SOURCE_DIR/.env" ]]; then
-    install -o root -g uniqbd -m 0640 "$SOURCE_DIR/.env" /etc/uniqbd/api.env
+install -d -o uniqbd -g uniqbd -m 0755 "$TARGET_DIR/apps/api" "$TARGET_DIR/apps/web"
+
+if [[ ! -f "$API_ENV" ]]; then
+  if [[ -f "$LEGACY_API_ENV" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 "$LEGACY_API_ENV" "$API_ENV"
+  elif [[ -f "$SOURCE_DIR/apps/api/.env" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 "$SOURCE_DIR/apps/api/.env" "$API_ENV"
+  elif [[ -f "$SOURCE_DIR/.env" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 "$SOURCE_DIR/.env" "$API_ENV"
   else
-    install -o root -g uniqbd -m 0640 \
-      "$TARGET_DIR/deploy/deploy/ubuntu22.04/api.env.example" /etc/uniqbd/api.env
+    install -o uniqbd -g uniqbd -m 0640 \
+      "$TARGET_DIR/deploy/deploy/ubuntu22.04/api.env.example" "$API_ENV"
   fi
 fi
-if [[ ! -f /etc/uniqbd/web.env ]]; then
-  if [[ -f "$SOURCE_DIR/apps/web/.env.production.local" ]]; then
-    install -o root -g uniqbd -m 0640 \
-      "$SOURCE_DIR/apps/web/.env.production.local" /etc/uniqbd/web.env
+if [[ ! -f "$WEB_ENV" ]]; then
+  if [[ -f "$LEGACY_WEB_ENV" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 "$LEGACY_WEB_ENV" "$WEB_ENV"
+  elif [[ -f "$SOURCE_DIR/apps/web/.env.local" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 "$SOURCE_DIR/apps/web/.env.local" "$WEB_ENV"
+  elif [[ -f "$SOURCE_DIR/apps/web/.env.production.local" ]]; then
+    install -o uniqbd -g uniqbd -m 0640 \
+      "$SOURCE_DIR/apps/web/.env.production.local" "$WEB_ENV"
   else
-    install -o root -g uniqbd -m 0640 \
-      "$TARGET_DIR/deploy/deploy/ubuntu22.04/web.env.example" /etc/uniqbd/web.env
+    install -o uniqbd -g uniqbd -m 0640 \
+      "$TARGET_DIR/deploy/deploy/ubuntu22.04/web.env.example" "$WEB_ENV"
   fi
 fi
 
@@ -53,14 +70,14 @@ upsert_env() {
     printf '%s=%s\n' "$key" "$value" >>"$file"
   fi
 }
-upsert_env /etc/uniqbd/api.env API_HOST 127.0.0.1
-upsert_env /etc/uniqbd/api.env API_PORT 4000
-upsert_env /etc/uniqbd/api.env UPLOADS_DIR /opt/uniqbd/uploads
+upsert_env "$API_ENV" API_HOST 127.0.0.1
+upsert_env "$API_ENV" API_PORT 4000
+upsert_env "$API_ENV" UPLOADS_DIR /opt/uniqbd.com/uploads
 
 if [[ -d "$SOURCE_DIR/uploads" ]]; then
   echo "==> Migrating persistent uploads"
-  rsync -a "$SOURCE_DIR/uploads/" /opt/uniqbd/uploads/
-  chown -R uniqbd:uniqbd /opt/uniqbd/uploads
+  rsync -a "$SOURCE_DIR/uploads/" /opt/uniqbd.com/uploads/
+  chown -R uniqbd:uniqbd /opt/uniqbd.com/uploads
 fi
 
 if ! "$TARGET_DIR/deploy/deploy/ubuntu22.04/deploy.sh"; then
@@ -79,7 +96,7 @@ clean_public_root() {
     rm -rf -- "$root/$item"
   done
   install -d -m 0755 "$root/.well-known"
-  printf '%s\n' 'UniQbd is served by systemd from /opt/uniqbd/current.' >"$root/index.html"
+  printf '%s\n' 'UniQbd is served by systemd from /opt/uniqbd.com.' >"$root/index.html"
 }
 
 echo "==> Removing application files from aaPanel public webroots"

@@ -11,7 +11,7 @@ const URI = process.env.MONGODB_URI;
 const withCatalog = process.argv.includes('--with-catalog');
 
 if (!URI) {
-  console.error('DB SETUP ERROR: MONGODB_URI is not set (check /etc/uniqbd/api.env)');
+  console.error('DB SETUP ERROR: MONGODB_URI is not set (check apps/api/.env)');
   process.exit(1);
 }
 

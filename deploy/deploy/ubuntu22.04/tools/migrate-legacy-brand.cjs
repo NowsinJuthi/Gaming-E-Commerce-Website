@@ -2,7 +2,7 @@
  * Replace leftover pre-uniqbd brand/domain strings across all MongoDB collections.
  *
  * Usage (on server):
- *   cd /opt/uniqbd/current
+ *   cd /opt/uniqbd.com
  *   node deploy/deploy/ubuntu22.04/tools/migrate-legacy-brand.cjs
  */
 const path = require('path');

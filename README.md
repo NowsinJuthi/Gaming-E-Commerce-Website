@@ -154,32 +154,38 @@ pnpm seed
 
 ---
 
-## Production hosting
+## Production hosting (Ubuntu 22.04 + aaPanel)
 
-Production uses native Ubuntu 22.04 services. The application runs directly
-under systemd; aaPanel is used only for domains, SSL, and Nginx reverse proxying.
+**aaPanel:** only `uniqbd.com` / `www.uniqbd.com` and `api.uniqbd.com` — domain
+binding, SSL, Nginx proxy to loopback.
 
-- source/builds: `/opt/uniqbd/current`
-- uploads: `/opt/uniqbd/uploads`
-- API env: `/etc/uniqbd/api.env`
-- web env: `/etc/uniqbd/web.env`
+**Ubuntu (native):** systemd, Redis, builds, MongoDB Atlas client, all site
+files under one tree:
+
+```text
+/opt/uniqbd.com/                 full application (no current/ subfolder)
+/opt/uniqbd.com/uploads/         all upload files (images, chat attachments, …)
+/opt/uniqbd.com/apps/api/.env    API secrets
+/opt/uniqbd.com/apps/web/.env.local   storefront env
+```
+
 - process manager: systemd (`uniqbd-api`, `uniqbd-web`)
-- database: MongoDB Atlas
+- database: MongoDB Atlas (chat text, orders, users — not on disk)
 - queue/cache/realtime: native Redis on `127.0.0.1:6379`
-- edge: aaPanel manages domains, SSL, HTTPS redirects, and Nginx only
 
-Application source and secrets must never be placed in aaPanel public webroots.
+Do not put application code, uploads, or `.env` in `/www/wwwroot/*`.
 
 Full guides:
 
-- [Native Ubuntu installation and deployment](deploy/deploy/ubuntu22.04/README.md)
-- [aaPanel domain, SSL, and Nginx setup](deploy/deploy/aapanel/README.md)
+- **[New VPS checklist](deploy/deploy/ubuntu22.04/NEW-SERVER-SETUP.md)** ← start here
+- [Native Ubuntu deployment](deploy/deploy/ubuntu22.04/README.md)
+- [aaPanel domain, SSL, and Nginx](deploy/deploy/aapanel/README.md)
 
 Deploy or update:
 
 ```bash
-sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh
-sudo VERIFY_PUBLIC=1 /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh
+sudo /opt/uniqbd.com/deploy/deploy/ubuntu22.04/deploy.sh
+sudo VERIFY_PUBLIC=1 /opt/uniqbd.com/deploy/deploy/ubuntu22.04/verify.sh
 ```
 
 The systemd services are enabled at installation and automatically start after
@@ -275,10 +281,10 @@ Configure under **Admin → Settings → Payments** (requires license feature `p
 |-------|-----|
 | Admin login "Access denied" | `pnpm seed:users` or `node apps/api/scripts/promote-admin.cjs you@email.com` |
 | Chat / WebSocket broken | Nginx `/socket.io/` on main domain — see `deploy/deploy/aapanel/nginx/` |
-| Uploads 404 | Confirm `UPLOADS_DIR=/opt/uniqbd/uploads`, ownership `uniqbd:uniqbd`, and Nginx `/api/uploads/` proxy |
+| Uploads 404 | Confirm `UPLOADS_DIR=/opt/uniqbd.com/uploads`, ownership `uniqbd:uniqbd`, and Nginx `/api/uploads/` proxy |
 | Service failed | `journalctl -u uniqbd-api -u uniqbd-web -n 100 --no-pager` |
-| Old site after upload | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh` |
-| Live diagnostics | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh` |
+| Old site after upload | Run `/opt/uniqbd.com/deploy/deploy/ubuntu22.04/deploy.sh` |
+| Live diagnostics | Run `/opt/uniqbd.com/deploy/deploy/ubuntu22.04/verify.sh` |
 
 Full troubleshooting table: [`deploy/deploy/aapanel/README.md`](deploy/deploy/aapanel/README.md)
 

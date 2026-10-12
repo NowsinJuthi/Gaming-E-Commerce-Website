@@ -28,13 +28,13 @@ function loadEnvFile(envPath) {
   }
 }
 
-/** Load native production env, then local development envs without overriding. */
+/** Load app-tree env files; legacy /etc/uniqbd only fills unset keys. */
 function loadApiEnv() {
-  loadEnvFile('/etc/uniqbd/api.env');
   const rootEnv = path.join(__dirname, '..', '..', '..', '.env');
   const apiEnv = path.join(__dirname, '..', '.env');
-  loadEnvFile(rootEnv);
   loadEnvFile(apiEnv);
+  loadEnvFile(rootEnv);
+  loadEnvFile('/etc/uniqbd/api.env');
 }
 
 module.exports = { loadApiEnv };

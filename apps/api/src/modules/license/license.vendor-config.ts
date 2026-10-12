@@ -1,6 +1,6 @@
 /**
  * Server-only vendor credentials (never exposed in admin UI or API responses).
- * Set LICENSE_* in /etc/uniqbd/api.env on production. Legacy MongoDB siteSecret
+ * Set LICENSE_* in apps/api/.env on production. Legacy MongoDB siteSecret
  * is read only when env is unset.
  */
 export type LicenseVendorConfig = {

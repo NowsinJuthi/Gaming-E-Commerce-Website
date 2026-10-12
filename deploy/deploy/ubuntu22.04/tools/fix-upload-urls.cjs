@@ -2,7 +2,7 @@
  * Replace old VPS IP / localhost upload URLs in MongoDB with same-origin paths.
  *
  * Usage (on server):
- *   cd /opt/uniqbd/current
+ *   cd /opt/uniqbd.com
  *   node deploy/deploy/ubuntu22.04/tools/fix-upload-urls.cjs
  */
 const path = require('path');

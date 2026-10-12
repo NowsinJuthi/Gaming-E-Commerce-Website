@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 
 const URI = process.env.MONGODB_URI;
 if (!URI) {
-  console.error('FAIL: MONGODB_URI is not set in /etc/uniqbd/api.env');
+  console.error('FAIL: MONGODB_URI is not set in apps/api/.env');
   process.exit(1);
 }
 
@@ -27,7 +27,7 @@ Fix checklist:
      Run: curl -4 ifconfig.me
      Add only that VPS IP
   2. Atlas → Database Access → user has readWrite on your DB
-  3. /etc/uniqbd/api.env MONGODB_URI must be mongodb+srv://...
+  3. apps/api/.env MONGODB_URI must be mongodb+srv://...
   4. Password special chars must be URL-encoded (@ → %40, # → %23)
   5. systemctl restart uniqbd-api after fixing the env file
 `);

@@ -8,10 +8,10 @@ Requires=redis-server.service
 Type=simple
 User=uniqbd
 Group=uniqbd
-WorkingDirectory=/opt/uniqbd/current/apps/api
-EnvironmentFile=/etc/uniqbd/api.env
+WorkingDirectory=/opt/uniqbd.com/apps/api
+EnvironmentFile=/opt/uniqbd.com/apps/api/.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /opt/uniqbd/current/apps/api/dist/main.js
+ExecStart=/usr/bin/node /opt/uniqbd.com/apps/api/dist/main.js
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
@@ -20,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/uniqbd/uploads
+ReadWritePaths=/opt/uniqbd.com/uploads
 UMask=0027
 
 [Install]

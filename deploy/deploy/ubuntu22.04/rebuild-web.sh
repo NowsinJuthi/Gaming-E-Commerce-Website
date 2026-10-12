@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR=/opt/uniqbd/current
+APP_DIR=/opt/uniqbd.com
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo $0" >&2; exit 1; }
 [[ -f "$APP_DIR/package.json" ]] || { echo "Missing $APP_DIR/package.json" >&2; exit 1; }
-[[ -f /etc/uniqbd/web.env ]] || { echo "Missing /etc/uniqbd/web.env" >&2; exit 1; }
+WEB_ENV="$APP_DIR/apps/web/.env.local"
+[[ -f "$WEB_ENV" ]] || { echo "Missing $WEB_ENV" >&2; exit 1; }
 
 systemctl stop uniqbd-web.service
 rm -rf "$APP_DIR/apps/web/.next"
 chown -R uniqbd:uniqbd "$APP_DIR/apps/web"
 
 cd "$APP_DIR"
-if ! runuser -u uniqbd -- env HOME=/opt/uniqbd bash -c \
-  'set -a; source /etc/uniqbd/web.env; set +a; exec corepack pnpm --filter @uniqbd/web build'; then
+if ! runuser -u uniqbd -- env HOME=/opt/uniqbd.com bash -c \
+  "set -a; source '$WEB_ENV'; set +a; exec corepack pnpm --filter @uniqbd/web build"; then
   echo "Web build failed; uniqbd-web remains stopped." >&2
   exit 1
 fi
@@ -21,7 +22,7 @@ fi
   exit 1
 }
 install -d -o uniqbd -g uniqbd -m 0755 "$APP_DIR/apps/web/.next/cache"
-runuser -u uniqbd -- env HOME=/opt/uniqbd \
+runuser -u uniqbd -- env HOME=/opt/uniqbd.com \
   node "$APP_DIR/deploy/deploy/ubuntu22.04/tools/write-deploy-manifest.cjs"
 
 systemctl restart uniqbd-web.service

@@ -1,33 +1,38 @@
-# aaPanel role in UniQbd production
+# aaPanel role in UniQbd production (Ubuntu 22.04)
 
-aaPanel is used only for:
+aaPanel handles **only** these two sites:
 
-- `uniqbd.com`, `www.uniqbd.com`, and `api.uniqbd.com` domain management
-- Let's Encrypt/SSL certificate management
-- HTTP-to-HTTPS redirects
-- Nginx reverse proxying to native systemd services
+| aaPanel site | Domains | SSL | Nginx → |
+|--------------|---------|-----|---------|
+| Storefront | `uniqbd.com`, `www.uniqbd.com` | Let's Encrypt (aaPanel) | `127.0.0.1:3000` |
+| API | `api.uniqbd.com` | Let's Encrypt (aaPanel) | `127.0.0.1:4000` |
 
-Application source, builds, dependencies, uploads, and secrets must not be stored
-in aaPanel's public webroots.
+aaPanel does **not** run UniQbd: no aaPanel Node projects, PM2, PHP, or a second
+app stack. Processes are **systemd** on Ubuntu (`uniqbd-web`, `uniqbd-api`).
+
+Everything else stays on Ubuntu under **`/opt/uniqbd.com`**: source, builds,
+**`uploads/`** (all images and chat files), and **`.env`** files next to the app.
+
+**New server step-by-step:** [`../ubuntu22.04/NEW-SERVER-SETUP.md`](../ubuntu22.04/NEW-SERVER-SETUP.md)
 
 ## Filesystem boundaries
 
 ```text
-/opt/uniqbd/current/              application source and builds
-/opt/uniqbd/uploads/          persistent uploads
-/etc/uniqbd/api.env               API secrets/configuration
-/etc/uniqbd/web.env               frontend build/runtime configuration
-/www/wwwroot/uniqbd.com/          .well-known and placeholder only
-/www/wwwroot/api.uniqbd.com/      .well-known and placeholder only
+/opt/uniqbd.com/                    entire website (apps, deploy, uploads, .env)
+/opt/uniqbd.com/uploads/            products, logos, live-chat images, …
+/opt/uniqbd.com/apps/api/.env       API secrets (Mongo, JWT, UPLOADS_DIR, …)
+/opt/uniqbd.com/apps/web/.env.local Next.js public URLs + INTERNAL_API_URL
+/www/wwwroot/uniqbd.com/            .well-known + placeholder only
+/www/wwwroot/api.uniqbd.com/        .well-known + placeholder only
 ```
 
 The complete Ubuntu installation and deployment guide is at
 [`../ubuntu22.04/README.md`](../ubuntu22.04/README.md).
 
-## aaPanel setup
+## aaPanel setup (after `/opt/uniqbd.com` exists)
 
 1. Add websites for `uniqbd.com` (including `www.uniqbd.com`) and
-   `api.uniqbd.com`.
+   `api.uniqbd.com` only.
 2. Issue certificates in aaPanel and keep certificate renewal under aaPanel.
 3. Paste these complete vhost templates in Website → Config:
    - `nginx/uniqbd.com.aapanel-full.conf`
@@ -42,12 +47,12 @@ headers. The storefront also proxies `/api/uploads/` and `/api/app/` to the API.
 
 1. Orange-cloud `uniqbd.com` / `www` / `api.uniqbd.com` in Cloudflare DNS.
 2. Paste the vhost templates. They include
-   `/opt/uniqbd/current/deploy/deploy/aapanel/nginx/cloudflare-real-ip.conf`,
+   `/opt/uniqbd.com/deploy/deploy/aapanel/nginx/cloudflare-real-ip.conf`,
    which sets `real_ip_header CF-Connecting-IP` **only** for official Cloudflare
    ranges. Nginx then overwrites `X-Forwarded-For` / `X-Real-IP` with
    `$remote_addr` (the restored visitor IP). Client-supplied forwarding headers
    are not appended.
-3. Set `TRUST_PROXY_HOPS=1` in `/etc/uniqbd/api.env` (Joi allows 0–2 only).
+3. Set `TRUST_PROXY_HOPS=1` in `apps/api/.env` (Joi allows 0–2 only).
    Node trusts a single nginx hop. Do not raise this to “catch” extra proxies.
 4. Keep API/web bound to `127.0.0.1`. Vhost templates now include
    `cloudflare-origin-allow.conf` so direct hits to the origin IP are denied.
@@ -70,6 +75,6 @@ source maps.
 Run the native verification after changes:
 
 ```bash
-sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh
-sudo VERIFY_PUBLIC=1 /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh
+sudo /opt/uniqbd.com/deploy/deploy/ubuntu22.04/verify.sh
+sudo VERIFY_PUBLIC=1 /opt/uniqbd.com/deploy/deploy/ubuntu22.04/verify.sh
 ```

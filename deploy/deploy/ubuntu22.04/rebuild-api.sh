@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR=/opt/uniqbd/current
+APP_DIR=/opt/uniqbd.com
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo $0" >&2; exit 1; }
 [[ -f "$APP_DIR/package.json" ]] || { echo "Missing $APP_DIR/package.json" >&2; exit 1; }
-[[ -f /etc/uniqbd/api.env ]] || { echo "Missing /etc/uniqbd/api.env" >&2; exit 1; }
+[[ -f "$APP_DIR/apps/api/.env" ]] || { echo "Missing $APP_DIR/apps/api/.env" >&2; exit 1; }
 
 cd "$APP_DIR"
 chown -R uniqbd:uniqbd "$APP_DIR/apps/api"
-runuser -u uniqbd -- env HOME=/opt/uniqbd \
+runuser -u uniqbd -- env HOME=/opt/uniqbd.com \
   corepack pnpm --filter @uniqbd/api build
 [[ -f "$APP_DIR/apps/api/dist/main.js" ]] || {
   echo "API build did not create dist/main.js" >&2

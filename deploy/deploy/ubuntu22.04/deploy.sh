@@ -1,18 +1,35 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR=/opt/uniqbd/current
-API_ENV=/etc/uniqbd/api.env
-WEB_ENV=/etc/uniqbd/web.env
+APP_DIR=/opt/uniqbd.com
+UPLOADS_DIR="${APP_DIR}/uploads"
+API_ENV="${APP_DIR}/apps/api/.env"
+WEB_ENV="${APP_DIR}/apps/web/.env.local"
+LEGACY_API_ENV=/etc/uniqbd/api.env
+LEGACY_WEB_ENV=/etc/uniqbd/web.env
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+migrate_legacy_env() {
+  if [[ ! -f "$API_ENV" && -f "$LEGACY_API_ENV" ]]; then
+    log "Migrating $LEGACY_API_ENV -> $API_ENV"
+    install -o uniqbd -g uniqbd -m 0640 "$LEGACY_API_ENV" "$API_ENV"
+  fi
+  if [[ ! -f "$WEB_ENV" && -f "$LEGACY_WEB_ENV" ]]; then
+    log "Migrating $LEGACY_WEB_ENV -> $WEB_ENV"
+    install -o uniqbd -g uniqbd -m 0640 "$LEGACY_WEB_ENV" "$WEB_ENV"
+  fi
+}
+migrate_legacy_env
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "==> $*"; }
 [[ $EUID -eq 0 ]] || fail "Run as root: sudo $0"
 [[ -f "$APP_DIR/package.json" ]] || fail "Missing $APP_DIR/package.json"
 [[ -f "$APP_DIR/pnpm-lock.yaml" ]] || fail "Missing pnpm-lock.yaml"
-[[ -f "$API_ENV" ]] || fail "Missing $API_ENV (copy api.env.example and fill secrets)"
-[[ -f "$WEB_ENV" ]] || fail "Missing $WEB_ENV (copy web.env.example and edit it)"
+[[ -f "$API_ENV" ]] ||
+  fail "Missing $API_ENV (copy deploy/deploy/ubuntu22.04/api.env.example and fill secrets)"
+[[ -f "$WEB_ENV" ]] ||
+  fail "Missing $WEB_ENV (copy deploy/deploy/ubuntu22.04/web.env.example to apps/web/.env.local)"
 id uniqbd >/dev/null 2>&1 || fail "User uniqbd is missing; run install-prerequisites.sh"
 command -v corepack >/dev/null 2>&1 || fail "corepack is missing"
 systemctl is-active --quiet redis-server || fail "redis-server is not active"
@@ -22,17 +39,16 @@ if grep -Eq '(^|=)REPLACE_WITH_|mongodb\+srv://USER:PASSWORD@CLUSTER' "$API_ENV"
 fi
 grep -Eq '^API_HOST=127\.0\.0\.1$' "$API_ENV" ||
   fail "API_HOST must be 127.0.0.1 in $API_ENV"
-grep -Eq '^UPLOADS_DIR=/opt/uniqbd/uploads$' "$API_ENV" ||
-  fail "UPLOADS_DIR must be /opt/uniqbd/uploads in $API_ENV"
+grep -Eq "^UPLOADS_DIR=${UPLOADS_DIR}$" "$API_ENV" ||
+  fail "UPLOADS_DIR must be ${UPLOADS_DIR} in $API_ENV (same tree as the app, like local uploads/)"
 
-install -d -o uniqbd -g uniqbd -m 0755 /opt/uniqbd/uploads
-chown -R uniqbd:uniqbd "$APP_DIR" /opt/uniqbd/uploads
-chmod 0750 /etc/uniqbd
-chown root:uniqbd "$API_ENV" "$WEB_ENV"
+install -d -o uniqbd -g uniqbd -m 0755 "$UPLOADS_DIR"
+chown -R uniqbd:uniqbd "$APP_DIR"
+chown uniqbd:uniqbd "$API_ENV" "$WEB_ENV"
 chmod 0640 "$API_ENV" "$WEB_ENV"
 
 run_uniqbd() {
-  runuser -u uniqbd -- env HOME=/opt/uniqbd "$@"
+  runuser -u uniqbd -- env HOME=/opt/uniqbd.com "$@"
 }
 
 log "Installing frozen dependencies with repository-pinned pnpm"
@@ -52,12 +68,12 @@ log "Building API"
 run_uniqbd corepack pnpm --filter @uniqbd/api build
 [[ -f "$APP_DIR/apps/api/dist/main.js" ]] || fail "API build did not create dist/main.js"
 
-log "Building Next.js with /etc/uniqbd/web.env"
+log "Building Next.js with $WEB_ENV"
 grep '^NEXT_PUBLIC_' "$WEB_ENV" >"$APP_DIR/apps/web/.env.production"
 chown uniqbd:uniqbd "$APP_DIR/apps/web/.env.production"
 chmod 0640 "$APP_DIR/apps/web/.env.production"
-runuser -u uniqbd -- env HOME=/opt/uniqbd bash -c \
-  'set -a; source /etc/uniqbd/web.env; set +a; exec corepack pnpm --filter @uniqbd/web build'
+runuser -u uniqbd -- env HOME=/opt/uniqbd.com bash -c \
+  "set -a; source '$WEB_ENV'; set +a; exec corepack pnpm --filter @uniqbd/web build"
 [[ -f "$APP_DIR/apps/web/.next/BUILD_ID" ]] || fail "Web build did not create .next/BUILD_ID"
 install -d -o uniqbd -g uniqbd -m 0755 "$APP_DIR/apps/web/.next/cache"
 run_uniqbd node "$APP_DIR/deploy/deploy/ubuntu22.04/tools/write-deploy-manifest.cjs"

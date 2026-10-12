@@ -2,7 +2,7 @@
  * Test MFS SMS sync on the server (simulates Paymently app).
  *
  * Usage:
- *   cd /opt/uniqbd/current
+ *   cd /opt/uniqbd.com
  *   ADMIN_EMAIL=admin@uniqbd.com ADMIN_PASS='...' node deploy/deploy/ubuntu22.04/tools/test-sms-sync.cjs
  *
  * Optional env:

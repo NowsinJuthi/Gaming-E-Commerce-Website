@@ -57,20 +57,18 @@ redis-cli -h 127.0.0.1 ping | grep -qx PONG || {
 }
 
 if ! id uniqbd >/dev/null 2>&1; then
-  useradd --system --home-dir /opt/uniqbd --create-home --shell /usr/sbin/nologin uniqbd
+  useradd --system --home-dir /opt/uniqbd.com --create-home --shell /usr/sbin/nologin uniqbd
 fi
 
 install -d -o uniqbd -g uniqbd -m 0755 \
-  /opt/uniqbd/current \
-  /opt/uniqbd/uploads \
-  /opt/uniqbd/uploads/avatars \
-  /opt/uniqbd/uploads/banners \
-  /opt/uniqbd/uploads/live-chat \
-  /opt/uniqbd/uploads/logos \
-  /opt/uniqbd/uploads/mfs-qr \
-  /opt/uniqbd/uploads/products
-install -d -o root -g uniqbd -m 0750 /etc/uniqbd
-
+  /opt/uniqbd.com \
+  /opt/uniqbd.com/uploads \
+  /opt/uniqbd.com/uploads/avatars \
+  /opt/uniqbd.com/uploads/banners \
+  /opt/uniqbd.com/uploads/live-chat \
+  /opt/uniqbd.com/uploads/logos \
+  /opt/uniqbd.com/uploads/mfs-qr \
+  /opt/uniqbd.com/uploads/products
 for domain in uniqbd.com api.uniqbd.com; do
   install -d -m 0755 "/www/wwwroot/$domain/.well-known"
   if [[ ! -f "/www/wwwroot/$domain/index.html" ]]; then

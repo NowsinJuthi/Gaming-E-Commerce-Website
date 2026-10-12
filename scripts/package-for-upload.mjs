@@ -64,7 +64,7 @@ if (platform() === "win32") {
   console.log("\nServer steps:");
   console.log("  1. Extract into /opt/uniqbd/incoming (never an aaPanel webroot)");
   console.log("  2. sudo bash deploy/deploy/ubuntu22.04/migrate-from-aapanel.sh /opt/uniqbd/incoming");
-  console.log("  3. sudo VERIFY_PUBLIC=1 /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh");
+  console.log("  3. sudo VERIFY_PUBLIC=1 /opt/uniqbd.com/deploy/deploy/ubuntu22.04/verify.sh");
   process.exit(0);
 }
 
