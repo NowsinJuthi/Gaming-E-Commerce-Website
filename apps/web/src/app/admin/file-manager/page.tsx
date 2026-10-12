@@ -24,6 +24,7 @@ export default function AdminFileManagerPage() {
   const [entries, setEntries] = useState<SmbBrowseEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [browsing, setBrowsing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
@@ -47,8 +48,7 @@ export default function AdminFileManagerPage() {
   }, []);
 
   const loadBrowse = useCallback(async (id: string, path: string) => {
-    const data = await browseSmb(id, path);
-    setEntries(data.entries);
+    return browseSmb(id, path);
   }, []);
 
   useEffect(() => {
@@ -61,9 +61,23 @@ export default function AdminFileManagerPage() {
 
   useEffect(() => {
     if (!selectedId) return;
-    void loadBrowse(selectedId, browsePath).catch((err: unknown) =>
-      setError(err instanceof Error ? err.message : "Could not browse this share."),
-    );
+    let cancelled = false;
+    setBrowsing(true);
+    setError(null);
+    setEntries([]);
+    void loadBrowse(selectedId, browsePath)
+      .then((data) => {
+        if (!cancelled) setEntries(data.entries);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(browseErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setBrowsing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, browsePath, loadBrowse]);
 
   async function onCreate(event: React.FormEvent) {
@@ -233,7 +247,8 @@ export default function AdminFileManagerPage() {
                         .then(async () => {
                           setUpdatePassword("");
                           await reload();
-                          await loadBrowse(selected.id, browsePath);
+                          const data = await loadBrowse(selected.id, browsePath);
+                          setEntries(data.entries);
                         })
                         .catch((err: unknown) =>
                           setError(err instanceof Error ? err.message : "Could not save password."),
@@ -281,8 +296,10 @@ export default function AdminFileManagerPage() {
                       ))}
                     </tbody>
                   </table>
-                  {entries.length === 0 ? (
-                    <p className={styles.emptyFolder}>This folder is empty or not reachable.</p>
+                  {browsing ? (
+                    <p className={styles.emptyFolder}>Loading folder…</p>
+                  ) : entries.length === 0 && !error ? (
+                    <p className={styles.emptyFolder}>This folder is empty.</p>
                   ) : null}
                 </div>
                 <form
@@ -336,6 +353,14 @@ export default function AdminFileManagerPage() {
       </div>
     </AdminPageLayout>
   );
+}
+
+function browseErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not browse this share.";
+  if (/failed to fetch/i.test(message)) {
+    return "The folder list did not finish. Refresh the page after the API finishes restarting.";
+  }
+  return message;
 }
 
 function Field({
