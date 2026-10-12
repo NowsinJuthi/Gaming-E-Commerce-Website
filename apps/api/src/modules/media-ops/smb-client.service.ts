@@ -1,8 +1,4 @@
 import { execFile } from 'child_process';
-import { randomBytes } from 'crypto';
-import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -96,42 +92,153 @@ export class SmbClientService {
   }
 
   private async runSmbclient(auth: SmbAuth, command: string, remotePath = ''): Promise<string> {
-    const credFile = join(tmpdir(), `uniqbd-smb-${randomBytes(12).toString('hex')}.cred`);
-    const domain = (auth.domain ?? '').trim();
-    const credDomain = !domain || domain === '.' ? 'WORKGROUP' : domain;
-    await fs.writeFile(
-      credFile,
-      `username=${auth.username}\npassword=${auth.password}\ndomain=${credDomain}\n`,
-      { mode: 0o600 },
-    );
-    try {
-      const args = [
-        `//${auth.host}/${auth.share}`,
-        '-A',
-        credFile,
-        '-p',
-        String(auth.port ?? 445),
-        '-m',
-        'SMB3',
-      ];
-      if (credDomain.toUpperCase() !== 'WORKGROUP') {
-        args.push('-W', credDomain);
+    const attempts = this.authAttempts(auth);
+    let lastError: unknown;
+    for (const attempt of attempts) {
+      try {
+        return await this.execSmbclient(attempt, command, remotePath, 'SMB3');
+      } catch (error) {
+        lastError = error;
+        const raw = this.execText(error);
+        if (this.isUnreachable(raw)) break;
+        if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
+          try {
+            return await this.execSmbclient(attempt, command, remotePath, 'SMB2');
+          } catch (smb2Error) {
+            lastError = smb2Error;
+          }
+        }
+        if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
       }
-      const cleaned = remotePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-      if (cleaned) args.push('-D', cleaned);
-      args.push('-c', command);
-      const { stdout } = await execFileAsync('smbclient', args, {
-        timeout: 25_000,
-        maxBuffer: 4_000_000,
-      });
-      return stdout;
-    } catch (error) {
-      const message = this.formatLinuxSmbError(error);
-      this.logger.warn(`Samba list failed for //${auth.host}/${auth.share}: ${message}`);
-      throw new Error(message);
-    } finally {
-      await fs.unlink(credFile).catch(() => undefined);
     }
+
+    const shares = await this.listDiskShares(attempts[0] ?? auth).catch(() => [] as string[]);
+    const wanted = auth.share.trim();
+    const only = shares.length === 1 ? shares[0] : undefined;
+    if (only && only.toLowerCase() !== wanted.toLowerCase()) {
+      try {
+        return await this.execSmbclient(
+          { ...auth, share: only },
+          command,
+          remotePath,
+          'SMB3',
+        );
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const message = this.formatLinuxSmbError(lastError);
+    const shareHint =
+      shares.length > 0
+        ? ` Shares on this server: ${shares.join(', ')}.`
+        : '';
+    this.logger.warn(`Samba list failed for //${auth.host}/${auth.share}: ${message}`);
+    throw new Error(`${message}${shareHint}`);
+  }
+
+  private authAttempts(auth: SmbAuth): SmbAuth[] {
+    const parsed = this.parseUsername(auth.username, auth.domain);
+    const hostLabel = auth.host.includes('.') ? auth.host.split('.')[0] || auth.host : auth.host;
+    const domains = [parsed.domain, '', hostLabel, auth.host];
+    const seen = new Set<string>();
+    const attempts: SmbAuth[] = [];
+    for (const domain of domains) {
+      const key = `${domain.toUpperCase()}|${parsed.username}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      attempts.push({ ...auth, username: parsed.username, domain });
+      if (attempts.length >= 4) break;
+    }
+    return attempts;
+  }
+
+  private parseUsername(username: string, domain?: string): { username: string; domain: string } {
+    const trimmed = username.trim();
+    const stored = (domain ?? '').trim();
+    const slash = trimmed.indexOf('\\');
+    if (slash > 0) {
+      return { domain: trimmed.slice(0, slash).trim(), username: trimmed.slice(slash + 1).trim() };
+    }
+    return {
+      username: trimmed,
+      domain: !stored || stored === '.' || stored.toUpperCase() === 'WORKGROUP' ? '' : stored,
+    };
+  }
+
+  private async execSmbclient(
+    auth: SmbAuth,
+    command: string,
+    remotePath: string,
+    protocol: 'SMB2' | 'SMB3',
+  ): Promise<string> {
+    const share = auth.share.trim().replace(/^[\\/]+|[\\/]+$/g, '');
+    const args = [
+      `//${auth.host}/${share}`,
+      '-U',
+      this.linuxUser(auth),
+      `--password=${auth.password}`,
+      '-p',
+      String(auth.port ?? 445),
+      '-m',
+      protocol,
+    ];
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      args.push('-W', domain);
+    }
+    const cleaned = remotePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    if (cleaned) args.push('-D', cleaned);
+    args.push('-c', command);
+    const { stdout } = await execFileAsync('smbclient', args, {
+      timeout: 20_000,
+      maxBuffer: 4_000_000,
+    });
+    return stdout;
+  }
+
+  private linuxUser(auth: SmbAuth): string {
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      return `${domain}/${auth.username}`;
+    }
+    return auth.username;
+  }
+
+  private async listDiskShares(auth: SmbAuth): Promise<string[]> {
+    const args = [
+      '-L',
+      auth.host,
+      '-U',
+      this.linuxUser(auth),
+      `--password=${auth.password}`,
+      '-p',
+      String(auth.port ?? 445),
+      '-m',
+      'SMB3',
+    ];
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      args.push('-W', domain);
+    }
+    const { stdout } = await execFileAsync('smbclient', args, {
+      timeout: 15_000,
+      maxBuffer: 1_000_000,
+    });
+    const names: string[] = [];
+    for (const line of stdout.split(/\r?\n/)) {
+      const match = line.match(/^\s*(.+?)\s{2,}Disk\b/i);
+      const name = match?.[1]?.trim();
+      if (!name || name === 'Sharename' || name === '---------' || name.endsWith('$')) continue;
+      names.push(name);
+    }
+    return names;
+  }
+
+  private isUnreachable(raw: string): boolean {
+    return /ETIMEDOUT|timed out|EHOSTUNREACH|ENETUNREACH|ECONNREFUSED|Connection refused|HOST_UNREACHABLE|IO_TIMEOUT|CONNECTION_REFUSED/i.test(
+      raw,
+    );
   }
 
   /** smbclient `ls` lines are not grepable; `-g` does not apply to directory listings. */
@@ -164,7 +271,7 @@ export class SmbClientService {
       return 'Access denied for this Samba share.';
     }
     if (nt === 'NT_STATUS_BAD_NETWORK_NAME') {
-      return 'Share name was not found on that server.';
+      return 'Share name was not found. Use the share name shown by the storage server, not the Windows drive label.';
     }
     if (nt === 'NT_STATUS_HOST_UNREACHABLE' || nt === 'NT_STATUS_IO_TIMEOUT' || nt === 'NT_STATUS_CONNECTION_REFUSED') {
       return 'The website server cannot reach this storage server on port 445.';
@@ -202,7 +309,9 @@ export class SmbClientService {
   }
 
   private redactSecrets(value: string): string {
-    return value.replace(/password=[^\s]+/gi, 'password=***');
+    return value
+      .replace(/--password=\S+/gi, '--password=***')
+      .replace(/password=[^\s]+/gi, 'password=***');
   }
 
   private async createClient(auth: SmbAuth): Promise<Smb2Client> {

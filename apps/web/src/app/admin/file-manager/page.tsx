@@ -183,7 +183,7 @@ export default function AdminFileManagerPage() {
                         {server.host}/{server.share}
                       </span>
                       <span className="mt-1.5 inline-flex text-xs text-subtle">
-                        {server.lastError ? "Needs password" : "Ready"}
+                        {serverStatus(server.lastError)}
                       </span>
                     </span>
                   </button>
@@ -238,7 +238,7 @@ export default function AdminFileManagerPage() {
                     Delete
                   </button>
                 </div>
-                {selected.lastError ? (
+                {selected.lastError && isPasswordError(selected.lastError) ? (
                   <form
                     className="flex flex-wrap items-end gap-2 p-3"
                     onSubmit={(event) => {
@@ -353,6 +353,17 @@ export default function AdminFileManagerPage() {
       </div>
     </AdminPageLayout>
   );
+}
+
+function isPasswordError(error: string): boolean {
+  return /password|logon|login/i.test(error);
+}
+
+function serverStatus(lastError?: string | null): string {
+  if (!lastError) return "Ready";
+  if (isPasswordError(lastError)) return "Needs password";
+  if (/share name/i.test(lastError)) return "Share not found";
+  return "Not connected";
 }
 
 function browseErrorMessage(err: unknown): string {
