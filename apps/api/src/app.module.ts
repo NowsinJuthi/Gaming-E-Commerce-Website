@@ -48,6 +48,7 @@ import { ContactInquiriesModule } from './modules/contact-inquiries/contact-inqu
 import { ProductRequestsModule } from './modules/product-requests/product-requests.module';
 import { EventsModule } from './shared/events/events.module';
 import { LicenseModule } from './modules/license/license.module';
+import { MediaOpsModule } from './modules/media-ops/media-ops.module';
 
 /**
  * Root application module.
@@ -129,6 +130,7 @@ import { LicenseModule } from './modules/license/license.module';
     ProductRequestsModule,
     EventsModule,
     LicenseModule,
+    MediaOpsModule,
   ],
   providers: [
     {

@@ -24,6 +24,7 @@
     "migrate:recover-superseded": "node scripts/recover-superseded-payments.cjs"
   },
   "dependencies": {
+    "@marsaud/smb2": "^0.18.0",
     "@nestjs/bullmq": "^11.0.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
