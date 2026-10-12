@@ -105,7 +105,7 @@ export default function AdminFileManagerPage() {
       backHref="/admin"
       backLabel="Dashboard"
       action={
-        <button type="button" className="admin-btn-primary" onClick={() => setShowConnect((v) => !v)}>
+        <button type="button" className="dashboard-pro-btn shrink-0" onClick={() => setShowConnect((v) => !v)}>
           {showConnect ? "Close" : "Connect server"}
         </button>
       }
@@ -136,7 +136,7 @@ export default function AdminFileManagerPage() {
                 <Field label="Username" value={username} onChange={setUsername} placeholder="samba-user" required />
                 <Field label="Password" value={password} onChange={setPassword} type="password" required />
                 <Field label="Domain (optional)" value={domain} onChange={setDomain} placeholder="WORKGROUP" />
-                <button type="submit" className="admin-btn-primary" disabled={busy}>
+                <button type="submit" className="dashboard-pro-btn disabled:opacity-50" disabled={busy}>
                   {busy ? "Connecting…" : "Save & connect"}
                 </button>
               </div>
@@ -196,7 +196,7 @@ export default function AdminFileManagerPage() {
                 <div className={styles.toolbar}>
                   <button
                     type="button"
-                    className="admin-btn-ghost"
+                    className="dashboard-pro-btn-ghost"
                     disabled={!browsePath}
                     onClick={() => setBrowsePath(parentPath)}
                   >
@@ -208,7 +208,7 @@ export default function AdminFileManagerPage() {
                   </p>
                   <button
                     type="button"
-                    className="admin-btn-ghost"
+                    className="dashboard-pro-btn-ghost"
                     onClick={() => {
                       if (!confirm(`Remove ${selected.name}?`)) return;
                       void deleteSmbServer(selected.id)
@@ -250,7 +250,7 @@ export default function AdminFileManagerPage() {
                         required
                       />
                     </label>
-                    <button type="submit" className="admin-btn-primary">
+                    <button type="submit" className="dashboard-pro-btn disabled:opacity-50">
                       Save password
                     </button>
                   </form>
@@ -325,7 +325,7 @@ export default function AdminFileManagerPage() {
                       <option value="tv">TV</option>
                     </select>
                   </label>
-                  <button type="submit" className="admin-btn-primary">
+                  <button type="submit" className="dashboard-pro-btn disabled:opacity-50">
                     Add as media library
                   </button>
                 </form>
