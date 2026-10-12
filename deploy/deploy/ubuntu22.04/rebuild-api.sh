@@ -16,8 +16,9 @@ runuser -u uniqbd -- env HOME=/opt/uniqbd.com \
 }
 
 systemctl restart uniqbd-api.service
+echo "Waiting for API on port 4000..."
 for ((i=1; i<=45; i++)); do
-  if curl -fsS --max-time 5 http://127.0.0.1:4000/api/health >/dev/null; then
+  if curl -fsS --max-time 5 http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
     echo "API rebuild and restart successful."
     exit 0
   fi

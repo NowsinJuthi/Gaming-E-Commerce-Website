@@ -26,8 +26,9 @@ runuser -u uniqbd -- env HOME=/opt/uniqbd.com \
   node "$APP_DIR/deploy/deploy/ubuntu22.04/tools/write-deploy-manifest.cjs"
 
 systemctl restart uniqbd-web.service
+echo "Waiting for web on port 3000..."
 for ((i=1; i<=45; i++)); do
-  if curl -fsS --max-time 5 http://127.0.0.1:3000/api/deploy-info >/dev/null; then
+  if curl -fsS --max-time 5 http://127.0.0.1:3000/api/deploy-info >/dev/null 2>&1; then
     echo "Web rebuild and restart successful."
     exit 0
   fi
