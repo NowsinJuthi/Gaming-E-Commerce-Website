@@ -36,6 +36,7 @@ import {
   deleteChatRoom,
   getChatAdminOverview,
   fetchFullChatHistory,
+  fetchMergedCustomerSupportHistory,
   getCustomerPanelConfig,
   getMe,
   getOnlineUsers,
@@ -745,7 +746,9 @@ export function ChatPanel({
       historyFullyLoadedRef.current.delete(id);
 
       try {
-        const hist = await fetchFullChatHistory(id);
+        const hist = isAdminRef.current
+          ? await fetchFullChatHistory(id)
+          : await fetchMergedCustomerSupportHistory(id);
         if (
           historyLoadSeqRef.current !== loadSeq ||
           activeIdRef.current !== id
@@ -793,7 +796,9 @@ export function ChatPanel({
     const rid = activeIdRef.current;
     if (!rid) return;
     try {
-      const hist = await fetchFullChatHistory(rid);
+      const hist = isAdminRef.current
+        ? await fetchFullChatHistory(rid)
+        : await fetchMergedCustomerSupportHistory(rid);
       const normalized = hist.items.map((m) => ({
         ...m,
         id: m.id ?? m._id,
