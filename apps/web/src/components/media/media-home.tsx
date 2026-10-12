@@ -30,7 +30,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
           >
             {slide.posterUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className={styles.slideImage} src={slide.posterUrl} alt="" />
+              <img className={styles.slideImage} src={slide.posterUrl} alt="" referrerPolicy="no-referrer" />
             ) : null}
           </div>
         ))}
@@ -94,7 +94,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
             <div className={styles.dialogPoster}>
               {info.posterUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={info.posterUrl} alt="" />
+                <img src={info.posterUrl} alt="" referrerPolicy="no-referrer" />
               ) : null}
             </div>
             <div className={styles.dialogBody}>
@@ -148,7 +148,7 @@ function MediaRowView({
               <span className={styles.poster}>
                 {item.posterUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.posterUrl} alt="" />
+                  <img src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
                 ) : (
                   <span className={styles.fallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
                 )}

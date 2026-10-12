@@ -76,6 +76,7 @@ export class TmdbMetadataService {
   private async savePoster(posterPath: string): Promise<string | null> {
     const safe = posterPath.trim();
     if (!safe.startsWith('/') || safe.includes('..') || safe.includes('\\')) return null;
+    const remoteUrl = `${TMDB_IMAGE}${safe}`;
     const filename = `${createHash('sha1').update(safe).digest('hex').slice(0, 20)}.webp`;
     const dir = join(resolveUploadsRoot(), 'posters');
     const output = join(dir, filename);
@@ -89,10 +90,10 @@ export class TmdbMetadataService {
       });
       if (!response.ok) {
         this.logger.warn(`TMDB poster responded ${response.status}`);
-        return null;
+        return remoteUrl;
       }
       const bytes = Buffer.from(await response.arrayBuffer());
-      if (bytes.length < 32 || bytes.length > 8_000_000) return null;
+      if (bytes.length < 32 || bytes.length > 8_000_000) return remoteUrl;
       await sharp(bytes)
         .rotate()
         .resize(POSTER_WIDTH, POSTER_HEIGHT, {
@@ -105,7 +106,7 @@ export class TmdbMetadataService {
       return publicUrl;
     } catch (error) {
       this.logger.warn(`Could not save poster: ${error instanceof Error ? error.message : 'error'}`);
-      return null;
+      return remoteUrl;
     }
   }
 

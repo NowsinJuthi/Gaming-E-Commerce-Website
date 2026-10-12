@@ -188,7 +188,7 @@ export function CatalogCollectionsPage({
                         <span className={styles.posterThumb}>
                           {item.posterUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.posterUrl} alt="" />
+                            <img src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
                           ) : (
                             <span className={styles.posterFallback}>{initial}</span>
                           )}

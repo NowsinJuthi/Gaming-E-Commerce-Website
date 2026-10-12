@@ -69,7 +69,7 @@ export function buildContentSecurityPolicy(nonce?: string): string {
     // Residual: React `style={{}}` attributes (charts, meters, email preview,
     // OG images, animation delays). Removing this directive breaks those UIs.
     "style-src-attr 'unsafe-inline'",
-    `img-src 'self' data: blob: ${apiOrigins.join(" ")}`.trim(),
+    `img-src 'self' data: blob: https://image.tmdb.org ${apiOrigins.join(" ")}`.trim(),
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
     [
