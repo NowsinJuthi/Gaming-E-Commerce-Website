@@ -17,11 +17,13 @@ import {
   useUnreadNotifications,
 } from "@/hooks/useUnreadNotifications";
 import {
+  getMe,
   getOnlineSupportStaff,
   markChatNotificationsRead,
   setTokens,
   startGuestChatSession,
 } from "@/lib/api";
+import { isChatStaffFromRoles } from "@/lib/chat-roles";
 import type { ChatSupportAgent } from "@/lib/api";
 import { FabChatBubbleIcon } from "@/components/chat/FabChatBubbleIcon";
 import { canAccessLiveChat } from "@/lib/chat-access";
@@ -62,7 +64,9 @@ export function LiveChatLauncher({
   const [guestError, setGuestError] = useState<string | null>(null);
   const [refreshingChat, setRefreshingChat] = useState(false);
   const [supportAgents, setSupportAgents] = useState<ChatSupportAgent[]>([]);
-  const [chatPanelGeneration, setChatPanelGeneration] = useState(0);
+  const [overlayRole, setOverlayRole] = useState<
+    ChatLauncherRole | "loading"
+  >("loading");
   const chatRefreshRef = useRef<(() => Promise<void>) | null>(null);
 
   const onChatRefreshReady = useCallback(
@@ -145,10 +149,46 @@ export function LiveChatLauncher({
   }, [open]);
 
   useEffect(() => {
-    if (open) {
-      setChatPanelGeneration((generation) => generation + 1);
+    if (!open) {
+      setOverlayRole("loading");
+      return;
     }
-  }, [open]);
+    let cancelled = false;
+    (async () => {
+      syncRole();
+      const sessionRole = resolveLauncherRole();
+      if (sessionRole === "staff" || sessionRole === "guest") {
+        if (!cancelled) {
+          setRole(sessionRole);
+          setOverlayRole(sessionRole);
+        }
+        return;
+      }
+      if (!hasAuthSession()) {
+        if (!cancelled) {
+          setRole("guest");
+          setOverlayRole("guest");
+        }
+        return;
+      }
+      try {
+        const me = await getMe();
+        if (cancelled) return;
+        const staff = isChatStaffFromRoles(me.roles ?? []);
+        const nextRole: ChatLauncherRole = staff ? "staff" : "customer";
+        setRole(nextRole);
+        setOverlayRole(nextRole);
+      } catch {
+        if (!cancelled) {
+          setRole(sessionRole);
+          setOverlayRole(sessionRole);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, syncRole]);
 
   useChatOverlayLock(open);
 
@@ -163,7 +203,8 @@ export function LiveChatLauncher({
 
   if (hidden) return null;
 
-  const isStaff = role === "staff";
+  const panelRole = open ? overlayRole : role;
+  const isStaff = panelRole === "staff";
   const dashboardHref = isStaff ? "/admin/chat" : "/chat";
   const messengerTitle = isStaff ? "Chats" : "Live Support";
   const messengerSubtitle = isStaff ? "" : "Chat with our team in real time";
@@ -218,7 +259,7 @@ export function LiveChatLauncher({
                   </div>
                 </div>
                 <div className="admin-chat-messenger-actions">
-                  {role !== "guest" ? (
+                  {panelRole !== "guest" && panelRole !== "loading" ? (
                     <Link
                       href={dashboardHref}
                       className="admin-chat-messenger-link"
@@ -232,7 +273,7 @@ export function LiveChatLauncher({
                       onClick={() => void chatRefreshRef.current?.()}
                       busy={refreshingChat}
                       className={`admin-chat-messenger-refresh${
-                        role === "staff" ? " admin-chat-refresh-btn--staff" : ""
+                        panelRole === "staff" ? " admin-chat-refresh-btn--staff" : ""
                       }`}
                     />
                   ) : null}
@@ -247,7 +288,11 @@ export function LiveChatLauncher({
                 </div>
               </header>
               <div className="admin-chat-messenger-body">
-                {!chatAllowed && role !== "staff" ? (
+                {panelRole === "loading" ? (
+                  <div className="flex flex-1 items-center justify-center p-8 text-sm text-subtle">
+                    Loading chat…
+                  </div>
+                ) : !chatAllowed && panelRole !== "staff" ? (
                   <div className="live-chat-guest-prompt">
                     <div className="live-chat-guest-prompt-glow" aria-hidden />
                     <div className="live-chat-guest-prompt-inner">
@@ -261,7 +306,7 @@ export function LiveChatLauncher({
                         </span>
                       </div>
 
-                      {allowGuestChat && role === "guest" ? (
+                      {allowGuestChat && panelRole === "guest" ? (
                         /* ── Guest chat form ── */
                         <>
                           <div className="live-chat-guest-prompt-copy">
@@ -366,7 +411,6 @@ export function LiveChatLauncher({
                   />
                 ) : (
                   <ChatPanel
-                    key={chatPanelGeneration}
                     embedded
                     messenger
                     onMessengerMobileViewChange={(view) =>

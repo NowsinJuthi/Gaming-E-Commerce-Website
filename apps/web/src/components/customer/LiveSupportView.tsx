@@ -1,13 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { notifyUnreadCountChanged } from "@/hooks/useUnreadNotifications";
-import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
-import type { ChatRoomStatus } from "@/lib/api";
-import { markChatNotificationsRead } from "@/lib/api";
+import { getMe, markChatNotificationsRead, type ChatRoomStatus } from "@/lib/api";
 import { isChatStaffFromRoles } from "@/lib/chat-roles";
 
 export type LiveSupportStatus = {
@@ -22,10 +18,7 @@ type Props = {
 };
 
 export function LiveSupportView({ onStatusChange }: Props) {
-  const router = useRouter();
-  const [view, setView] = useState<"checking" | "customer" | "staff">(
-    "checking",
-  );
+  const [staffView, setStaffView] = useState<boolean | null>(null);
 
   useEffect(() => {
     markChatNotificationsRead("customer")
@@ -34,39 +27,36 @@ export function LiveSupportView({ onStatusChange }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!hasAuthSession()) {
-      setView("customer");
-      return;
-    }
-    if (isChatStaffFromRoles(getSessionRoles())) {
-      setView("staff");
-      router.replace("/admin/chat");
-      return;
-    }
-    setView("customer");
-  }, [router]);
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (!cancelled) {
+          setStaffView(isChatStaffFromRoles(me.roles ?? []));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStaffView(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  if (view === "checking" || view === "staff") {
+  if (staffView === null) {
     return (
       <div className="admin-chat-wrap admin-product-form-section min-w-0 p-8 text-center text-sm text-subtle">
-        {view === "staff" ? (
-          <p>
-            Redirecting to{" "}
-            <Link href="/admin/chat" className="text-brand underline">
-              Admin Live Chat
-            </Link>
-            …
-          </p>
-        ) : (
-          <p>Loading live chat…</p>
-        )}
+        Loading live chat…
       </div>
     );
   }
 
   return (
     <div className="admin-chat-wrap admin-product-form-section min-w-0">
-      <ChatPanel embedded onStatusChange={onStatusChange} />
+      {staffView ? (
+        <ChatPanel isAdmin pro embedded fullHeight onStatusChange={onStatusChange} />
+      ) : (
+        <ChatPanel embedded onStatusChange={onStatusChange} />
+      )}
     </div>
   );
 }

@@ -70,11 +70,7 @@ import {
   parseQuickReplyTrigger,
 } from "@/lib/chat-quick-reply-autocomplete";
 import { resolveMediaSrc } from "@/lib/site-appearance";
-import {
-  isChatStaffFromRoles,
-  isChatStaffRole,
-  primaryChatRole,
-} from "@/lib/chat-roles";
+import { isChatStaffRole, primaryChatRole } from "@/lib/chat-roles";
 import type { Socket } from "socket.io-client";
 
 type Props = {
@@ -1233,13 +1229,6 @@ export function ChatPanel({
         // Determine the primary role for use in optimistic message inserts
         meRoleRef.current = primaryChatRole(me.roles);
         setMeId(me.id);
-
-        if (!isAdmin && isChatStaffFromRoles(me.roles)) {
-          if (typeof window !== "undefined") {
-            window.location.assign("/admin/chat");
-          }
-          return;
-        }
 
         const [on, list] = await Promise.all([
           isAdmin ? getOnlineUsers() : Promise.resolve([] as string[]),
