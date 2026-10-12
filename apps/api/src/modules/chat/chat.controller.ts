@@ -24,7 +24,8 @@ import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { ChatHistoryQueryDto } from './dto/chat-history-query.dto';
+import { ChatRoomsQueryDto } from './dto/chat-rooms-query.dto';
 import { Role } from '../../common/enums';
 import { CHAT_STAFF_ROLES } from '../../common/utils/role.utils';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -61,14 +62,6 @@ class GuestChatSessionDto {
   @MinLength(1)
   @MaxLength(60)
   name?: string;
-}
-
-class ListChatRoomsDto extends PaginationDto {
-  /** Staff-only inbox search: customer name, email or phone number. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  q?: string;
 }
 
 @Controller('chat')
@@ -137,7 +130,7 @@ export class ChatController {
   @Get('rooms')
   async rooms(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() query: ListChatRoomsDto,
+    @Query() query: ChatRoomsQueryDto,
   ) {
     const allowGuestChat = await this.isGuestChatAllowed();
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
@@ -158,7 +151,7 @@ export class ChatController {
   async history(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query() pagination: PaginationDto,
+    @Query() pagination: ChatHistoryQueryDto,
   ) {
     const allowGuestChat = await this.isGuestChatAllowed();
     this.chat.assertRegisteredChatUser(user, allowGuestChat);

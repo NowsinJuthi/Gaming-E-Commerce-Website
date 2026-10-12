@@ -549,7 +549,7 @@ export function ChatPanel({
   roomSearchRef.current = roomSearch;
 
   const loadRooms = useCallback(async () => {
-    const list = await listChatRooms(1, 100, roomSearchRef.current);
+    const list = await listChatRooms(1, 200, roomSearchRef.current);
     setRooms(list);
     return list;
   }, []);
@@ -706,13 +706,14 @@ export function ChatPanel({
     async (room: ChatRoom) => {
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
+      const hasCachedHistory = cached !== undefined;
       if (roomJoinRetryTimerRef.current) {
         clearTimeout(roomJoinRetryTimerRef.current);
         roomJoinRetryTimerRef.current = null;
       }
       roomJoinRetryRef.current = { roomId: id, attempts: 0 };
 
-      if (activeIdRef.current === id && cached) {
+      if (activeIdRef.current === id && hasCachedHistory) {
         setActive(room);
         setTyping(null);
         setHistoryLoading(false);
@@ -729,9 +730,9 @@ export function ChatPanel({
       setTyping(null);
       joinActiveSocketRoom(id);
 
-      if (cached) {
+      if (hasCachedHistory) {
         setHistoryLoading(false);
-        setMessages(cached);
+        setMessages(cached ?? []);
         await markRoomRead(id);
         scheduleScrollBottom();
         return;
@@ -739,6 +740,7 @@ export function ChatPanel({
 
       setMessages([]);
       setHistoryLoading(true);
+      historyCacheRef.current.delete(id);
 
       try {
         const hist = await fetchFullChatHistory(id);
