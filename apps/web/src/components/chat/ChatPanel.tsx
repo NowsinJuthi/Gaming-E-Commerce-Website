@@ -470,13 +470,16 @@ export function ChatPanel({
   const textMuted =
     useFlatPro || use3d ? "text-foreground-muted" : "text-subtle";
   const inputCls = "admin-chat-composer min-w-0 flex-1 w-full";
+  const roomClosed = active?.status === "closed";
   const composerLocked =
-    !activeIdRef.current || imageUploading || active?.status === "closed";
+    !activeIdRef.current ||
+    imageUploading ||
+    (!isAdmin && roomClosed);
   const sendLocked =
     !text.trim() ||
     !activeIdRef.current ||
     imageUploading ||
-    active?.status === "closed";
+    (!isAdmin && roomClosed);
   const sendCls = `admin-chat-send-btn shrink-0 disabled:opacity-50${
     use3d ? " chat-3d-send" : ""
   }`;
@@ -705,8 +708,31 @@ export function ChatPanel({
 
   joinActiveSocketRoomRef.current = joinActiveSocketRoom;
 
+  const reopenRoomForStaff = useCallback(async (room: ChatRoom) => {
+    if (!isAdminRef.current || room.status !== "closed") {
+      return room;
+    }
+    try {
+      const updated = await updateChatRoomStatus(roomId(room), "open");
+      setRooms((current) =>
+        current.map((entry) =>
+          roomId(entry) === roomId(updated) ? updated : entry,
+        ),
+      );
+      if (overviewRef.current) {
+        applyOverviewRef.current(
+          patchOverviewStatus(overviewRef.current, "closed", "open"),
+        );
+      }
+      return updated;
+    } catch {
+      return room;
+    }
+  }, []);
+
   const selectRoom = useCallback(
     async (room: ChatRoom) => {
+      room = await reopenRoomForStaff(room);
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
       const fullyLoaded = historyFullyLoadedRef.current.has(id);
@@ -789,7 +815,7 @@ export function ChatPanel({
         }
       }
     },
-    [joinActiveSocketRoom, markRoomRead, scheduleScrollBottom],
+    [joinActiveSocketRoom, markRoomRead, reopenRoomForStaff, scheduleScrollBottom],
   );
 
   const selectRoomRef = useRef(selectRoom);
@@ -1394,6 +1420,11 @@ export function ChatPanel({
     const body = payload.body?.trim() ?? "";
     const imageUrl = payload.imageUrl?.trim() ?? "";
     if (!body && !imageUrl) return false;
+
+    if (isAdmin && active?.status === "closed") {
+      const updated = await reopenRoomForStaff(active);
+      setActive(updated);
+    }
 
     const applySentMessage = (message?: ChatMessage, id?: string) => {
       const preview = chatMessagePreview(body, imageUrl);
@@ -2344,7 +2375,11 @@ export function ChatPanel({
                 onInput={resizeMessageInput}
                 onKeyDown={onComposerKeyDown}
                 onKeyUp={onComposerKeyUp}
-                placeholder="Type a message…"
+                placeholder={
+                  isAdmin && roomClosed
+                    ? "Chat closed — type to reopen and reply…"
+                    : "Type a message…"
+                }
                 title={isAdmin ? "Type / for saved replies" : undefined}
                 disabled={composerLocked}
                 className={inputCls}
