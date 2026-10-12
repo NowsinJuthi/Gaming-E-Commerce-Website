@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>Gaming-E-Commerce-Website</strong><br/>
+  <strong>UniQbd</strong><br/>
   Bangladesh-focused digital goods marketplace — game top-ups, gift cards, vouchers &amp; instant delivery
 </p>
 
@@ -16,7 +16,7 @@
 
 ## Overview
 
-**Gaming-E-Commerce-Website** is a full-stack monorepo for selling digital products in Bangladesh. Customers can browse products, pay via **bKash / Nagad / Rocket / Upay / UddoktaPay**, receive codes instantly, and manage orders from a customer dashboard. Admins get a 40+ route control panel for catalog, payments, KYC, affiliates, resellers, live chat, SEO, and more.
+**UniQbd** is a full-stack monorepo for selling digital products in Bangladesh. Customers can browse products, pay via **bKash / Nagad / Rocket / Upay / UddoktaPay**, receive codes instantly, and manage orders from a customer dashboard. Admins get a 40+ route control panel for catalog, payments, KYC, affiliates, resellers, live chat, SEO, and more.
 
 | | |
 |---|---|
@@ -57,7 +57,8 @@ Next.js 15  (port 3000)  ──REST──▶  NestJS 11 API  (port 4000/api)
 | `packages/ui` | Shared UI scaffold |
 | `packages/config-ts` | Shared TS configs |
 | `packages/config-eslint` | Shared ESLint config |
-| `deploy/deploy/aapanel/` | Production deploy (aaPanel, PM2, Nginx) |
+| `deploy/deploy/ubuntu22.04/` | Native Ubuntu/systemd production deploy |
+| `deploy/deploy/aapanel/` | aaPanel domain, SSL, and Nginx proxy config |
 | `uploads/` | Product images, logos, chat attachments |
 | `scripts/` | Seed & diagnostic scripts |
 
@@ -79,8 +80,8 @@ Next.js 15  (port 3000)  ──REST──▶  NestJS 11 API  (port 4000/api)
 ### 1. Clone & install
 
 ```bash
-git clone <your-repo-url> gaming-e-commerce-website
-cd gaming-e-commerce-website
+git clone <your-repo-url> uniqbd
+cd uniqbd
 corepack enable
 corepack prepare pnpm@9.12.0 --activate
 pnpm install
@@ -105,14 +106,13 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 INTERNAL_API_URL=http://127.0.0.1:4000/api
 ```
 
-**API essentials:** `MONGODB_URI`, `UPLOADS_DIR` (absolute path, e.g. `D:/gaming-e-commerce-website/uploads`), JWT secrets.
+**API essentials:** `MONGODB_URI`, `UPLOADS_DIR` (absolute path, e.g.
+`D:/uniqbd.com/uploads` in local development), and JWT secrets.
 
 ### 3. Redis (optional in dev)
 
-```bash
-pnpm redis:up    # Docker Compose
-pnpm redis:down
-```
+Run a local Redis service on `127.0.0.1:6379`. Development can use the
+application's in-memory fallbacks; production requires native Redis.
 
 ### 4. Database & seed
 
@@ -151,200 +151,37 @@ pnpm seed
 
 ---
 
-## Production hosting (aaPanel / VPS)
+## Production hosting
 
-Detailed deploy docs: [`deploy/deploy/aapanel/README.md`](deploy/deploy/aapanel/README.md)
+Production uses native Ubuntu 22.04 services. The application runs directly
+under systemd; aaPanel is used only for domains, SSL, and Nginx reverse proxying.
 
-### Recommended setup
+- source/builds: `/opt/uniqbd/current`
+- uploads: `/var/lib/uniqbd/uploads`
+- API env: `/etc/uniqbd/api.env`
+- web env: `/etc/uniqbd/web.env`
+- process manager: systemd (`uniqbd-api`, `uniqbd-web`)
+- database: MongoDB Atlas
+- queue/cache/realtime: native Redis on `127.0.0.1:6379`
+- edge: aaPanel manages domains, SSL, HTTPS redirects, and Nginx only
 
-| Service | Domain | Internal port | PM2 name |
-|---------|--------|---------------|----------|
-| Next.js (website) | `https://yourdomain.com` | `3000` | `gaming-web` |
-| NestJS (API) | `https://api.yourdomain.com` | `4000` | `gaming-api` |
+Application source and secrets must never be placed in aaPanel public webroots.
 
-**Install path:** `/www/wwwroot/gaming-e-commerce-website`
+Full guides:
 
-### Step-by-step
+- [Native Ubuntu installation and deployment](deploy/deploy/ubuntu22.04/README.md)
+- [aaPanel domain, SSL, and Nginx setup](deploy/deploy/aapanel/README.md)
 
-#### 1. DNS
-
-| Type | Name | Value |
-|------|------|-------|
-| A | `@` | VPS IP |
-| A | `www` | VPS IP |
-| A | `api` | VPS IP |
-
-Cloudflare: SSL mode **Full (strict)**.
-
-#### 2. Server dependencies (aaPanel)
-
-- Nginx
-- Node.js 20+
-- PM2: `npm i -g pm2`
-- MongoDB 7 (local or MongoDB Atlas)
-- Redis 7
-- pnpm: `corepack enable && corepack prepare pnpm@9.12.0 --activate`
-
-#### 3. Upload code
-
-Upload **only source** — never `node_modules`, `.next`, `dist`, `.turbo`, or `.env`.
+Deploy or update:
 
 ```bash
-cd /www/wwwroot/gaming-e-commerce-website
-bash deploy/deploy/aapanel/post-upload.sh
+sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh
+sudo VERIFY_PUBLIC=1 /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh
 ```
 
-Or manually:
-
-```bash
-corepack pnpm install --frozen-lockfile
-```
-
-#### 4. Environment files
-
-```bash
-cp deploy/deploy/aapanel/.env.production.example .env
-nano .env
-
-cp deploy/deploy/aapanel/web.env.production.example apps/web/.env.production.local
-nano apps/web/.env.production.local
-
-mkdir -p uploads/{avatars,logos,products,banners,mfs-qr,live-chat}
-chown -R www:www uploads
-```
-
-**Root `.env` highlights:**
-
-| Variable | Example |
-|----------|---------|
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017/gaming_ecommerce` or Atlas URI |
-| `REDIS_HOST` | `127.0.0.1` |
-| `UPLOADS_DIR` | `/www/wwwroot/gaming-e-commerce-website/uploads` |
-| `JWT_ACCESS_SECRET` | random 48+ chars |
-| `JWT_REFRESH_SECRET` | random 48+ chars |
-| `DATA_ENCRYPTION_KEY` | 32-byte base64 |
-| `API_PUBLIC_URL` | `https://api.yourdomain.com/api` |
-| `APP_PUBLIC_URL` | `https://yourdomain.com` |
-
-**`apps/web/.env.production.local`:**
-
-```env
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
-NEXT_PUBLIC_WS_URL=https://api.yourdomain.com
-NEXT_PUBLIC_SITE_URL=https://yourdomain.com
-INTERNAL_API_URL=http://127.0.0.1:4000/api
-```
-
-Generate secrets:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
-#### 5. License vendor config (one-time per deploy bundle)
-
-Site secret ships with the app — **not** in MongoDB or admin UI.
-
-```bash
-cp apps/api/src/modules/license/license.vendor-config.example.ts \
-   apps/api/src/modules/license/license.vendor-config.ts
-# Edit siteSecret (+ websiteId if provided by Amarpin)
-```
-
-After deploy, admins activate at **Admin → Settings → License key** with the license key only.
-
-#### 6. Build & PM2
-
-```bash
-corepack pnpm build
-
-pm2 delete all 2>/dev/null || true
-pm2 start deploy/deploy/aapanel/ecosystem.config.cjs
-pm2 save
-pm2 startup
-pm2 status
-```
-
-Verify:
-
-```bash
-curl -I http://127.0.0.1:3000
-curl -s http://127.0.0.1:4000/api/health
-curl -s https://yourdomain.com/api/deploy-info
-```
-
-#### 7. Nginx (aaPanel)
-
-**yourdomain.com**
-
-1. Website → Add site → `yourdomain.com` + `www.yourdomain.com`
-2. SSL → Let's Encrypt
-3. Config → paste `deploy/deploy/aapanel/nginx/uniqbd.com.aapanel-full.conf` (adapt domain)
-
-**api.yourdomain.com**
-
-1. Website → Add site → `api.yourdomain.com`
-2. SSL → Let's Encrypt
-3. Config → paste `deploy/deploy/aapanel/nginx/api.uniqbd.com.aapanel-full.conf` (adapt domain)
-
-Health checks:
-
-- `https://api.yourdomain.com/api/health`
-- `https://api.yourdomain.com/api/health/ready`
-
-#### 8. First admin user
-
-```bash
-corepack pnpm seed:users
-```
-
-Then open **Admin → Settings → License key** and activate your Amarpin license.
-
-### Redeploy after updates
-
-**Always use the redeploy script** — not `pm2 restart` alone:
-
-```bash
-cd /www/wwwroot/gaming-e-commerce-website
-bash deploy/deploy/aapanel/redeploy.sh
-```
-
-Confirm live build:
-
-```bash
-curl -s https://yourdomain.com/api/deploy-info
-# buildId must match: cat apps/web/.next/BUILD_ID
-```
-
----
-
-## Hosting quick reference
-
-### What you need
-
-- VPS with aaPanel · Node 20+ · MongoDB · Redis · PM2 · Nginx
-- Domains: `yourdomain.com` (web) + `api.yourdomain.com` (API)
-
-### Quick steps
-
-1. Upload code to `/www/wwwroot/gaming-e-commerce-website` (exclude `node_modules`)
-2. Set `.env` and `apps/web/.env.production.local`
-3. Add site secret in `license.vendor-config.ts` (one-time per deploy bundle)
-4. Run `bash deploy/deploy/aapanel/redeploy.sh`
-5. Paste Nginx config in aaPanel + enable SSL
-6. Run `pnpm seed:users` → admin login → activate with **License key**
-
-### After domain, hosting, or MongoDB changes
-
-Deploy the app on the new server (with vendor-config), then activate in the admin panel using **only the license key** — no need to re-enter the site secret.
-
-### Two types of changes
-
-| Type | Action |
-|------|--------|
-| Admin panel (logo, products, settings) | Save + **Publish** + hard refresh |
-| Code updates (new features, CSS) | Upload code + run `redeploy.sh` |
+The systemd services are enabled at installation and automatically start after
+a future reboot. They restart on process failure. Deployment does not reboot
+the server.
 
 ---
 
@@ -435,10 +272,10 @@ Configure under **Admin → Settings → Payments** (requires license feature `p
 |-------|-----|
 | Admin login "Access denied" | `pnpm seed:users` or `node apps/api/scripts/promote-admin.cjs you@email.com` |
 | Chat / WebSocket broken | Nginx `/socket.io/` on main domain — see `deploy/deploy/aapanel/nginx/` |
-| Uploads 404 | Set `UPLOADS_DIR`; copy `uploads/` folder; nginx `/api/uploads/` → port 4000 |
-| Old site after upload | Run `bash deploy/deploy/aapanel/redeploy.sh`, not just `pm2 restart` |
-| `$'\r': command not found` | Windows CRLF — `bash deploy/deploy/aapanel/fix-shell-crlf.sh` |
-| Live diagnostics | `bash deploy/deploy/aapanel/verify-live.sh` |
+| Uploads 404 | Confirm `UPLOADS_DIR=/var/lib/uniqbd/uploads`, ownership `uniqbd:uniqbd`, and Nginx `/api/uploads/` proxy |
+| Service failed | `journalctl -u uniqbd-api -u uniqbd-web -n 100 --no-pager` |
+| Old site after upload | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/deploy.sh` |
+| Live diagnostics | Run `/opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh` |
 
 Full troubleshooting table: [`deploy/deploy/aapanel/README.md`](deploy/deploy/aapanel/README.md)
 
@@ -455,27 +292,30 @@ pnpm db:setup         # MongoDB indexes
 pnpm db:setup:full    # Indexes + sample catalog
 pnpm seed             # Seed catalog data
 pnpm seed:users       # Default admin + test users
-pnpm redis:up         # Start Redis (Docker)
 ```
 
 ---
 
-## Production file map
+## Production deployment map
 
 ```
-deploy/deploy/aapanel/
-├── .env.production.example       → copy to repo root .env
-├── web.env.production.example    → apps/web/.env.production.local
-├── ecosystem.config.cjs          → PM2 (gaming-api + gaming-web)
-├── redeploy.sh                   → full clean build + verify (use after every upload)
-├── verify-live.sh                → read-only diagnostics
-├── post-upload.sh                → install + redeploy
-├── setup.sh                      → env templates + upload dirs
-└── nginx/                        → aaPanel nginx configs
+deploy/deploy/
+├── ubuntu22.04/
+│   ├── install-prerequisites.sh  → Node, pnpm, Redis, user/directories
+│   ├── migrate-from-aapanel.sh   → one-time filesystem migration
+│   ├── deploy.sh                 → frozen install, build, systemd, health
+│   ├── rebuild-api.sh            → API-only build and systemd restart
+│   ├── rebuild-web.sh            → web-only build and systemd restart
+│   ├── verify.sh                 → service, bind, webroot and health checks
+│   ├── api.env.example
+│   ├── web.env.example
+│   └── systemd/                  → native API and web units
+└── aapanel/
+    └── nginx/                    → aaPanel SSL/reverse-proxy configs
 ```
 
 ---
 
 <p align="center">
-  <sub>Gaming-E-Commerce-Website · Digital goods marketplace for Bangladesh · BDT · Built with Next.js &amp; NestJS</sub>
+  <sub>UniQbd · Digital goods marketplace for Bangladesh · BDT · Built with Next.js &amp; NestJS</sub>
 </p>

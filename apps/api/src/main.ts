@@ -123,7 +123,10 @@ async function bootstrap(): Promise<void> {
   }
 
   const port = config.get<number>('app.port') ?? 4000;
-  await app.listen(port, '0.0.0.0');
+  const host =
+    config.get<string>('app.host') ??
+    (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0');
+  await app.listen(port, host);
 }
 
 void bootstrap();

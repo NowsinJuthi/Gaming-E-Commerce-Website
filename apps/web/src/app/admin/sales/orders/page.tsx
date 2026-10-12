@@ -32,7 +32,14 @@ import {
   resolveOrderCustomerLabel,
 } from "@/lib/admin-order-view";
 
-type OrderView = "all" | "paid" | "completed" | "cancelled" | "refunded" | "trash";
+type OrderView =
+  | "all"
+  | "pending"
+  | "paid"
+  | "completed"
+  | "cancelled"
+  | "refunded"
+  | "trash";
 
 type DateRange = "all" | "today" | "7d" | "30d" | "month";
 
@@ -43,6 +50,7 @@ type SortKey = "order" | "date" | "total";
 type SortDir = "asc" | "desc";
 
 const VIEW_STATUS: Record<Exclude<OrderView, "all">, OrderStatusValue> = {
+  pending: "pending",
   paid: "paid",
   completed: "delivered",
   cancelled: "cancelled",
@@ -180,8 +188,9 @@ export default function AdminOrdersPage() {
   // Map of orderId → lock info for orders currently being edited by someone
   const [lockedOrders, setLockedOrders] = useState<Record<string, OrderLockInfo>>({});
   const [view, setView] = useState<OrderView>("all");
-  const [counts, setCounts] = useState<Record<OrderView, number> & { paid: number }>({
+  const [counts, setCounts] = useState<Record<OrderView, number>>({
     all: 0,
+    pending: 0,
     paid: 0,
     completed: 0,
     cancelled: 0,
@@ -226,15 +235,17 @@ export default function AdminOrdersPage() {
   const loadCounts = useCallback(() => {
     Promise.all([
       adminListOrders({ limit: 1 }),
+      adminListOrders({ status: "pending", limit: 1 }),
       adminListOrders({ status: "paid", limit: 1 }),
       adminListOrders({ status: "delivered", limit: 1 }),
       adminListOrders({ status: "cancelled", limit: 1 }),
       adminListOrders({ status: "refunded", limit: 1 }),
       adminListOrders({ status: "failed", limit: 1 }),
     ])
-      .then(([all, paid, completed, cancelled, refunded, trash]) => {
+      .then(([all, pending, paid, completed, cancelled, refunded, trash]) => {
         setCounts({
           all: all.total,
+          pending: pending.total,
           paid: paid.total,
           completed: completed.total,
           cancelled: cancelled.total,
@@ -578,6 +589,11 @@ export default function AdminOrdersPage() {
     >
       {[
         { label: "All", value: counts.all, view: "all" as OrderView },
+        {
+          label: "Pending",
+          value: counts.pending,
+          view: "pending" as OrderView,
+        },
         { label: "Paid", value: counts.paid, view: "paid" as OrderView },
         {
           label: "Completed",

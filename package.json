@@ -12,8 +12,6 @@
     "dev": "corepack pnpm -r --parallel --filter @uniqbd/web --filter @uniqbd/api dev",
     "dev:web": "corepack pnpm --filter @uniqbd/web dev",
     "dev:api": "corepack pnpm --filter @uniqbd/api dev",
-    "redis:up": "docker compose -f docker-compose.redis.yml up -d",
-    "redis:down": "docker compose -f docker-compose.redis.yml down",
     "dev:turbo": "turbo run dev",
     "seed": "corepack pnpm --filter @uniqbd/api seed",
     "seed:users": "corepack pnpm --filter @uniqbd/api seed:users",

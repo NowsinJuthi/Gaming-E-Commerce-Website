@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Quick MongoDB connection test on VPS.
-# Usage: cd /www/wwwroot/uniqbd.com && bash deploy/deploy/aapanel/test-db.sh
+# Usage: cd /opt/uniqbd/current && bash deploy/deploy/ubuntu22.04/tools/test-db.sh
 set -eu
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 cd "$ROOT"
 
-if [ ! -f .env ]; then
-  echo "ERROR: .env missing at $ROOT/.env"
+if [ ! -f /etc/uniqbd/api.env ]; then
+  echo "ERROR: /etc/uniqbd/api.env is missing"
   exit 1
 fi
 
@@ -16,13 +16,13 @@ curl -4 -s ifconfig.me || curl -4 -s icanhazip.com || echo "(could not detect)"
 echo ""
 
 echo "==> MONGODB_URI set?"
-if grep -q '^MONGODB_URI=.' .env; then
+if grep -q '^MONGODB_URI=.' /etc/uniqbd/api.env; then
   echo "YES (value hidden)"
 else
-  echo "NO — add MONGODB_URI to .env"
+  echo "NO — add MONGODB_URI to /etc/uniqbd/api.env"
   exit 1
 fi
 
 echo "==> Testing MongoDB connection..."
 cd apps/api
-node "$ROOT/deploy/deploy/aapanel/test-db.cjs"
+node "$ROOT/deploy/deploy/ubuntu22.04/tools/test-db.cjs"

@@ -1,12 +1,12 @@
 /**
- * Replace leftover pre-uniqbd brand/domain strings across all MongoDB collections.
+ * Replace old VPS IP / localhost upload URLs in MongoDB with same-origin paths.
  *
  * Usage (on server):
- *   cd /www/wwwroot/uniqbd.com
- *   node deploy/deploy/aapanel/migrate-legacy-brand.cjs
+ *   cd /opt/uniqbd/current
+ *   node deploy/deploy/ubuntu22.04/tools/fix-upload-urls.cjs
  */
 const path = require('path');
-require(path.join(__dirname, '../../../apps/api/scripts/load-env.cjs')).loadApiEnv();
+require(path.join(__dirname, '../../../../apps/api/scripts/load-env.cjs')).loadApiEnv();
 const mongoose = require('mongoose');
 
 const URI = process.env.MONGODB_URI;
@@ -16,36 +16,29 @@ if (!URI) {
   process.exit(1);
 }
 
-const LEGACY_LABEL = String.fromCharCode(97, 109, 97, 114, 112, 105, 110);
-const UNIQBD_DOMAIN = 'uniqbd.com';
+const BAD_ORIGINS = [
+  /^https?:\/\/103\.114\.38\.220(?::\d+)?/i,
+  /^https?:\/\/127\.0\.0\.1(?::\d+)?/i,
+  /^https?:\/\/localhost(?::\d+)?/i,
+];
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function fixUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return value;
 
-function legacyLabelRegex() {
-  return new RegExp(LEGACY_LABEL, 'gi');
-}
+  const trimmed = value.trim().replace(/\/api\/api\//i, '/api/');
 
-function legacyWwwDomainRegex() {
-  return new RegExp(`www\\.${escapeRegExp(LEGACY_LABEL)}\\.com`, 'gi');
-}
+  if (trimmed.startsWith('/api/uploads/')) {
+    return trimmed;
+  }
 
-function legacyDomainRegex() {
-  return new RegExp(`${escapeRegExp(LEGACY_LABEL)}\\.com`, 'gi');
-}
-
-function toUniQbdBrand(match) {
-  if (match.toUpperCase() === match) return 'UNIQBD';
-  if (match[0] === match[0].toUpperCase()) return 'UniQbd';
-  return 'uniqbd';
-}
-
-function replaceLegacyBrandInText(value) {
-  let out = value.replace(legacyWwwDomainRegex(), UNIQBD_DOMAIN);
-  out = out.replace(legacyDomainRegex(), UNIQBD_DOMAIN);
-  out = out.replace(legacyLabelRegex(), toUniQbdBrand);
-  return out;
+  try {
+    const parsed = new URL(trimmed);
+    if (!parsed.pathname.startsWith('/api/uploads/')) return value;
+    if (!BAD_ORIGINS.some((re) => re.test(parsed.origin))) return value;
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return value;
+  }
 }
 
 function walkAndFix(node) {
@@ -54,7 +47,7 @@ function walkAndFix(node) {
   if (Array.isArray(node)) {
     for (let i = 0; i < node.length; i += 1) {
       if (typeof node[i] === 'string') {
-        const next = replaceLegacyBrandInText(node[i]);
+        const next = fixUrl(node[i]);
         if (next !== node[i]) {
           node[i] = next;
           changes += 1;
@@ -71,7 +64,7 @@ function walkAndFix(node) {
   for (const key of Object.keys(node)) {
     const val = node[key];
     if (typeof val === 'string') {
-      const next = replaceLegacyBrandInText(val);
+      const next = fixUrl(val);
       if (next !== val) {
         node[key] = next;
         changes += 1;
@@ -85,7 +78,7 @@ function walkAndFix(node) {
 }
 
 (async () => {
-  console.log('Migrating legacy brand/domain strings to UniQbd / uniqbd.com');
+  console.log('Normalizing upload URLs to same-origin /api/uploads/ paths');
   const conn = await mongoose.createConnection(URI).asPromise();
   const db = conn.db;
 
@@ -101,6 +94,7 @@ function walkAndFix(node) {
       const clone = JSON.parse(JSON.stringify(doc));
       const changes = walkAndFix(clone);
       if (changes > 0) {
+        clone._id = doc._id;
         await col.replaceOne({ _id: doc._id }, clone);
         totalDocs += 1;
         totalFields += changes;
@@ -109,7 +103,7 @@ function walkAndFix(node) {
     }
   }
 
-  console.log(`\nDone. ${totalDocs} document(s), ${totalFields} field(s) updated.`);
+  console.log(`\nDone. ${totalDocs} document(s), ${totalFields} URL field(s) fixed.`);
   await conn.close();
 })().catch((error) => {
   console.error('FAIL:', error?.message ?? error);

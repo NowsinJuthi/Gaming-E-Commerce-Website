@@ -2,15 +2,15 @@
  * Test MFS SMS sync on the server (simulates Paymently app).
  *
  * Usage:
- *   cd /www/wwwroot/uniqbd.com
- *   ADMIN_EMAIL=admin@uniqbd.com ADMIN_PASS='Admin1234!' node deploy/aapanel/test-sms-sync.cjs
+ *   cd /opt/uniqbd/current
+ *   ADMIN_EMAIL=admin@uniqbd.com ADMIN_PASS='...' node deploy/deploy/ubuntu22.04/tools/test-sms-sync.cjs
  *
  * Optional env:
  *   API_BASE=https://api.uniqbd.com/api
  *   SMS_BODY="You have received payment Tk 780.00 ..."
  */
 const path = require('path');
-require(path.join(__dirname, '../../apps/api/scripts/load-env.cjs')).loadApiEnv();
+require(path.join(__dirname, '../../../../apps/api/scripts/load-env.cjs')).loadApiEnv();
 
 const API_BASE = (process.env.API_BASE || process.env.API_PUBLIC_URL || 'https://api.uniqbd.com/api').replace(
   /\/$/,

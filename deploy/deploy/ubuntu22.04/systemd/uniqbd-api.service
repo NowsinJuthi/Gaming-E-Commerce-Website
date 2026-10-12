@@ -1,0 +1,27 @@
+[Unit]
+Description=UniQbd NestJS API
+Wants=network-online.target
+After=network-online.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=uniqbd
+Group=uniqbd
+WorkingDirectory=/opt/uniqbd/current/apps/api
+EnvironmentFile=/etc/uniqbd/api.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/uniqbd/current/apps/api/dist/main.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/uniqbd/uploads
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

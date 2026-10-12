@@ -219,7 +219,7 @@ export default function AdminSmsLogsPage() {
       const message = err instanceof Error ? err.message : "Bulk delete failed";
       if (message.includes("Cannot POST") || message.includes("404")) {
         setError(
-          "Delete API not deployed on server. Run: bash deploy/deploy/aapanel/rebuild-api.sh",
+          "Delete API not deployed on server. Run: sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/rebuild-api.sh",
         );
       } else {
         setError(message);
@@ -268,7 +268,7 @@ export default function AdminSmsLogsPage() {
       const message = err instanceof Error ? err.message : "Delete failed";
       if (message.includes("Cannot POST") || message.includes("404")) {
         setError(
-          "Delete API not deployed on server. Run: bash deploy/deploy/aapanel/rebuild-api.sh",
+          "Delete API not deployed on server. Run: sudo /opt/uniqbd/current/deploy/deploy/ubuntu22.04/rebuild-api.sh",
         );
       } else {
         setError(message);

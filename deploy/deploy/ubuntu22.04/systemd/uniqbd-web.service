@@ -1,0 +1,26 @@
+[Unit]
+Description=UniQbd Next.js storefront
+Wants=network-online.target
+After=network-online.target uniqbd-api.service
+
+[Service]
+Type=simple
+User=uniqbd
+Group=uniqbd
+WorkingDirectory=/opt/uniqbd/current/apps/web
+EnvironmentFile=/etc/uniqbd/web.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/uniqbd/current/apps/web/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/uniqbd/current/apps/web/.next/cache
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 /**
- * Package a clean upload archive for aaPanel (no node_modules, no .next, no dist).
+ * Package a clean native Ubuntu release (no node_modules, builds, env, or uploads).
  *
  * Usage (from repo root):
  *   node scripts/package-for-upload.mjs
@@ -53,7 +53,7 @@ if (pkg.name !== "uniqbd") {
 
 const items = INCLUDE_TOP.filter((p) => existsSync(join(ROOT, p)));
 
-console.log("Packaging for aaPanel upload");
+console.log("Packaging native Ubuntu release");
 console.log("Include:", items.join(", "));
 console.log("Exclude:", EXCLUDE.join(", "));
 
@@ -62,9 +62,9 @@ if (platform() === "win32") {
   for (const p of items) console.log(`  ${p}`);
   console.log("\nDo NOT include: node_modules, .next, dist, .turbo, .env");
   console.log("\nServer steps:");
-  console.log("  1. Extract into /www/wwwroot/uniqbd.com (not a subfolder)");
-  console.log("  2. bash deploy/deploy/aapanel/redeploy.sh");
-  console.log("  3. curl https://uniqbd.com/api/deploy-info");
+  console.log("  1. Extract into /opt/uniqbd/incoming (never an aaPanel webroot)");
+  console.log("  2. sudo bash deploy/deploy/ubuntu22.04/migrate-from-aapanel.sh /opt/uniqbd/incoming");
+  console.log("  3. sudo VERIFY_PUBLIC=1 /opt/uniqbd/current/deploy/deploy/ubuntu22.04/verify.sh");
   process.exit(0);
 }
 
@@ -75,5 +75,5 @@ execSync(
   { cwd: ROOT, stdio: "inherit", shell: "/bin/bash" },
 );
 console.log(`\nCreated: ${OUT_TAR}`);
-console.log("Extract into /www/wwwroot/uniqbd.com then:");
-console.log("  bash deploy/deploy/aapanel/redeploy.sh");
+console.log("Extract into /opt/uniqbd/incoming then:");
+console.log("  sudo bash deploy/deploy/ubuntu22.04/migrate-from-aapanel.sh /opt/uniqbd/incoming");

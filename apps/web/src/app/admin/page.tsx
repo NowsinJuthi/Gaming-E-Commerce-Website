@@ -1144,11 +1144,11 @@ function WebsiteFullInfoPanel({
                 {queuesRedisOffline ? (
                   <p className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200">
                     Redis is offline. Orders and delivery still work via sync
-                    fallback in dev. Run{" "}
+                    fallback in dev. On production, run{" "}
                     <code className="rounded bg-black/20 px-1 py-0.5 font-mono text-[11px]">
-                      pnpm redis:up
+                      systemctl status redis-server
                     </code>{" "}
-                    to enable background queues.
+                    and restore the native Redis service.
                   </p>
                 ) : null}
                 <table className="panel-3d-table">

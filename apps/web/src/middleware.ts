@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
     const host = request.nextUrl.hostname;
     const isLoopback = host === "127.0.0.1" || host === "localhost";
     const forwardedProto = request.headers.get("x-forwarded-proto");
-    // Public traffic: nginx sets x-forwarded-proto. Skip loopback (PM2 health / redeploy.sh).
+    // Public traffic: nginx sets x-forwarded-proto. Skip native systemd health checks.
     if (!isLoopback && forwardedProto === "http") {
       const httpsUrl = request.nextUrl.clone();
       httpsUrl.protocol = "https:";
@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  // HSTS is owned by nginx on the HTTPS vhost (see deploy/aapanel/nginx/*.conf).
+  // HSTS is owned by aaPanel nginx (see deploy/deploy/aapanel/nginx/*.conf).
   applySecurityHeaders(response, { includeHsts: false });
 
   const path = request.nextUrl.pathname;

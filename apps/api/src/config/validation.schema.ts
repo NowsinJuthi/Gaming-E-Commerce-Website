@@ -4,6 +4,7 @@ export const validationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
     .default('development'),
+  API_HOST: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional(),
   API_PORT: Joi.number().default(4000),
   API_GLOBAL_PREFIX: Joi.string().default('api'),
   API_CORS_ORIGIN: Joi.string().default('http://localhost:3000'),

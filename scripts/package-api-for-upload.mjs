@@ -33,8 +33,8 @@ Compress-Archive -Path "$temp\\api" -DestinationPath api-only.zip -Force
 Remove-Item $temp -Recurse -Force
 `);
   console.log("Created path: api-only.zip");
-  console.log("\nServer (after upload to /www/wwwroot/uniqbd.com):");
-  console.log("  cd /www/wwwroot/uniqbd.com");
+  console.log("\nServer (after upload outside the public webroot):");
+  console.log("  cd /opt/uniqbd/current");
   console.log("  unzip -o api-only.zip -d apps");
   console.log("  ls apps/api/package.json");
   process.exit(0);

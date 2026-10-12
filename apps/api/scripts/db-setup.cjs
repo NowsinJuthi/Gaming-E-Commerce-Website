@@ -11,7 +11,7 @@ const URI = process.env.MONGODB_URI;
 const withCatalog = process.argv.includes('--with-catalog');
 
 if (!URI) {
-  console.error('DB SETUP ERROR: MONGODB_URI is not set (check /www/wwwroot/uniqbd.com/.env)');
+  console.error('DB SETUP ERROR: MONGODB_URI is not set (check /etc/uniqbd/api.env)');
   process.exit(1);
 }
 
@@ -51,9 +51,8 @@ function runScript(name) {
 MongoDB Atlas blocked this server IP. Fix in Atlas dashboard:
   1. https://cloud.mongodb.com → your project → Network Access
   2. Add IP Address → your VPS IP from: curl -4 ifconfig.me
-  3. Or temporarily "Allow access from anywhere" (0.0.0.0/0)
-  4. Database Access → user needs readWrite on database "UniQbdWebData"
-  5. Re-run: corepack pnpm db:setup
+  3. Database Access → user needs readWrite on database "UniQbdWebData"
+  4. Re-run: corepack pnpm db:setup
 `);
   }
   process.exit(1);

@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.resolve(__dirname, '../../..');
+const ROOT = path.resolve(__dirname, '../../../..');
 const buildIdPath = path.join(ROOT, 'apps/web/.next/BUILD_ID');
 const apiMainPath = path.join(ROOT, 'apps/api/dist/main.js');
 

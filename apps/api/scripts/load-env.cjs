@@ -28,8 +28,9 @@ function loadEnvFile(envPath) {
   }
 }
 
-/** Load root .env then apps/api/.env (scripts only; does not override existing). */
+/** Load native production env, then local development envs without overriding. */
 function loadApiEnv() {
+  loadEnvFile('/etc/uniqbd/api.env');
   const rootEnv = path.join(__dirname, '..', '..', '..', '.env');
   const apiEnv = path.join(__dirname, '..', '.env');
   loadEnvFile(rootEnv);

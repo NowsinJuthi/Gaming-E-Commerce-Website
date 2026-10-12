@@ -48,10 +48,10 @@ export const WEBSITE_STACK: {
   },
   infrastructure: {
     title: "Infrastructure & integrations",
-    subtitle: "Monorepo, Docker, payments, suppliers",
+    subtitle: "Monorepo, native services, payments, suppliers",
     items: [
       { label: "Monorepo", value: "pnpm workspaces + Turborepo" },
-      { label: "Containers", value: "Docker Compose (MongoDB, Redis, API)" },
+      { label: "Hosting", value: "Ubuntu + systemd + aaPanel Nginx" },
       { label: "Payments", value: "bKash, Nagad, Rocket, Upay, UddoktaPay" },
       { label: "Suppliers", value: "Reloadly, Xsolla, Turgame, Foxreload" },
       { label: "Security", value: "Helmet, reCAPTCHA, Cloudflare" },
@@ -59,6 +59,6 @@ export const WEBSITE_STACK: {
       { label: "Logging", value: "Pino" },
       { label: "Testing", value: "Jest, Playwright" },
     ],
-    tags: ["Docker", "pnpm", "Turborepo", "TypeScript"],
+    tags: ["systemd", "pnpm", "Turborepo", "TypeScript"],
   },
 };

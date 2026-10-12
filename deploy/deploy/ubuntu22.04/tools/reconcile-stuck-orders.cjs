@@ -2,10 +2,10 @@
  * Mark processing orders as delivered when every line already has codes.
  *
  * Usage:
- *   NODE_PATH=apps/api/node_modules node deploy/deploy/aapanel/reconcile-stuck-orders.cjs
+ *   NODE_PATH=apps/api/node_modules node deploy/deploy/ubuntu22.04/tools/reconcile-stuck-orders.cjs
  */
 const path = require('path');
-require(path.join(__dirname, '../../../apps/api/scripts/load-env.cjs')).loadApiEnv();
+require(path.join(__dirname, '../../../../apps/api/scripts/load-env.cjs')).loadApiEnv();
 const mongoose = require('mongoose');
 
 const URI = process.env.MONGODB_URI;
