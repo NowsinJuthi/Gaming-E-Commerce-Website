@@ -37,7 +37,7 @@ import {
   deleteChatRoom,
   getChatAdminOverview,
   fetchFullChatHistory,
-  fetchFullCustomerSupportHistory,
+  getChatHistory,
   getCustomerPanelConfig,
   getMe,
   getOnlineUsers,
@@ -441,7 +441,7 @@ export function ChatPanel({
   }, [applyOverview]);
 
   const useAdminPro = isAdmin && pro;
-  const useCustomerPro = !isAdmin && (embedded || messenger);
+  const useCustomerPro = !isAdmin && embedded;
   const useChatPro = useAdminPro || useCustomerPro;
   const showAverageResponseHeader = Boolean(
     (useChatPro || messenger) && (isAdmin ? active?.customer : true),
@@ -737,21 +737,28 @@ export function ChatPanel({
 
   const selectRoom = useCallback(
     async (room: ChatRoom) => {
-      room = await reopenRoomForStaff(room);
+      const adminMode = isAdminRef.current;
+      if (adminMode) {
+        room = await reopenRoomForStaff(room);
+      }
       const id = roomId(room);
       const cached = historyCacheRef.current.get(id);
-      const fullyLoaded = historyFullyLoadedRef.current.has(id);
+      const fullyLoaded =
+        adminMode && historyFullyLoadedRef.current.has(id);
+      const cacheHit = adminMode
+        ? fullyLoaded && cached !== undefined
+        : cached !== undefined;
       if (roomJoinRetryTimerRef.current) {
         clearTimeout(roomJoinRetryTimerRef.current);
         roomJoinRetryTimerRef.current = null;
       }
       roomJoinRetryRef.current = { roomId: id, attempts: 0 };
 
-      if (activeIdRef.current === id && fullyLoaded && cached !== undefined) {
+      if (activeIdRef.current === id && cacheHit) {
         setActive(room);
         setTyping(null);
         setHistoryLoading(false);
-        setMessages(cached);
+        setMessages(cached ?? []);
         await markRoomRead(id);
         joinActiveSocketRoom(id);
         scheduleScrollBottom();
@@ -764,22 +771,24 @@ export function ChatPanel({
       setTyping(null);
       joinActiveSocketRoom(id);
 
-      if (fullyLoaded && cached !== undefined) {
+      if (cacheHit) {
         setHistoryLoading(false);
-        setMessages(cached);
+        setMessages(cached ?? []);
         await markRoomRead(id);
         scheduleScrollBottom();
         return;
       }
 
-      setMessages(cached?.length ? cached : []);
+      setMessages(adminMode && cached?.length ? cached : []);
       setHistoryLoading(true);
-      historyFullyLoadedRef.current.delete(id);
+      if (adminMode) {
+        historyFullyLoadedRef.current.delete(id);
+      }
 
       try {
-        const hist = isAdminRef.current
+        const hist = adminMode
           ? await fetchFullChatHistory(id)
-          : await fetchFullCustomerSupportHistory();
+          : await getChatHistory(id, 1, 100);
         if (
           historyLoadSeqRef.current !== loadSeq ||
           activeIdRef.current !== id
@@ -797,7 +806,9 @@ export function ChatPanel({
           historyCacheRef.current.get(id) ?? [],
         );
         historyCacheRef.current.set(id, merged);
-        historyFullyLoadedRef.current.add(id);
+        if (adminMode) {
+          historyFullyLoadedRef.current.add(id);
+        }
         setMessages(merged);
         await markRoomRead(id);
         joinActiveSocketRoom(id);
@@ -807,7 +818,9 @@ export function ChatPanel({
           historyLoadSeqRef.current === loadSeq &&
           activeIdRef.current === id
         ) {
-          historyFullyLoadedRef.current.delete(id);
+          if (adminMode) {
+            historyFullyLoadedRef.current.delete(id);
+          }
           setMessages([]);
           setError("Failed to load messages for this room.");
         }
@@ -832,7 +845,7 @@ export function ChatPanel({
     try {
       const hist = isAdminRef.current
         ? await fetchFullChatHistory(rid)
-        : await fetchFullCustomerSupportHistory();
+        : await getChatHistory(rid, 1, 100);
       const normalized = hist.items.map((m) => ({
         ...m,
         id: m.id ?? m._id,
@@ -1263,13 +1276,11 @@ export function ChatPanel({
             participants: room.participants ?? [],
           };
           setRooms([normalized]);
-          if (!cancelled) setLoading(false);
           await selectRoomRef.current(normalized);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load chat");
-          setLoading(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -1278,7 +1289,16 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, messenger, initialRoomId, loadRooms, applySupportAgents]);
+  }, [
+    isAdmin,
+    messenger,
+    initialRoomId,
+    onOverviewChange,
+    refreshOverview,
+    showConfig,
+    loadRooms,
+    applySupportAgents,
+  ]);
 
   useEffect(() => {
     if (!messenger || !onMessengerMobileViewChange || !isMobileMessenger)

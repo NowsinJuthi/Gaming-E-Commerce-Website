@@ -360,7 +360,6 @@ export function LiveChatLauncher({
                 ) : (
                   <ChatPanel
                     embedded
-                    pro
                     messenger
                     onMessengerMobileViewChange={(view) =>
                       setMobileThreadOpen(view === "thread")
