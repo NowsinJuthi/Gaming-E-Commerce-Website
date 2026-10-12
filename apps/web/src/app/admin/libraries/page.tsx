@@ -55,7 +55,7 @@ export default function AdminLibrariesPage() {
 
   return (
     <AdminPageLayout
-      section="Operations"
+      section="Movie Server"
       title="Media library"
       description="Add a folder on this server, or import a folder from Samba file manager."
       icon={LayersIcon}

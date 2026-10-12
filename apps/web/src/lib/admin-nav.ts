@@ -197,33 +197,6 @@ export const ADMIN_NAV: NavSection[] = [
     ],
   },
   {
-    id: "operations",
-    title: "Operations",
-    items: [
-      {
-        href: "/admin/libraries",
-        label: "Add Media library",
-        icon: LayersIcon,
-        accent: "accent",
-        keywords: ["media", "library", "samba", "folder", "movies", "tv"],
-        children: [
-          {
-            href: "/admin/libraries",
-            label: "Media library",
-            icon: LayersIcon,
-            keywords: ["folder", "scan", "movies", "tv"],
-          },
-          {
-            href: "/admin/file-manager",
-            label: "Samba file manager",
-            icon: BoxIcon,
-            keywords: ["smb", "share", "upload", "browse"],
-          },
-        ],
-      },
-    ],
-  },
-  {
     id: "support",
     title: "Support",
     items: [
@@ -277,6 +250,33 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Email inbox",
             icon: MailIcon,
             keywords: ["email", "contact", "inbox", "reply", "message"],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "movie-server",
+    title: "Movie Server",
+    items: [
+      {
+        href: "/admin/libraries",
+        label: "Movie Server",
+        icon: LayersIcon,
+        accent: "accent",
+        keywords: ["media", "library", "samba", "folder", "movies", "tv"],
+        children: [
+          {
+            href: "/admin/libraries",
+            label: "Media library",
+            icon: LayersIcon,
+            keywords: ["folder", "scan", "movies", "tv"],
+          },
+          {
+            href: "/admin/file-manager",
+            label: "Samba file manager",
+            icon: BoxIcon,
+            keywords: ["smb", "share", "upload", "browse"],
           },
         ],
       },

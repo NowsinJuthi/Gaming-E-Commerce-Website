@@ -98,7 +98,7 @@ export default function AdminFileManagerPage() {
 
   return (
     <AdminPageLayout
-      section="Operations"
+      section="Movie Server"
       title="Samba file manager"
       description="Browse configured Samba shares and add a folder as a media library."
       icon={BoxIcon}
