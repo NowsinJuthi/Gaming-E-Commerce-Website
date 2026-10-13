@@ -146,8 +146,30 @@ export class MfsSmsFormatService implements OnModuleInit {
 
     return DEFAULT_MFS_SMS_FORMATS.map((defaults) => {
       const saved = byProvider.get(defaults.provider);
-      return saved ? { ...defaults, ...saved, provider: defaults.provider } : defaults;
+      if (!saved) return defaults;
+      const trxIdPatterns = this.upgradeStaleTrxPatterns(
+        defaults.provider,
+        saved.trxIdPatterns,
+        defaults.trxIdPatterns,
+      );
+      return { ...defaults, ...saved, trxIdPatterns, provider: defaults.provider };
     });
+  }
+
+  /** Saved copies of the old bKash pattern ignore `TrxID:` from the phone app. */
+  private upgradeStaleTrxPatterns(
+    provider: MfsProvider,
+    saved: string[],
+    defaults: string[],
+  ): string[] {
+    if (
+      provider === MfsProvider.Bkash &&
+      saved.length === 1 &&
+      saved[0] === 'TrxID\\s+([A-Za-z0-9]{6,})'
+    ) {
+      return defaults;
+    }
+    return saved.length > 0 ? saved : defaults;
   }
 
   private normalizeProviders(

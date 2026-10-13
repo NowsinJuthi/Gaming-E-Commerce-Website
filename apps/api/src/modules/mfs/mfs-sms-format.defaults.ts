@@ -91,7 +91,7 @@ Balance: Tk 3821.31`,
     ],
     // bKash TrxID is always 10-char alphanumeric uppercase.
     // Require at least 6 chars to avoid matching short Nagad IDs.
-    trxIdPatterns: ['TrxID\\s+([A-Za-z0-9]{6,})'],
+    trxIdPatterns: ['TrxID\\s*[:.]?\\s*([A-Za-z0-9]{6,})'],
     amountPatterns: [
       'received\\s+payment\\s+Tk\\s*([\\d,.]+)',
       'sent\\s+Tk\\s*([\\d,.]+)',
