@@ -291,23 +291,48 @@
   background: transparent;
   padding: 0.25rem;
   text-align: left;
-  cursor: pointer;
   transition:
     border-color 0.18s ease,
     background 0.18s ease,
     transform 0.18s ease;
 }
 
-.searchHintCard:hover {
+.searchHintCard:has(:hover),
+.searchHintCard:has(:focus-visible) {
   border-color: rgb(38 191 176 / 0.35);
   background: rgb(38 191 176 / 0.08);
   transform: translateY(-1px);
 }
 
-.searchHintCard:focus-visible {
+.searchHintPosterLink {
+  display: block;
+  border: 0;
+  padding: 0;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.searchHintPosterLink:focus-visible {
   outline: none;
-  border-color: rgb(38 191 176 / 0.65);
-  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.22);
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.55);
+}
+
+.searchHintMetaBtn {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchHintMetaBtn:focus-visible {
+  outline: none;
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.35);
 }
 
 .searchHintPoster {
@@ -573,6 +598,8 @@
   border: 0;
   background: transparent;
   padding: 0;
+  text-decoration: none;
+  color: inherit;
   cursor: pointer;
 }
 

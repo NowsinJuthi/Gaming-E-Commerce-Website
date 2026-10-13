@@ -261,18 +261,26 @@ function SearchHintSection({
         <ul className={styles.searchHintGrid}>
           {items.map((item) => (
             <li key={item.id}>
-              <button type="button" className={styles.searchHintCard} onClick={() => onSelect(item)}>
-                <span className={styles.searchHintPoster}>
-                  {item.posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.posterUrl} alt="" referrerPolicy="no-referrer" loading="lazy" />
-                  ) : (
-                    <span className={styles.searchHintFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
-                  )}
-                </span>
-                <span className={styles.searchHintName}>{item.title}</span>
-                {item.year ? <span className={styles.searchHintYear}>{item.year}</span> : null}
-              </button>
+              <div className={styles.searchHintCard}>
+                <Link
+                  className={styles.searchHintPosterLink}
+                  href={`/media/watch/${item.id}` as Route}
+                  aria-label={`Play ${item.title}`}
+                >
+                  <span className={styles.searchHintPoster}>
+                    {item.posterUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.posterUrl} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                    ) : (
+                      <span className={styles.searchHintFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+                    )}
+                  </span>
+                </Link>
+                <button type="button" className={styles.searchHintMetaBtn} onClick={() => onSelect(item)}>
+                  <span className={styles.searchHintName}>{item.title}</span>
+                  {item.year ? <span className={styles.searchHintYear}>{item.year}</span> : null}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -286,7 +294,11 @@ function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: M
     <div className={styles.grid}>
       {items.map((item) => (
         <article key={item.id} className={styles.card}>
-          <button type="button" className={styles.posterLink} onClick={() => onSelect(item)} aria-label={item.title}>
+          <Link
+            className={styles.posterLink}
+            href={`/media/watch/${item.id}` as Route}
+            aria-label={`Play ${item.title}`}
+          >
             <span className={styles.posterFrame}>
               {item.posterUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -298,7 +310,7 @@ function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: M
                 <span className={styles.playButton} />
               </span>
             </span>
-          </button>
+          </Link>
           <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
             {item.title}
           </button>
