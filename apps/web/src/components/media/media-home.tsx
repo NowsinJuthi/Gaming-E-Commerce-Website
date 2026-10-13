@@ -133,36 +133,34 @@ export function MediaHome({ home }: { home: MediaHome }) {
           ) : null}
         </div>
         <div className={styles.filters}>
-          <div className={styles.filterStack}>
-            <label className={styles.field}>
-              <span className={styles.label}>Genre</span>
-              <span className={styles.selectWrap}>
-                <select className={styles.control} defaultValue="">
-                  <option value="">All genres</option>
-                </select>
-              </span>
-            </label>
-            <label className={styles.field}>
-              <span className={styles.label}>Media Menu</span>
-              <span className={styles.selectWrap}>
-                <select
-                  className={styles.control}
-                  value={libraryId}
-                  onChange={(event) => {
-                    setLibraryId(event.target.value);
-                    setYear("");
-                  }}
-                >
-                  <option value={ALL_LIBRARIES}>All</option>
-                  {home.libraries.map((library) => (
-                    <option key={library.id} value={library.id}>
-                      {library.name}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </label>
-          </div>
+          <label className={styles.field}>
+            <span className={styles.label}>Genre</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} defaultValue="">
+                <option value="">All genres</option>
+              </select>
+            </span>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Media Menu</span>
+            <span className={styles.selectWrap}>
+              <select
+                className={styles.control}
+                value={libraryId}
+                onChange={(event) => {
+                  setLibraryId(event.target.value);
+                  setYear("");
+                }}
+              >
+                <option value={ALL_LIBRARIES}>All</option>
+                {home.libraries.map((library) => (
+                  <option key={library.id} value={library.id}>
+                    {library.name}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
           <label className={styles.field}>
             <span className={styles.label}>Year</span>
             <span className={styles.selectWrap}>
