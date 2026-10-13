@@ -330,6 +330,11 @@
   background: #fff;
 }
 
+.seekTrackFill,
+.seekTrackThumb {
+  pointer-events: none;
+}
+
 .seekTrackThumb {
   position: absolute;
   top: 50%;

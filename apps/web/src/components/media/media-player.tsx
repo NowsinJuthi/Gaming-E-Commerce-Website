@@ -118,6 +118,10 @@ function volumeReadOnly(): boolean {
 
 /** 0 at the start of the bar, 1 at the end, including a CSS-rotated phone player. */
 function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number): number {
+  const rect = el.getBoundingClientRect();
+  if (rect.width >= rect.height) {
+    return Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1)));
+  }
   let angle = 0;
   if (typeof DOMMatrixReadOnly === "function") {
     for (let node: HTMLElement | null = el; node; node = node.parentElement) {
@@ -131,7 +135,6 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
       }
     }
   }
-  const rect = el.getBoundingClientRect();
   const dx = clientX - (rect.left + rect.width / 2);
   const dy = clientY - (rect.top + rect.height / 2);
   const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
@@ -151,30 +154,7 @@ function isLocalTimeBuffered(video: HTMLVideoElement, localSeconds: number, slac
   return false;
 }
 
-/** Finite seekable only. An open live range is not the whole movie. */
-function isLocalTimeInPack(video: HTMLVideoElement, localSeconds: number, slack = 0.5): boolean {
-  if (isLocalTimeBuffered(video, localSeconds, slack)) return true;
-  if (!Number.isFinite(localSeconds) || localSeconds < -slack) return false;
-  const ranges = video.seekable;
-  if (ranges.length === 0) return false;
-  for (let i = 0; i < ranges.length; i += 1) {
-    const start = ranges.start(i);
-    const end = ranges.end(i);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
-  }
-  return false;
-}
-
 function applyVideoSeek(video: HTMLVideoElement, target: number) {
-  if (typeof video.fastSeek === "function") {
-    try {
-      video.fastSeek(target);
-      return;
-    } catch {
-      /* fall through to currentTime */
-    }
-  }
   video.currentTime = target;
 }
 
@@ -632,7 +612,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     let destroyed = false;
     let hls: Hls | null = null;
     const playlist = session.playlistUrl;
-    const startAt = session.startSeconds;
 
     const showGesture = () => {
       if (!destroyed) setNeedsGesture(true);
@@ -659,6 +638,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         enableWorker: true,
         lowLatencyMode: false,
         autoStartLoad: false,
+        liveDurationInfinity: false,
         startPosition: 0.001,
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: Infinity,
@@ -692,7 +672,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       if (hlsRef.current === hls) hlsRef.current = null;
       video.removeAttribute("src");
       video.load();
-      setCurrent(startAt);
     };
     // Reload only when the server starts a new playlist.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -702,10 +681,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const video = videoRef.current;
     if (!video) return;
     const onTime = () => {
+      if (video.seeking || seekingRef.current) return;
       const start = sessionRef.current?.startSeconds ?? 0;
       const mediaTime = start + video.currentTime;
       if (seekHold.current != null) {
-        if (Math.abs(mediaTime - seekHold.current) > 2) return;
+        if (Math.abs(mediaTime - seekHold.current) > 1.25) return;
         seekHold.current = null;
       }
       setCurrent(mediaTime);
@@ -889,11 +869,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     seekHold.current = absolute;
     if (seekHoldTimer.current) window.clearTimeout(seekHoldTimer.current);
     seekHoldTimer.current = window.setTimeout(() => {
-      if (seekHold.current === absolute) seekHold.current = null;
+      if (seekHold.current !== absolute) return;
+      seekHold.current = null;
+      if (!seekingRef.current) return;
+      seekingRef.current = false;
+      const queued = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      if (queued != null) void seekTo(queued);
     }, 8000);
   }
 
-  async function seekTo(target: number) {
+  async function seekTo(target: number, forceRestart = false) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
@@ -907,19 +893,35 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }
     const start = currentSession.startSeconds;
     const local = Math.max(0, absolute - start);
+    const before = start + video.currentTime;
     holdSeek(absolute);
     setCurrent(absolute);
-    // Inside this transcode, move the playhead. Past it, restart from that movie time.
-    // An infinite live seekable range is ignored so the browser cannot snap to the edge.
-    if (absolute >= start - 0.35 && isLocalTimeInPack(video, local)) {
+    seekingRef.current = true;
+    // Only a position already in the decoder buffer can be a direct playhead move.
+    // A live event playlist's seekable range is not the movie: setting currentTime
+    // there snaps to the live edge, so a forward drag lands backward.
+    const inBuffer = !forceRestart && absolute >= start - 0.35 && isLocalTimeBuffered(video, local, 0.35);
+    if (inBuffer) {
       try {
         applyVideoSeek(video, local);
+        const onSeeked = () => {
+          video.removeEventListener("seeked", onSeeked);
+          const after = (sessionRef.current?.startSeconds ?? start) + video.currentTime;
+          const wanted = absolute - before;
+          const got = after - before;
+          const wrongWay = wanted * got < 0 && Math.abs(wanted) > 2 && Math.abs(got) > 2;
+          const queued = pendingSeekRef.current;
+          pendingSeekRef.current = null;
+          seekingRef.current = false;
+          if (queued != null) void seekTo(queued);
+          else if (wrongWay) void seekTo(absolute, true);
+        };
+        video.addEventListener("seeked", onSeeked);
         return;
       } catch {
         /* restart the transcode at the requested time */
       }
     }
-    seekingRef.current = true;
     pendingSeekRef.current = null;
     remember(absolute);
     try {
