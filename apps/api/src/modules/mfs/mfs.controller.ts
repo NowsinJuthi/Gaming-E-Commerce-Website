@@ -94,12 +94,7 @@ export class MfsPaymentController {
     @Param('intentId') intentId: string,
     @Body() dto: SelectMfsGatewayDto,
   ) {
-    return this.verification.selectGateway(
-      user.id,
-      intentId,
-      dto.gatewayId,
-      isStaffUser(user.roles),
-    );
+    return this.verification.selectGateway(user.id, intentId, dto.gatewayId);
   }
 
   @Post('checkout/:intentId/reset-gateway')
@@ -107,11 +102,7 @@ export class MfsPaymentController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('intentId') intentId: string,
   ) {
-    return this.verification.resetGateway(
-      user.id,
-      intentId,
-      isStaffUser(user.roles),
-    );
+    return this.verification.resetGateway(user.id, intentId);
   }
 
   @Patch('checkout/:intentId/items/:itemIndex')
@@ -130,7 +121,6 @@ export class MfsPaymentController {
       intentId,
       index,
       dto.quantity,
-      isStaffUser(user.roles),
     );
   }
 
@@ -144,12 +134,7 @@ export class MfsPaymentController {
     if (!Number.isInteger(index) || index < 0) {
       throw new BadRequestException('Invalid item index');
     }
-    return this.verification.removeCheckoutItem(
-      user.id,
-      intentId,
-      index,
-      isStaffUser(user.roles),
-    );
+    return this.verification.removeCheckoutItem(user.id, intentId, index);
   }
 
   @Post('checkout/:intentId/trx')
@@ -158,12 +143,7 @@ export class MfsPaymentController {
     @Param('intentId') intentId: string,
     @Body() dto: SubmitMfsTrxDto,
   ) {
-    return this.verification.submitTrxId(
-      user.id,
-      intentId,
-      dto.trxId,
-      isStaffUser(user.roles),
-    );
+    return this.verification.submitTrxId(user.id, intentId, dto.trxId);
   }
 
   @Public()

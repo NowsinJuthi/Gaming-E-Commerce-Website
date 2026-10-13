@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -99,7 +100,7 @@ export type MfsCheckoutSession = {
 };
 
 @Injectable()
-export class MfsVerificationService {
+export class MfsVerificationService implements OnModuleInit {
   private readonly logger = new Logger(MfsVerificationService.name);
 
   constructor(
@@ -120,6 +121,29 @@ export class MfsVerificationService {
     private readonly rolePermissions: RolePermissionsService,
     private readonly audit: AuditService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.paymentModel.collection.createIndex(
+        { submittedTrxId: 1 },
+        {
+          unique: true,
+          name: 'uniq_active_mfs_submitted_trx',
+          partialFilterExpression: {
+            submittedTrxId: { $type: 'string' },
+            status: {
+              $in: ['created', 'initializing', 'pending', 'succeeded', 'superseded'],
+            },
+          },
+        },
+      );
+    } catch (error) {
+      this.logger.error(
+        'MFS TrxID uniqueness index was not created. Two payments can still claim one TrxID until duplicate rows are cleared.',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
 
   async listCheckoutGateways() {
     return this.gateways.listActive();
@@ -159,9 +183,16 @@ export class MfsVerificationService {
 
     const appUrl =
       this.config.get<string>('payments.appUrl') ?? 'http://localhost:3000';
-    const redirectUrl = await this.resolvePaidOrderRedirectUrl(intent, appUrl);
+    const isOwner = String(intent.userId) === userId;
+    const redirectUrl = await this.resolvePaidOrderRedirectUrl(
+      intent,
+      appUrl,
+      isOwner,
+    );
 
-    const summary = await this.resolveCheckoutSummary(intent);
+    const summary = isOwner
+      ? await this.resolveCheckoutSummary(intent)
+      : undefined;
 
     return {
       intentId: String(intent._id),
@@ -180,10 +211,13 @@ export class MfsVerificationService {
   private async resolvePaidOrderRedirectUrl(
     intent: PaymentIntentDocument,
     appUrl: string,
+    isOwner: boolean,
   ): Promise<string | undefined> {
     if (intent.status !== PaymentIntentStatus.Succeeded) {
       return undefined;
     }
+
+    if (!isOwner) return undefined;
 
     if (intent.purpose === PaymentPurpose.WalletTopup) {
       return `${appUrl}/wallet`;
@@ -276,12 +310,9 @@ export class MfsVerificationService {
     userId: string,
     intentId: string,
     gatewayId: string,
-    isStaff: boolean,
   ): Promise<MfsCheckoutSession> {
     const intent = await this.getMfsIntent(intentId);
-    if (!isStaff && String(intent.userId) !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
+    this.assertPaymentOwner(intent, userId);
     if (TERMINAL.has(intent.status)) {
       throw new BadRequestException('Payment is already finalized');
     }
@@ -296,24 +327,21 @@ export class MfsVerificationService {
     intent.status = PaymentIntentStatus.Pending;
     await intent.save();
 
-    return this.getCheckoutSession(userId, intentId, isStaff);
+    return this.getCheckoutSession(userId, intentId, false);
   }
 
   async resetGateway(
     userId: string,
     intentId: string,
-    isStaff: boolean,
   ): Promise<MfsCheckoutSession> {
     const intent = await this.getMfsIntent(intentId);
-    if (!isStaff && String(intent.userId) !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
+    this.assertPaymentOwner(intent, userId);
     if (TERMINAL.has(intent.status)) {
       throw new BadRequestException('Payment is already finalized');
     }
     intent.mfsGatewayId = undefined;
     await intent.save();
-    return this.getCheckoutSession(userId, intentId, isStaff);
+    return this.getCheckoutSession(userId, intentId, false);
   }
 
   async updateCheckoutItemQuantity(
@@ -321,7 +349,6 @@ export class MfsVerificationService {
     intentId: string,
     itemIndex: number,
     quantity: number,
-    isStaff: boolean,
   ): Promise<MfsCheckoutSession> {
     const result = await this.orders.updatePendingOrderItemQuantity(
       userId,
@@ -330,33 +357,29 @@ export class MfsVerificationService {
       quantity,
     );
     if (result.cancelled) {
-      return this.getCheckoutSession(userId, intentId, isStaff);
+      return this.getCheckoutSession(userId, intentId, false);
     }
-    return this.getCheckoutSession(userId, intentId, isStaff);
+    return this.getCheckoutSession(userId, intentId, false);
   }
 
   async removeCheckoutItem(
     userId: string,
     intentId: string,
     itemIndex: number,
-    isStaff: boolean,
   ): Promise<MfsCheckoutSession> {
     await this.orders.removePendingOrderItem(userId, intentId, itemIndex);
-    return this.getCheckoutSession(userId, intentId, isStaff);
+    return this.getCheckoutSession(userId, intentId, false);
   }
 
   async submitTrxId(
     userId: string,
     intentId: string,
     trxId: string,
-    isStaff: boolean,
   ): Promise<MfsCheckoutSession> {
     const intent = await this.getMfsIntent(intentId);
-    if (!isStaff && String(intent.userId) !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
+    this.assertPaymentOwner(intent, userId);
     if (TERMINAL.has(intent.status)) {
-      return this.getCheckoutSession(userId, intentId, isStaff);
+      return this.getCheckoutSession(userId, intentId, false);
     }
     if (!intent.mfsGatewayId) {
       throw new BadRequestException('Select a payment method first');
@@ -370,7 +393,16 @@ export class MfsVerificationService {
     await this.assertTrxIdAvailable(normalized, intent._id);
 
     intent.submittedTrxId = normalized;
-    await intent.save();
+    try {
+      await intent.save();
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new BadRequestException(
+          'This transaction ID is already submitted for another payment',
+        );
+      }
+      throw error;
+    }
 
     const matched = await this.tryMatchIntent(intent, normalized, 'trx_submit');
     if (!matched) {
@@ -383,7 +415,7 @@ export class MfsVerificationService {
       }
     }
 
-    return this.getCheckoutSession(userId, intentId, isStaff);
+    return this.getCheckoutSession(userId, intentId, false);
   }
 
   async adminApprove(
@@ -713,6 +745,15 @@ export class MfsVerificationService {
       .exec();
   }
 
+  private assertPaymentOwner(
+    intent: PaymentIntentDocument,
+    userId: string,
+  ): void {
+    if (String(intent.userId) !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+  }
+
   private async getMfsIntent(intentId: string): Promise<PaymentIntentDocument> {
     const intent = await this.paymentModel.findById(intentId).exec();
     if (!intent) throw new NotFoundException('Payment not found');
@@ -815,4 +856,13 @@ export class MfsVerificationService {
 
 export function isStaffUser(roles: string[]): boolean {
   return isChatStaff(roles);
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: number }).code === 11000
+  );
 }
