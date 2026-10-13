@@ -135,19 +135,47 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
   const dx = clientX - (rect.left + rect.width / 2);
   const dy = clientY - (rect.top + rect.height / 2);
   const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-  const width = el.offsetWidth || rect.width || 1;
+  const width = el.offsetWidth || 1;
   return Math.min(1, Math.max(0, localX / width + 0.5));
 }
 
-function localTimeBuffered(video: HTMLVideoElement, local: number): boolean {
+function isLocalTimeBuffered(video: HTMLVideoElement, localSeconds: number, slack = 0.35): boolean {
   const ranges = video.buffered;
+  if (ranges.length === 0) return false;
   for (let i = 0; i < ranges.length; i += 1) {
     const start = ranges.start(i);
     const end = ranges.end(i);
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-    if (local >= start - 0.35 && local <= end + 1.5) return true;
+    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
   }
   return false;
+}
+
+/** Finite seekable only. An open live range is not the whole movie. */
+function isLocalTimeInPack(video: HTMLVideoElement, localSeconds: number, slack = 0.5): boolean {
+  if (isLocalTimeBuffered(video, localSeconds, slack)) return true;
+  if (!Number.isFinite(localSeconds) || localSeconds < -slack) return false;
+  const ranges = video.seekable;
+  if (ranges.length === 0) return false;
+  for (let i = 0; i < ranges.length; i += 1) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
+  }
+  return false;
+}
+
+function applyVideoSeek(video: HTMLVideoElement, target: number) {
+  if (typeof video.fastSeek === "function") {
+    try {
+      video.fastSeek(target);
+      return;
+    } catch {
+      /* fall through to currentTime */
+    }
+  }
+  video.currentTime = target;
 }
 
 function SeekTrack({
@@ -165,19 +193,57 @@ function SeekTrack({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<number | null>(null);
+  const previewRef = useRef<number | null>(null);
+  const onScrubRef = useRef(onScrub);
+  const onCommitRef = useRef(onCommit);
+  const [dragging, setDragging] = useState(false);
+  onScrubRef.current = onScrub;
+  onCommitRef.current = onCommit;
   const limit = Math.max(max, 1);
   const ratio = Math.min(1, Math.max(0, value / limit));
 
-  function secondsFrom(clientX: number, clientY: number) {
+  const secondsFrom = useCallback((clientX: number, clientY: number) => {
     const el = trackRef.current;
     if (!el) return 0;
-    return Math.round(sliderRatioFromClient(el, clientX, clientY) * limit);
-  }
+    return Math.round(sliderRatioFromClient(el, clientX, clientY) * Math.max(max, 1));
+  }, [max]);
 
-  function finish(event: React.PointerEvent<HTMLDivElement>) {
-    if (dragId.current !== event.pointerId) return;
+  const endScrub = useCallback(() => {
+    const finalSeconds = previewRef.current;
     dragId.current = null;
-    onCommit(secondsFrom(event.clientX, event.clientY));
+    previewRef.current = null;
+    setDragging(false);
+    if (finalSeconds != null) onCommitRef.current(finalSeconds);
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (event: PointerEvent) => {
+      if (dragId.current == null || event.pointerId !== dragId.current) return;
+      const seconds = secondsFrom(event.clientX, event.clientY);
+      previewRef.current = seconds;
+      onScrubRef.current(seconds);
+    };
+    const onUp = (event: PointerEvent) => {
+      if (dragId.current == null || event.pointerId !== dragId.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      endScrub();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragging, endScrub, secondsFrom]);
+
+  function pointAt(clientX: number, clientY: number) {
+    const seconds = secondsFrom(clientX, clientY);
+    previewRef.current = seconds;
+    onScrubRef.current(seconds);
   }
 
   return (
@@ -200,25 +266,28 @@ function SeekTrack({
         try {
           event.currentTarget.setPointerCapture(event.pointerId);
         } catch {
-          /* the bar still tracks the pointer while it stays over the track */
+          /* window listeners still follow the pointer */
         }
-        onScrub(secondsFrom(event.clientX, event.clientY));
+        pointAt(event.clientX, event.clientY);
+        setDragging(true);
       }}
       onPointerMove={(event) => {
         if (dragId.current !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        onScrub(secondsFrom(event.clientX, event.clientY));
+        pointAt(event.clientX, event.clientY);
       }}
       onPointerUp={(event) => {
+        if (dragId.current !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        finish(event);
+        endScrub();
       }}
       onPointerCancel={(event) => {
+        if (dragId.current !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        finish(event);
+        endScrub();
       }}
       onKeyDown={(event) => {
         const step = event.shiftKey ? 30 : 5;
@@ -393,6 +462,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const skipAt = useRef<number | null>(null);
   const seekHold = useRef<number | null>(null);
   const seekHoldTimer = useRef<number | null>(null);
+  const seekingRef = useRef(false);
+  const pendingSeekRef = useRef<number | null>(null);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
@@ -802,20 +873,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video || !currentSession) return;
     setSkipFlash(delta < 0 ? "back" : "forward");
     window.setTimeout(() => setSkipFlash(null), 700);
-    const base = skipAt.current ?? video.currentTime;
-    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : base + Math.max(delta, 0);
-    const local = Math.min(duration, Math.max(0, base + delta));
-    skipAt.current = local;
+    const display = skipAt.current ?? currentSession.startSeconds + video.currentTime;
+    const movie = currentSession.durationSeconds;
+    let next = Math.max(0, display + delta);
+    if (movie > 0) next = Math.min(movie, next);
+    skipAt.current = next;
     window.setTimeout(() => {
-      if (skipAt.current === local) skipAt.current = null;
+      if (skipAt.current === next) skipAt.current = null;
     }, 500);
-    try {
-      video.currentTime = local;
-    } catch {
-      const target = Math.max(0, currentSession.startSeconds + local);
-      void seekTo(target);
-    }
-    setCurrent(currentSession.startSeconds + local);
+    void seekTo(next);
     reveal();
   }
 
@@ -832,29 +898,40 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
     const movie = currentSession.durationSeconds;
-    let absolute = Math.max(0, target);
-    if (movie > 0) absolute = Math.min(absolute, movie);
+    const absolute = movie > 0 ? Math.min(Math.max(0, target), movie) : Math.max(0, target);
+    if (seekingRef.current) {
+      pendingSeekRef.current = absolute;
+      holdSeek(absolute);
+      setCurrent(absolute);
+      return;
+    }
     const start = currentSession.startSeconds;
     const local = Math.max(0, absolute - start);
     holdSeek(absolute);
     setCurrent(absolute);
-    // A live HLS event playlist reports a seekable range that is not the movie.
-    // Setting currentTime outside the buffer snaps to the live edge, so a forward
-    // drag jumps backward and a backward drag jumps forward. Restart from that time.
-    if (absolute + 0.4 >= start && localTimeBuffered(video, local)) {
+    // Inside this transcode, move the playhead. Past it, restart from that movie time.
+    // An infinite live seekable range is ignored so the browser cannot snap to the edge.
+    if (absolute >= start - 0.35 && isLocalTimeInPack(video, local)) {
       try {
-        video.currentTime = local;
+        applyVideoSeek(video, local);
         return;
       } catch {
         /* restart the transcode at the requested time */
       }
     }
+    seekingRef.current = true;
+    pendingSeekRef.current = null;
     remember(absolute);
     try {
       await retarget({ startSeconds: absolute });
     } catch (reason) {
       seekHold.current = null;
       setError(reason instanceof Error ? reason.message : "Could not seek.");
+    } finally {
+      seekingRef.current = false;
+      const queued = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      if (queued != null) void seekTo(queued);
     }
   }
 
