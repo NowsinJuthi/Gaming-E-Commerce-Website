@@ -76,6 +76,23 @@ function errorMessage(data: { message?: string | string[] } | null, fallback: st
   return fallback;
 }
 
+function unlockPlaybackOrientation() {
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    /* iOS Safari does not allow unlock. */
+  }
+}
+
+async function lockPlaybackLandscape() {
+  const type = screen.orientation?.type ?? "";
+  if (type.startsWith("portrait")) return;
+  const orientation = screen.orientation as ScreenOrientation & {
+    lock?: (mode: string) => Promise<void>;
+  };
+  await orientation.lock?.("landscape").catch(() => undefined);
+}
+
 function appleMobile(): boolean {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/i.test(ua)) return true;
@@ -154,6 +171,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [notice, setNotice] = useState("");
   const [skipFlash, setSkipFlash] = useState<"back" | "forward" | null>(null);
   const [mobile, setMobile] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+  const [immersive, setImmersive] = useState(false);
+  const mobileRef = useRef(false);
+  mobileRef.current = mobile;
   const [pipOn, setPipOn] = useState(false);
   const [volumeLocked, setVolumeLocked] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -231,11 +252,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     sync();
     setVolumeLocked(volumeReadOnly());
     media.addEventListener("change", sync);
+    const portraitMedia = window.matchMedia("(orientation: portrait)");
+    const syncPortrait = () => setPortrait(portraitMedia.matches);
+    syncPortrait();
+    portraitMedia.addEventListener("change", syncPortrait);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       media.removeEventListener("change", sync);
+      portraitMedia.removeEventListener("change", syncPortrait);
       document.body.style.overflow = previous;
+      unlockPlaybackOrientation();
     };
   }, []);
 
@@ -365,6 +392,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setPlaying(true);
       setBuffering(false);
       reveal();
+      if (mobileRef.current) setImmersive(true);
     };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
@@ -517,24 +545,30 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }
   }
 
+  useEffect(() => {
+    if (!immersive) {
+      unlockPlaybackOrientation();
+      return;
+    }
+    if (!portrait) void lockPlaybackLandscape();
+  }, [immersive, portrait]);
+
   async function toggleFullscreen() {
     const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
     const shell = video?.parentElement;
     if (!video || !shell) return;
-    if (appleMobile() && video.webkitEnterFullscreen) {
-      video.webkitEnterFullscreen();
+    if (mobile) {
+      if (immersive) {
+        setImmersive(false);
+        unlockPlaybackOrientation();
+        return;
+      }
+      setImmersive(true);
+      await lockPlaybackLandscape();
       return;
     }
     if (document.fullscreenElement) await document.exitFullscreen();
-    else {
-      await shell.requestFullscreen();
-      if (mobile) {
-        const orientation = screen.orientation as ScreenOrientation & {
-          lock?: (mode: string) => Promise<void>;
-        };
-        await orientation.lock?.("landscape").catch(() => undefined);
-      }
-    }
+    else await shell.requestFullscreen();
   }
 
   async function togglePip() {
@@ -604,7 +638,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   return (
     <section
-      className={styles.shell}
+      className={`${styles.shell} ${immersive && portrait ? styles.landscapeEmulate : ""}`}
       tabIndex={-1}
       onMouseMove={() => {
         if (!locked) reveal();
@@ -752,8 +786,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               )}
               {volumeOpen ? null : (
                 <>
-                  <button type="button" className={styles.mIcon} aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={() => void toggleFullscreen()}>
-                    <Icon d={fullscreen ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
+                  <button type="button" className={styles.mIcon} aria-label={immersive ? "Exit landscape" : "Landscape"} onClick={() => void toggleFullscreen()}>
+                    <Icon d={immersive ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
                   </button>
                   {pipSupported ? (
                     <button type="button" className={styles.mIcon} aria-label="Picture in picture" onClick={() => void togglePip()}>
@@ -874,12 +908,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 </button>
               ) : null}
               <button type="button" className={styles.mSkip} aria-label="Rewind 10 seconds" onClick={() => skip(-10)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.2-5.9M3 4v5h5" /></svg>
                 <span>10</span>
               </button>
               <button type="button" className={styles.mPlay} aria-label={playing ? "Pause" : "Play"} onClick={togglePlay}>
                 <Icon filled d={playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z"} />
               </button>
               <button type="button" className={styles.mSkip} aria-label="Forward 10 seconds" onClick={() => skip(10)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.2-5.9M21 4v5h-5" /></svg>
                 <span>10</span>
               </button>
               {(session?.episodes.length ?? 0) > 1 ? (

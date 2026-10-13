@@ -13,6 +13,22 @@
   outline: none;
 }
 
+@media (orientation: portrait) {
+  .landscapeEmulate {
+    position: fixed;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    z-index: 2147483646;
+    width: 100dvh;
+    height: 100dvw;
+    max-width: none;
+    max-height: none;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+}
+
 .video {
   position: absolute;
   inset: 0;
@@ -807,7 +823,8 @@
 
 .mVolume {
   width: 5.75rem;
-  accent-color: #fff;
+  height: 1.4rem;
+  accent-color: #26bfb0;
 }
 
 .mDock {
@@ -827,10 +844,26 @@
 
 .mSkip {
   position: relative;
-  border: 1.5px solid rgb(255 255 255 / 0.85);
-  border-radius: 999px;
-  font-size: 10px;
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 0.9);
+}
+
+.mSkip svg {
+  width: 1.85rem;
+  height: 1.85rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mSkip span {
+  position: absolute;
+  font-size: 9px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .mPlay {
@@ -848,7 +881,6 @@
 .mPlay svg {
   width: 1.7rem;
   height: 1.7rem;
-  margin-left: 0.12rem;
   fill: currentColor;
   stroke: none;
 }
@@ -873,6 +905,7 @@
 .mSeekRow input {
   min-width: 0;
   flex: 1;
+  height: 1.15rem;
   accent-color: #26bfb0;
 }
 
