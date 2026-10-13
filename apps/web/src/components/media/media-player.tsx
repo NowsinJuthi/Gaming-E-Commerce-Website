@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-player.module.css";
@@ -121,6 +121,116 @@ function Icon({ d, filled = false }: { d: string; filled?: boolean }) {
     <svg viewBox="0 0 24 24" aria-hidden="true" className={filled ? styles.filled : undefined}>
       <path d={d} fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"} />
     </svg>
+  );
+}
+
+function Glyph({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+
+function CaptionsIcon() {
+  return (
+    <Glyph>
+      <rect width="18" height="14" x="3" y="5" rx="2" ry="2" />
+      <path d="M7 15h4M15 15h2M7 11h2M13 11h4" />
+    </Glyph>
+  );
+}
+
+function AudioLinesIcon() {
+  return (
+    <Glyph>
+      <path d="M2 10v3" />
+      <path d="M6 6v11" />
+      <path d="M10 3v18" />
+      <path d="M14 8v7" />
+      <path d="M18 5v13" />
+      <path d="M22 10v3" />
+    </Glyph>
+  );
+}
+
+function GaugeIcon() {
+  return (
+    <Glyph>
+      <path d="m12 14 4-4" />
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+    </Glyph>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <Glyph>
+      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+      <circle cx="12" cy="12" r="3" />
+    </Glyph>
+  );
+}
+
+function Volume2Icon() {
+  return (
+    <Glyph>
+      <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+      <path d="M16 9a5 5 0 0 1 0 6" />
+      <path d="M19.364 18.364a9 9 0 0 0 0-12.728" />
+    </Glyph>
+  );
+}
+
+function VolumeXIcon() {
+  return (
+    <Glyph>
+      <path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z" />
+      <path d="m16.5 14.5 5-5" />
+      <path d="m16.5 9.5 5 5" />
+    </Glyph>
+  );
+}
+
+function CastIcon() {
+  return (
+    <Glyph>
+      <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+      <path d="M2 12a9 9 0 0 1 8 8" />
+      <path d="M2 16a5 5 0 0 1 4 4" />
+      <path d="M2 20h.01" />
+    </Glyph>
+  );
+}
+
+function PipIcon() {
+  return (
+    <Glyph>
+      <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
+      <rect width="10" height="7" x="12" y="13" rx="2" />
+    </Glyph>
+  );
+}
+
+function MaximizeIcon() {
+  return (
+    <Glyph>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </Glyph>
+  );
+}
+
+function MinimizeIcon() {
+  return (
+    <Glyph>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+    </Glyph>
   );
 }
 
@@ -721,16 +831,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                     onChange={(event) => changeVolume(Number(event.target.value))}
                   />
                   <button type="button" className={styles.icon} aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
-                    <Icon d={muted || volume === 0 ? "M11 5L6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6" : "M11 5L6 9H3v6h3l5 4V5zM16 9a5 5 0 0 1 0 6"} />
+                    {muted || volume === 0 ? <VolumeXIcon /> : <Volume2Icon />}
                   </button>
                 </div>
               )}
               <button type="button" className={styles.icon} aria-label="Cast" onClick={cast}>
-                <Icon d="M2 16V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v11M7 20h10M12 16v4" />
+                <CastIcon />
               </button>
               {pipSupported ? (
                 <button type="button" className={styles.icon} aria-label="Picture in picture" aria-pressed={pipOn} onClick={() => void togglePip()}>
-                  <Icon d="M4 6h16v12H4zM12 11h6v4h-6z" />
+                  <PipIcon />
                 </button>
               ) : null}
               {mobile ? (
@@ -739,7 +849,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 </button>
               ) : null}
               <button type="button" className={styles.icon} aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={() => void toggleFullscreen()}>
-                <Icon d={fullscreen ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
+                {fullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
               </button>
             </div>
           </header>
@@ -781,21 +891,21 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                     toggleMute();
                   }}
                 >
-                  <Icon d={muted || volume === 0 ? "M11 5L6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6" : "M11 5L6 9H3v6h3l5 4V5zM16 9a5 5 0 0 1 0 6"} />
+                  {muted || volume === 0 ? <VolumeXIcon /> : <Volume2Icon />}
                 </button>
               )}
               {volumeOpen ? null : (
                 <>
                   <button type="button" className={styles.mIcon} aria-label={immersive ? "Exit landscape" : "Landscape"} onClick={() => void toggleFullscreen()}>
-                    <Icon d={immersive ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
+                    {immersive ? <MinimizeIcon /> : <MaximizeIcon />}
                   </button>
                   {pipSupported ? (
                     <button type="button" className={styles.mIcon} aria-label="Picture in picture" onClick={() => void togglePip()}>
-                      <Icon d="M4 6h16v12H4zM12 11h6v4h-6z" />
+                      <PipIcon />
                     </button>
                   ) : null}
                   <button type="button" className={`${styles.mIcon} ${sheet === "settings" ? styles.iconOn : ""}`} aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
-                    <Icon d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.6a8 8 0 0 0-1.7-1L15 4h-4l-.5 2.9a8 8 0 0 0-1.7 1L6.5 7.4l-2 3.4L6.5 12a7.8 7.8 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.6a8 8 0 0 0 1.7 1L11 22h4l.5-2.9a8 8 0 0 0 1.7-1l2.3.6 2-3.4-2-1.3z" />
+                    <SettingsIcon />
                   </button>
                 </>
               )}
@@ -812,16 +922,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               </div>
               <div className={styles.iconRow}>
                 <button type="button" className={`${styles.icon} ${sheet === "subtitles" ? styles.iconOn : ""}`} aria-label="Subtitles" onClick={() => setSheet(sheet === "subtitles" ? null : "subtitles")}>
-                  <Icon d="M4 6h16v12H4zM7 11h4M7 15h2M13 15h4" />
+                  <CaptionsIcon />
                 </button>
                 <button type="button" className={`${styles.icon} ${sheet === "audio" ? styles.iconOn : ""}`} aria-label="Audio" onClick={() => setSheet(sheet === "audio" ? null : "audio")}>
-                  <Icon d="M4 10v4h4l5 4V6L8 10H4zM16 9a4 4 0 0 1 0 6" />
+                  <AudioLinesIcon />
                 </button>
                 <button type="button" className={`${styles.icon} ${sheet === "speed" ? styles.iconOn : ""}`} aria-label="Playback speed" onClick={() => setSheet(sheet === "speed" ? null : "speed")}>
-                  <Icon d="M12 21a9 9 0 1 1 9-9M12 12l4.5-3" />
+                  <GaugeIcon />
                 </button>
                 <button type="button" className={`${styles.icon} ${sheet === "settings" ? styles.iconOn : ""}`} aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
-                  <Icon d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.4 13.5a7.7 7.7 0 0 0 .1-1.5l1.8-1.1-1.8-3.1-2.1.5a7.4 7.4 0 0 0-1.3-.8L15.6 5h-3.2l-.5 2.5a7.4 7.4 0 0 0-1.3.8l-2.1-.5-1.8 3.1 1.8 1.1a7.7 7.7 0 0 0 .1 1.5l-1.8 1.1 1.8 3.1 2.1-.5c.4.3.8.6 1.3.8l.5 2.5h3.2l.5-2.5c.5-.2.9-.5 1.3-.8l2.1.5 1.8-3.1-1.8-1.1z" />
+                  <SettingsIcon />
                 </button>
               </div>
             </div>
