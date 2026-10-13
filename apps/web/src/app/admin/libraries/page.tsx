@@ -35,9 +35,14 @@ function ScanResult({
   const total = matched + missing + unmatched;
   const matchedPct = total > 0 ? Math.round((matched / total) * 100) : 0;
   const stats = [
-    { label: "Matched", value: matched, tone: "good" as const },
-    { label: "Missing", value: missing, tone: "warn" as const },
-    { label: "Unmatched", value: unmatched, tone: "gap" as const },
+    { label: "Matched", hint: "Poster found", value: matched, tone: "good" as const },
+    { label: "Missing", hint: "File not found", value: missing, tone: "warn" as const },
+    { label: "Unmatched", hint: "No poster", value: unmatched, tone: "gap" as const },
+  ];
+  const segments = [
+    { key: "matched", count: matched, className: styles.scanSegGood },
+    { key: "missing", count: missing, className: styles.scanSegWarn },
+    { key: "unmatched", count: unmatched, className: styles.scanSegGap },
   ];
 
   return (
@@ -73,14 +78,33 @@ function ScanResult({
           >
             <span>{stat.label}</span>
             <strong>{busy ? "—" : stat.value}</strong>
+            <small>{stat.hint}</small>
           </div>
         ))}
       </div>
-      <div className={styles.scanBar} aria-hidden>
-        <div className={busy ? styles.scanFillBusy : styles.scanFill} style={busy ? undefined : { width: `${matchedPct}%` }} />
+      <div
+        className={styles.scanBar}
+        role="img"
+        aria-label={busy ? "Scan in progress" : `${matched} matched, ${missing} missing, ${unmatched} unmatched`}
+      >
+        {busy ? (
+          <div className={styles.scanFillBusy} />
+        ) : (
+          <div className={styles.scanFillRow}>
+            {segments.map((segment) =>
+              total > 0 && segment.count > 0 ? (
+                <div key={segment.key} className={segment.className} style={{ width: `${(segment.count / total) * 100}%` }} />
+              ) : null,
+            )}
+          </div>
+        )}
       </div>
       <p className={styles.scanMeterLabel}>
-        {busy ? "Reading folders and matching posters…" : `${matchedPct}% matched${total > 0 ? ` of ${total}` : ""}`}
+        {busy
+          ? "Reading folders and matching posters…"
+          : total > 0
+            ? `${matchedPct}% have a poster · ${unmatched} of ${total} still need one`
+            : "No titles in this scan."}
       </p>
       <div className={styles.scanLogs}>
         {logs.length === 0 ? (
