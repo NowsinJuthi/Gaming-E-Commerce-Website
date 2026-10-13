@@ -428,6 +428,7 @@
 
 @media (max-width: 767px) {
   .filters {
+    --filter-font-size: 0.6875rem;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.35rem;
@@ -460,37 +461,34 @@
     max-width: none;
   }
 
-  .filters .control {
-    min-height: 1.65rem;
-    padding: 0.22rem 1.15rem 0.22rem 0.35rem;
-    font-size: 0.4375rem;
-    line-height: 1.2;
+  .filters .control,
+  .filters .searchInput,
+  .filters .searchInput::placeholder {
+    font-size: var(--filter-font-size);
+    line-height: 1.25;
     font-weight: 400;
+  }
+
+  .filters .control {
+    min-height: 1.85rem;
+    padding: 0.28rem 1.35rem 0.28rem 0.42rem;
   }
 
   .filters .selectWrap::after {
-    right: 0.4rem;
-    height: 0.26rem;
-    width: 0.26rem;
+    right: 0.48rem;
+    height: 0.3rem;
+    width: 0.3rem;
   }
 
   .filters .searchInput {
-    min-height: 1.65rem;
-    padding: 0.22rem 1.25rem 0.22rem 1.35rem;
-    font-size: 0.4375rem;
-    line-height: 1.2;
-    font-weight: 400;
-  }
-
-  .filters .searchInput::placeholder {
-    font-size: 0.4375rem;
-    font-weight: 400;
+    min-height: 1.85rem;
+    padding: 0.28rem 1.35rem 0.28rem 1.45rem;
   }
 
   .filters .searchIcon {
-    left: 0.4rem;
-    height: 0.72rem;
-    width: 0.72rem;
+    left: 0.45rem;
+    height: 0.8rem;
+    width: 0.8rem;
   }
 }
 
@@ -533,6 +531,16 @@
   rotate: 45deg;
   border-right: 1.5px solid rgb(38 191 176 / 0.85);
   border-bottom: 1.5px solid rgb(38 191 176 / 0.85);
+}
+
+.filters .searchInput {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.filters .searchInput::placeholder {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .control {

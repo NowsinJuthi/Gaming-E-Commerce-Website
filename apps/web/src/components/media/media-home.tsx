@@ -172,7 +172,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
                 type="search"
                 className={styles.searchInput}
                 value={searchQuery}
-                placeholder="Search movie or series…"
+                placeholder="Search"
                 autoComplete="off"
                 spellCheck={false}
                 aria-label="Search movie or series"
