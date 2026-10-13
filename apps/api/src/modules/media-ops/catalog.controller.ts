@@ -88,6 +88,13 @@ export class CatalogController {
     return this.catalog.publicHome();
   }
 
+  @Public()
+  @Roles()
+  @Get('media/titles/:id')
+  title(@Param('id') id: string) {
+    return this.catalog.publicTitle(id);
+  }
+
   @Get('admin/movie-collections')
   listMovies(@Query('q') q?: string, @Query('page') page?: string) {
     return this.catalog.list('movie', q, Number(page));

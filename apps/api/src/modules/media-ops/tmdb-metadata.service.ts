@@ -8,9 +8,13 @@ import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
 
 const TMDB_API = 'https://api.themoviedb.org';
 const TMDB_IMAGE = 'https://image.tmdb.org/t/p/w500';
+const TMDB_BACKDROP = 'https://image.tmdb.org/t/p/w1280';
+const TMDB_PROFILE = 'https://image.tmdb.org/t/p/w185';
 const POSTER_WIDTH = 480;
 const POSTER_HEIGHT = 720;
 const POSTER_QUALITY = 68;
+
+export type TmdbCast = { name: string; profileUrl: string | null };
 
 export type TmdbMatch = {
   title: string;
@@ -18,12 +22,44 @@ export type TmdbMatch = {
   posterUrl: string | null;
 };
 
+export type TmdbDetails = {
+  title: string;
+  year: number | null;
+  overview: string;
+  runtimeMinutes: number | null;
+  rating: number | null;
+  genres: string[];
+  backdropUrl: string | null;
+  directors: string[];
+  writers: string[];
+  cast: TmdbCast[];
+};
+
 type SearchHit = {
+  id?: number;
   title?: string;
   name?: string;
   release_date?: string;
   first_air_date?: string;
   poster_path?: string | null;
+};
+
+type DetailPayload = {
+  title?: string;
+  name?: string;
+  overview?: string;
+  runtime?: number;
+  episode_run_time?: number[];
+  vote_average?: number;
+  release_date?: string;
+  first_air_date?: string;
+  backdrop_path?: string | null;
+  genres?: { name?: string }[];
+  created_by?: { name?: string }[];
+  credits?: {
+    cast?: { name?: string; profile_path?: string | null }[];
+    crew?: { name?: string; job?: string }[];
+  };
 };
 
 @Injectable()
@@ -42,6 +78,14 @@ export class TmdbMetadataService {
 
   async searchSeries(title: string, year?: number | null): Promise<TmdbMatch | null> {
     return this.search('tv', title, year);
+  }
+
+  async detailsMovie(title: string, year?: number | null): Promise<TmdbDetails | null> {
+    return this.details('movie', title, year);
+  }
+
+  async detailsSeries(title: string, year?: number | null): Promise<TmdbDetails | null> {
+    return this.details('tv', title, year);
   }
 
   private async search(kind: 'movie' | 'tv', title: string, year?: number | null): Promise<TmdbMatch | null> {
@@ -71,6 +115,64 @@ export class TmdbMetadataService {
       year: Number.isFinite(parsedYear) ? parsedYear : null,
       posterUrl,
     };
+  }
+
+  private async details(kind: 'movie' | 'tv', title: string, year?: number | null): Promise<TmdbDetails | null> {
+    const hit = await this.searchHit(kind, title, year);
+    if (!hit?.id) return null;
+    const path = kind === 'movie' ? `/3/movie/${hit.id}` : `/3/tv/${hit.id}`;
+    const params = new URLSearchParams({
+      api_key: this.apiKey(),
+      append_to_response: 'credits',
+    });
+    const data = await this.getJson<DetailPayload>(`${path}?${params.toString()}`);
+    if (!data) return null;
+    const name = (kind === 'movie' ? data.title : data.name)?.trim() || title;
+    const date = kind === 'movie' ? data.release_date : data.first_air_date;
+    const parsedYear = date ? Number(date.slice(0, 4)) : null;
+    const crew = data.credits?.crew ?? [];
+    const runtime = kind === 'movie' ? data.runtime : data.episode_run_time?.[0];
+    return {
+      title: name,
+      year: Number.isFinite(parsedYear) ? parsedYear : null,
+      overview: data.overview?.trim() || '',
+      runtimeMinutes: runtime && runtime > 0 ? Math.round(runtime) : null,
+      rating: typeof data.vote_average === 'number' && data.vote_average > 0 ? Math.round(data.vote_average * 10) / 10 : null,
+      genres: (data.genres ?? []).map((genre) => genre.name?.trim() || '').filter(Boolean).slice(0, 6),
+      backdropUrl: data.backdrop_path ? `${TMDB_BACKDROP}${data.backdrop_path}` : null,
+      directors:
+        kind === 'tv'
+          ? (data.created_by ?? []).map((person) => person.name?.trim() || '').filter(Boolean).slice(0, 4)
+          : crew.filter((person) => person.job === 'Director').map((person) => person.name?.trim() || '').filter(Boolean).slice(0, 4),
+      writers: crew
+        .filter((person) => person.job === 'Writer' || person.job === 'Screenplay')
+        .map((person) => person.name?.trim() || '')
+        .filter(Boolean)
+        .slice(0, 6),
+      cast: (data.credits?.cast ?? [])
+        .map((person) => ({
+          name: person.name?.trim() || '',
+          profileUrl: person.profile_path ? `${TMDB_PROFILE}${person.profile_path}` : null,
+        }))
+        .filter((person) => person.name)
+        .slice(0, 12),
+    };
+  }
+
+  private async searchHit(kind: 'movie' | 'tv', title: string, year?: number | null): Promise<SearchHit | null> {
+    const cleaned = title.trim();
+    if (!this.enabled() || !cleaned) return null;
+    const params = new URLSearchParams({
+      api_key: this.apiKey(),
+      query: cleaned,
+      include_adult: 'false',
+    });
+    if (year) params.set(kind === 'movie' ? 'year' : 'first_air_date_year', String(year));
+    const path = kind === 'movie' ? '/3/search/movie' : '/3/search/tv';
+    const data = await this.getJson<{ results?: SearchHit[] }>(`${path}?${params.toString()}`);
+    const hit = data?.results?.[0];
+    if (!hit && year) return this.searchHit(kind, cleaned, null);
+    return hit ?? null;
   }
 
   private async savePoster(posterPath: string): Promise<string | null> {

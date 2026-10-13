@@ -31,6 +31,41 @@ export class CatalogTitle {
   posterUrl?: string | null;
 
   @Prop({ type: String, default: null })
+  backdropUrl?: string | null;
+
+  @Prop({ type: String, default: null })
+  overview?: string | null;
+
+  @Prop({ type: Number, default: null })
+  runtimeMinutes?: number | null;
+
+  @Prop({ type: Number, default: null })
+  rating?: number | null;
+
+  @Prop({ type: [String], default: [] })
+  genres?: string[];
+
+  @Prop({ type: [String], default: [] })
+  directors?: string[];
+
+  @Prop({ type: [String], default: [] })
+  writers?: string[];
+
+  @Prop({
+    type: [
+      {
+        name: { type: String, required: true },
+        profileUrl: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  cast?: { name: string; profileUrl?: string | null }[];
+
+  @Prop({ default: false })
+  detailsLoaded?: boolean;
+
+  @Prop({ type: String, default: null })
   videoFileName?: string | null;
 
   @Prop({ type: Number, default: null })

@@ -7,6 +7,7 @@ import {
   CatalogTitleDocument,
 } from '../../database/schemas/catalog-title.schema';
 import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media-library.schema';
+import { TmdbMetadataService } from './tmdb-metadata.service';
 
 export type CatalogBulkAction =
   | 'publish'
@@ -44,6 +45,7 @@ export class CatalogService {
     private readonly titles: Model<CatalogTitleDocument>,
     @InjectModel(MediaLibrary.name)
     private readonly libraries: Model<MediaLibraryDocument>,
+    private readonly tmdb: TmdbMetadataService,
   ) {}
 
   async list(kind: CatalogKind, q?: string, page?: number) {
@@ -69,6 +71,53 @@ export class CatalogService {
       page: current,
       pageSize,
       pageCount,
+    };
+  }
+
+  async publicTitle(id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
+    const doc = await this.titles.findById(id).exec();
+    if (!doc || !doc.published || doc.availability !== 'available') {
+      throw new NotFoundException('Title not found.');
+    }
+    if (!doc.detailsLoaded) {
+      const details =
+        doc.kind === 'series'
+          ? await this.tmdb.detailsSeries(doc.title, doc.year)
+          : await this.tmdb.detailsMovie(doc.title, doc.year);
+      doc.detailsLoaded = true;
+      if (details) {
+        if (details.title) doc.title = details.title.slice(0, 200);
+        if (details.year) doc.year = details.year;
+        doc.overview = details.overview || null;
+        doc.runtimeMinutes = details.runtimeMinutes;
+        doc.rating = details.rating;
+        doc.genres = details.genres;
+        doc.backdropUrl = details.backdropUrl;
+        doc.directors = details.directors;
+        doc.writers = details.writers;
+        doc.cast = details.cast;
+      }
+      await doc.save();
+    }
+    return {
+      id: String(doc._id),
+      title: doc.title,
+      year: doc.year,
+      kind: doc.kind,
+      posterUrl: doc.posterUrl ?? null,
+      backdropUrl: doc.backdropUrl ?? null,
+      overview: doc.overview ?? '',
+      runtimeMinutes: doc.runtimeMinutes ?? null,
+      rating: doc.rating ?? null,
+      genres: doc.genres ?? [],
+      directors: doc.directors ?? [],
+      writers: doc.writers ?? [],
+      cast: (doc.cast ?? []).map((person) => ({
+        name: person.name,
+        profileUrl: person.profileUrl ?? null,
+      })),
+      seasonCount: doc.seasonCount ?? null,
     };
   }
 
