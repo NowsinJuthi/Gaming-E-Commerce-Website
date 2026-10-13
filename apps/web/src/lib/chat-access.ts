@@ -1,4 +1,5 @@
 import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
+import { isChatStaffFromRoles } from "@/lib/chat-roles";
 import {
   isEphemeralGuestSession,
   isGuestFromAccessToken,
@@ -12,8 +13,7 @@ export function canAccessLiveChat(allowGuestChat: boolean): boolean {
 
   if (!hasAuthSession()) return false;
 
-  const roles = getSessionRoles();
-  if (roles.includes("admin") || roles.includes("support")) {
+  if (isChatStaffFromRoles(getSessionRoles())) {
     return true;
   }
 

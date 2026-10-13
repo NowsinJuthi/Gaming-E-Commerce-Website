@@ -11,7 +11,7 @@ import {
   ChatPanel,
 } from "@/components/chat/ChatPanel";
 import { SupportTeamAvatar } from "@/components/chat/ChatRoomAvatar";
-import { useStaffChatAlerts } from "@/hooks/useStaffChatAlerts";
+import { useLiveChatIconAlerts } from "@/hooks/useStaffChatAlerts";
 import {
   notifyUnreadCountChanged,
   useUnreadNotifications,
@@ -33,8 +33,7 @@ type ChatLauncherRole = "guest" | "customer" | "staff";
 
 function resolveLauncherRole(): ChatLauncherRole {
   if (typeof window === "undefined" || !hasAuthSession()) return "guest";
-  const roles = getSessionRoles();
-  if (roles.includes("admin") || roles.includes("support")) return "staff";
+  if (isChatStaffFromRoles(getSessionRoles())) return "staff";
   return "customer";
 }
 
@@ -93,17 +92,22 @@ export function LiveChatLauncher({
     };
   }, [syncRole]);
 
-  useStaffChatAlerts(role === "staff" && !pathname?.startsWith("/admin"));
-
   const chatAllowed = canAccessLiveChat(allowGuestChat);
 
   const unread = useUnreadNotifications(
-    chatAllowed,
+    chatAllowed && role !== "guest",
     role === "staff" ? "staff" : "customer",
     true,
   );
 
   const hidden = isLauncherHidden(pathname);
+
+  useLiveChatIconAlerts({
+    enabled: chatAllowed && !hidden && role !== "guest",
+    alertOn: role === "staff" ? "customer" : "staff",
+    chatOpen: open,
+    playSound: true,
+  });
 
   useEffect(() => {
     if (!open || role === "staff" || !chatAllowed) return;
@@ -479,7 +483,11 @@ export function LiveChatLauncher({
             type="button"
             className="admin-chat-launcher-fab"
             onClick={() => setOpen(true)}
-            aria-label="Open live chat"
+            aria-label={
+              unread > 0
+                ? `Open live chat, ${unread} unread`
+                : "Open live chat"
+            }
             aria-expanded={open}
           >
             <span className="admin-chat-launcher-fab-border-spin" aria-hidden />
