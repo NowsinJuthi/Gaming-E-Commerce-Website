@@ -4690,9 +4690,17 @@ export function uploadMfsQrCode(file: File): Promise<{ url: string }> {
   })();
 }
 
-export function listAdminSmsLogs(status?: string): Promise<SmsLogRow[]> {
-  const q = status ? `?status=${encodeURIComponent(status)}` : "";
-  return authRequest<SmsLogRow[]>(`/payments/admin/mfs/sms-logs${q}`);
+export function listAdminSmsLogs(
+  status?: string,
+  trxId?: string,
+): Promise<SmsLogRow[]> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (trxId?.trim()) params.set("trxId", trxId.trim());
+  const q = params.toString();
+  return authRequest<SmsLogRow[]>(
+    `/payments/admin/mfs/sms-logs${q ? `?${q}` : ""}`,
+  );
 }
 
 export function deleteAdminSmsLog(

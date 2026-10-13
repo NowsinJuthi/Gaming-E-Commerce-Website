@@ -227,8 +227,17 @@ export class MfsAdminController {
   }
 
   @Get('sms-logs')
-  listSmsLogs(@Query('status') status?: SmsLogStatus) {
-    return this.verification.listSmsLogs({ status });
+  listSmsLogs(
+    @Query('status') status?: SmsLogStatus,
+    @Query('trxId') trxId?: string,
+  ) {
+    if (status && !Object.values(SmsLogStatus).includes(status)) {
+      throw new BadRequestException('Invalid status');
+    }
+    return this.verification.listSmsLogs({
+      status,
+      trxId: trxId?.trim().slice(0, 64),
+    });
   }
 
   @Post('sms-logs/bulk-delete')

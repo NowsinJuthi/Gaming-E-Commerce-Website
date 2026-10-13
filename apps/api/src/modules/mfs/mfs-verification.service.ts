@@ -423,10 +423,6 @@ export class MfsVerificationService {
     let matched = 0;
 
     for (const payload of payloads) {
-      if (!isAllowedSmsSenderWithFormats(payload.sender, payload.body, formats)) {
-        continue;
-      }
-
       const effectiveSender = inferSmsSenderWithFormats(
         payload.sender,
         payload.body,
@@ -439,6 +435,10 @@ export class MfsVerificationService {
         payload.amount,
         formats,
       );
+      const allowed = isAllowedSmsSenderWithFormats(payload.sender, payload.body, formats);
+      if (!allowed && !parsed.trxId && parsed.amount === undefined) {
+        continue;
+      }
 
       const normalizedTrx = parsed.trxId?.trim().toUpperCase();
       if (normalizedTrx) {
@@ -451,12 +451,12 @@ export class MfsVerificationService {
       }
 
       const log = await this.smsModel.create({
-        sender: effectiveSender,
+        sender: effectiveSender || payload.sender || 'sms',
         body: payload.body,
         trxId: normalizedTrx ?? parsed.trxId,
         amount: parsed.amount,
         status: SmsLogStatus.Unmatched,
-        smsTimestamp: new Date(),
+        smsTimestamp: payload.smsTimestamp ?? new Date(),
       });
       processed += 1;
 
@@ -481,11 +481,6 @@ export class MfsVerificationService {
     let rejectedDump = '';
 
     for (const payload of payloads) {
-      if (!isAllowedSmsSenderWithFormats(payload.sender, payload.body, formats)) {
-        rejectedDump = JSON.stringify(payload).slice(0, 100);
-        continue;
-      }
-
       const effectiveSender = inferSmsSenderWithFormats(
         payload.sender,
         payload.body,
@@ -498,6 +493,10 @@ export class MfsVerificationService {
         payload.amount,
         formats,
       );
+      if (!payload.body.trim()) {
+        rejectedDump = JSON.stringify(payload).slice(0, 100);
+        continue;
+      }
 
       const normalizedTrx = parsed.trxId?.trim().toUpperCase();
       if (normalizedTrx) {
@@ -511,12 +510,12 @@ export class MfsVerificationService {
       }
 
       const log = await this.smsModel.create({
-        sender: effectiveSender,
+        sender: effectiveSender || payload.sender || 'sms',
         body: payload.body,
         trxId: normalizedTrx ?? parsed.trxId,
         amount: parsed.amount,
         status: SmsLogStatus.Unmatched,
-        smsTimestamp: new Date(),
+        smsTimestamp: payload.smsTimestamp ?? new Date(),
       });
       processed += 1;
 
@@ -574,6 +573,7 @@ export class MfsVerificationService {
 
   async listSmsLogs(opts: {
     status?: SmsLogStatus;
+    trxId?: string;
     limit?: number;
   }): Promise<
     Array<{
@@ -589,11 +589,18 @@ export class MfsVerificationService {
       updatedAt?: Date;
     }>
   > {
-    const filter = opts.status ? { status: opts.status } : {};
+    const filter: Record<string, unknown> = {};
+    if (opts.status) filter.status = opts.status;
+    const trx = opts.trxId?.trim();
+    if (trx) {
+      const escaped = trx.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = { $regex: escaped, $options: 'i' };
+      filter.$or = [{ trxId: pattern }, { body: pattern }];
+    }
     const docs = await this.smsModel
       .find(filter)
       .sort({ createdAt: -1 })
-      .limit(opts.limit ?? 100)
+      .limit(trx ? 200 : (opts.limit ?? 100))
       .exec();
     return docs.map((doc) => ({
       _id: String(doc._id),

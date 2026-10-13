@@ -87,6 +87,8 @@ function SmsLogOverviewStats({ items }: { items: SmsLogOverviewItem[] }) {
 export default function AdminSmsLogsPage() {
   const [logs, setLogs] = useState<SmsLogRow[]>([]);
   const [status, setStatus] = useState("");
+  const [trxDraft, setTrxDraft] = useState("");
+  const [trxId, setTrxId] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -100,13 +102,13 @@ export default function AdminSmsLogsPage() {
     setLoading(true);
     setError(null);
     try {
-      setLogs(await listAdminSmsLogs(status || undefined));
+      setLogs(await listAdminSmsLogs(status || undefined, trxId || undefined));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, trxId]);
 
   useEffect(() => {
     void load();
@@ -114,7 +116,7 @@ export default function AdminSmsLogsPage() {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [status]);
+  }, [status, trxId]);
 
   const stats = useMemo(() => {
     let matched = 0;
@@ -136,9 +138,9 @@ export default function AdminSmsLogsPage() {
         icon: <ChatIcon className="h-4 w-4" aria-hidden />,
         label: "Shown",
         value: stats.total.toLocaleString(),
-        meta: status
-          ? `Filtered by ${status}`
-          : "Current filter results",
+        meta: [status ? `Status ${status}` : "", trxId ? `TrxID ${trxId}` : ""]
+          .filter(Boolean)
+          .join(" · ") || "Current filter results",
       },
       {
         key: "matched",
@@ -165,7 +167,7 @@ export default function AdminSmsLogsPage() {
         meta: "Marked as ignored",
       },
     ];
-  }, [stats, status]);
+  }, [stats, status, trxId]);
 
   const allSelected =
     logs.length > 0 && logs.every((row) => selectedIds.has(row._id));
@@ -354,15 +356,55 @@ export default function AdminSmsLogsPage() {
         <SmsLogOverviewStats items={overviewItems} />
 
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="admin-sms-logs-filters max-w-xs">
-            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-subtle">
-              Filter by status
-            </label>
-            <AdminSelect
-              value={status}
-              onChange={setStatus}
-              options={FILTER_STATUS_OPTIONS}
-            />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="admin-sms-logs-filters max-w-xs">
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-subtle">
+                Filter by status
+              </label>
+              <AdminSelect
+                value={status}
+                onChange={setStatus}
+                options={FILTER_STATUS_OPTIONS}
+              />
+            </div>
+            <form
+              className="flex items-end gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setTrxId(trxDraft.trim());
+              }}
+            >
+              <div>
+                <label
+                  htmlFor="sms-trx-search"
+                  className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-subtle"
+                >
+                  Search TrxID
+                </label>
+                <input
+                  id="sms-trx-search"
+                  value={trxDraft}
+                  onChange={(event) => setTrxDraft(event.target.value)}
+                  placeholder="TrxID"
+                  className="admin-input min-w-[12rem]"
+                />
+              </div>
+              <button type="submit" className="panel-3d-btn text-xs">
+                Search
+              </button>
+              {trxId ? (
+                <button
+                  type="button"
+                  className="dashboard-pro-btn-ghost text-xs"
+                  onClick={() => {
+                    setTrxDraft("");
+                    setTrxId("");
+                  }}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </form>
           </div>
 
           {logs.length > 0 ? (

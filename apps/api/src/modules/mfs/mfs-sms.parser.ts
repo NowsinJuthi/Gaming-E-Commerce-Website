@@ -7,9 +7,10 @@ export type ParsedSmsPayload = {
   body: string;
   trxId?: string;
   amount?: number;
+  smsTimestamp?: Date;
 };
 
-const ALLOWED_SENDERS = ['bkash', 'nagad', 'rocket', '16216', 'upay'];
+const ALLOWED_SENDERS = ['bkash', 'nagad', 'rocket', '16216', '16247', 'upay'];
 
 function parsePositiveAmount(value: number | null | undefined): number | undefined {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -78,6 +79,8 @@ export function inferSmsSenderWithFormats(
   const sorted = [...formats]
     .filter((fmt) => fmt.enabled)
     .sort((a, b) => a.priority - b.priority);
+
+  if (normalized.includes('16247')) return 'bkash';
 
   // Phase 1: exact sender-name match (e.g. sender field = "bKash", "Nagad").
   // This is the most reliable signal — skip body analysis entirely.
@@ -216,8 +219,65 @@ const MAX_PAYLOADS_PER_REQUEST = 50;
 const clampBody = (s: string): string => s.slice(0, MAX_SMS_BODY_LEN);
 const clampSender = (s: string): string => s.slice(0, MAX_SMS_SENDER_LEN);
 
+const BODY_KEYS = ['message', 'body', 'sms', 'msg', 'raw_message', 'sms_body', 'content', 'text'];
+const SENDER_KEYS = [
+  'mobile_number',
+  'address',
+  'sender',
+  'from',
+  'sender_name',
+  'sender_number',
+  'number',
+  'payment_method',
+];
+const TRX_KEYS = ['transaction_id', 'trx_id', 'trxId', 'transactionId', 'txn_id', 'txnId'];
+
+function readText(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+}
+
+function readTimestamp(record: Record<string, unknown>): Date | undefined {
+  const raw =
+    record.timestamp ??
+    record.received_at ??
+    record.sent_at ??
+    record.receivedStamp ??
+    record.sentStamp ??
+    record.date_sent ??
+    record.date ??
+    record.time;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const ms = raw > 1_000_000_000_000 ? raw : raw * 1000;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  return undefined;
+}
+
+function looksLikeSms(record: Record<string, unknown>): boolean {
+  return (
+    readText(record, BODY_KEYS).length > 0 ||
+    readText(record, SENDER_KEYS).length > 0 ||
+    readText(record, TRX_KEYS).length > 0
+  );
+}
+
 /** Walk nested JSON from the SMS forwarding app. */
 export function flattenSmsPayloads(raw: unknown): ParsedSmsPayload[] {
+  if (typeof raw === 'string' && raw.trim()) {
+    const body = clampBody(raw.trim());
+    return [{ sender: inferSmsSender('', body), body }];
+  }
+
   const payloads: ParsedSmsPayload[] = [];
   const queue: unknown[] = [raw];
 
@@ -228,49 +288,34 @@ export function flattenSmsPayloads(raw: unknown): ParsedSmsPayload[] {
     if (!current || typeof current !== 'object') continue;
 
     const record = current as Record<string, unknown>;
-    const hasSmsShape =
-      'payment_method' in record ||
-      'transaction_id' in record ||
-      'address' in record ||
-      'sender' in record ||
-      'body' in record;
-
-    if (hasSmsShape) {
-      const body = clampBody(
-        String(
-          record.message ??
-            record.body ??
-            record.content ??
-            record.text ??
-            JSON.stringify(record),
-        ),
-      );
-      const rawSender = clampSender(
-        String(
-          record.mobile_number ??
-            record.address ??
-            record.sender ??
-            record.number ??
-            record.payment_method ??
-            '',
-        ),
-      );
-      const sender = inferSmsSender(rawSender, body);
-      const trxIdRaw =
-        (record.transaction_id as string | undefined) ??
-        (record.trx_id as string | undefined);
-      const trxId = trxIdRaw ? String(trxIdRaw).slice(0, 64) : undefined;
-      const amountRaw = record.amount;
+    if (looksLikeSms(record)) {
+      const rawSender = clampSender(readText(record, SENDER_KEYS));
+      const trxIdRaw = readText(record, TRX_KEYS);
+      const amountRaw = record.amount ?? record.tk;
       const amount =
-        amountRaw !== undefined && amountRaw !== null
-          ? Number(amountRaw)
-          : undefined;
+        amountRaw !== undefined && amountRaw !== null ? Number(amountRaw) : undefined;
+      let body = clampBody(readText(record, BODY_KEYS));
+      if (!body && (trxIdRaw || (Number.isFinite(amount) && (amount ?? 0) > 0))) {
+        body = clampBody(
+          [rawSender, trxIdRaw, Number.isFinite(amount) ? String(amount) : '']
+            .filter(Boolean)
+            .join(' '),
+        );
+      }
+      if (!body) {
+        for (const child of Object.values(record)) {
+          if (child && typeof child === 'object') queue.push(child);
+        }
+        continue;
+      }
+      const sender = inferSmsSender(rawSender, body);
 
       payloads.push({
         sender,
         body,
-        trxId,
+        trxId: trxIdRaw ? trxIdRaw.slice(0, 64) : undefined,
         amount: Number.isFinite(amount) ? amount : undefined,
+        smsTimestamp: readTimestamp(record),
       });
     } else {
       for (const child of Object.values(record)) {
@@ -282,13 +327,9 @@ export function flattenSmsPayloads(raw: unknown): ParsedSmsPayload[] {
   if (payloads.length === 0 && raw && typeof raw === 'object') {
     const record = raw as Record<string, unknown>;
     const body = clampBody(
-      String(
-        record.body ?? record.message ?? record.content ?? JSON.stringify(raw),
-      ),
+      readText(record, BODY_KEYS) || JSON.stringify(raw),
     );
-    const rawSender = clampSender(
-      String(record.sender ?? record.address ?? ''),
-    );
+    const rawSender = clampSender(readText(record, SENDER_KEYS));
     payloads.push({
       sender: inferSmsSender(rawSender, body),
       body,
