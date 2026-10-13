@@ -352,7 +352,156 @@
   color: var(--muted-foreground);
 }
 
+.scanCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  border: 1px solid rgb(38 191 176 / 0.28);
+  background:
+    radial-gradient(circle at 0% 0%, rgb(38 191 176 / 0.16), transparent 42%),
+    color-mix(in srgb, var(--card) 88%, transparent);
+  padding: 1.05rem 1.1rem 1rem;
+  animation: scanCardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.scanCardBusy {
+  border-color: rgb(38 191 176 / 0.5);
+}
+
+.scanCardDone {
+  border-color: rgb(38 191 176 / 0.28);
+}
+
+.scanGlow {
+  position: absolute;
+  inset: auto -20% auto auto;
+  top: -40%;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 999px;
+  background: rgb(38 191 176 / 0.16);
+  filter: blur(28px);
+  pointer-events: none;
+  animation: scanGlow 2.8s ease-in-out infinite;
+}
+
+.scanHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.scanMark {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: none;
+  place-items: center;
+}
+
+.scanSpin {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  border: 2px solid rgb(38 191 176 / 0.25);
+  border-top-color: #5eead4;
+  animation: scanSpin 0.75s linear infinite;
+}
+
+.scanCheck {
+  width: 2.15rem;
+  height: 2.15rem;
+  fill: none;
+  stroke: #5eead4;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgb(38 191 176 / 0.55));
+}
+
+.scanCheck circle {
+  stroke-dasharray: 58;
+  stroke-dashoffset: 58;
+  animation: scanDraw 0.55s ease forwards;
+}
+
+.scanCheck path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: scanDraw 0.35s ease 0.4s forwards;
+}
+
+.scanCopy {
+  min-width: 0;
+  flex: 1;
+}
+
+.scanKicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5eead4;
+}
+
+.scanTitle {
+  margin: 0.15rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.scanStats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.95rem;
+}
+
+.scanStat {
+  border-radius: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(0 0 0 / 0.22);
+  padding: 0.65rem 0.7rem;
+  animation: scanStatIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.scanStat span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.scanStat strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.scanStat_good strong {
+  color: #5eead4;
+}
+
+.scanStat_warn strong {
+  color: #fcd34d;
+}
+
+.scanStat_gap strong {
+  color: #fda4af;
+}
+
 .scanBar {
+  position: relative;
   margin-top: 0.85rem;
   height: 0.45rem;
   overflow: hidden;
@@ -360,11 +509,123 @@
   background: rgb(255 255 255 / 0.08);
 }
 
-.scanFill {
+.scanFill,
+.scanFillBusy {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, #0a6258, #26bfb0, #5eead4);
-  transition: width 0.25s ease;
+}
+
+.scanFill {
+  transform-origin: left center;
+  animation: scanFillGrow 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.scanFillBusy {
+  width: 38%;
+  animation: scanSweep 1.15s ease-in-out infinite;
+}
+
+.scanMeterLabel {
+  position: relative;
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.scanLogs {
+  position: relative;
+  margin-top: 0.75rem;
+  max-height: 8rem;
+  overflow: auto;
+  border-radius: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 0.06);
+  background: rgb(0 0 0 / 0.28);
+  padding: 0.7rem 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.scanLogs > div {
+  animation: scanStatIn 0.4s ease both;
+}
+
+@keyframes scanCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scanGlow {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes scanSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scanDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes scanStatIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scanFillGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes scanSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanCard,
+  .scanGlow,
+  .scanSpin,
+  .scanCheck circle,
+  .scanCheck path,
+  .scanStat,
+  .scanFill,
+  .scanFillBusy,
+  .scanLogs > div {
+    animation: none;
+  }
+
+  .scanCheck circle,
+  .scanCheck path {
+    stroke-dashoffset: 0;
+  }
 }
 
 .logs {

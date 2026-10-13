@@ -15,6 +15,88 @@ import {
   type MediaLibraryKind,
 } from "@/lib/media-ops-api";
 
+function ScanResult({
+  busy,
+  title,
+  matched,
+  missing,
+  unmatched,
+  logs,
+  onClose,
+}: {
+  busy: boolean;
+  title: string;
+  matched: number;
+  missing: number;
+  unmatched: number;
+  logs: string[];
+  onClose: () => void;
+}) {
+  const total = matched + missing + unmatched;
+  const matchedPct = total > 0 ? Math.round((matched / total) * 100) : 0;
+  const stats = [
+    { label: "Matched", value: matched, tone: "good" as const },
+    { label: "Missing", value: missing, tone: "warn" as const },
+    { label: "Unmatched", value: unmatched, tone: "gap" as const },
+  ];
+
+  return (
+    <section className={`${styles.scanCard} ${busy ? styles.scanCardBusy : styles.scanCardDone}`} aria-live="polite">
+      <div className={styles.scanGlow} aria-hidden />
+      <div className={styles.scanHead}>
+        <div className={styles.scanMark} aria-hidden>
+          {busy ? (
+            <span className={styles.scanSpin} />
+          ) : (
+            <svg className={styles.scanCheck} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8 12.5l2.4 2.4L16.2 9" />
+            </svg>
+          )}
+        </div>
+        <div className={styles.scanCopy}>
+          <p className={styles.scanKicker}>{busy ? "Scanning" : "Completed"}</p>
+          <h2 className={styles.scanTitle}>{title}</h2>
+        </div>
+        <button type="button" className={styles.headerBtn} onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <div className={styles.scanStats}>
+        {stats.map((stat, index) => (
+          <div
+            key={stat.label}
+            className={`${styles.scanStat} ${
+              stat.tone === "good" ? styles.scanStat_good : stat.tone === "warn" ? styles.scanStat_warn : styles.scanStat_gap
+            }`}
+            style={{ animationDelay: `${120 + index * 90}ms` }}
+          >
+            <span>{stat.label}</span>
+            <strong>{busy ? "—" : stat.value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className={styles.scanBar} aria-hidden>
+        <div className={busy ? styles.scanFillBusy : styles.scanFill} style={busy ? undefined : { width: `${matchedPct}%` }} />
+      </div>
+      <p className={styles.scanMeterLabel}>
+        {busy ? "Reading folders and matching posters…" : `${matchedPct}% matched${total > 0 ? ` of ${total}` : ""}`}
+      </p>
+      <div className={styles.scanLogs}>
+        {logs.length === 0 ? (
+          <div>Waiting for scan output…</div>
+        ) : (
+          logs.map((line, index) => (
+            <div key={`${index}-${line}`} style={{ animationDelay: `${280 + index * 70}ms` }}>
+              {line}
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function AdminLibrariesPage() {
   const [libraries, setLibraries] = useState<AdminMediaLibrary[]>([]);
   const [totals, setTotals] = useState({ items: 0, missing: 0, unmatched: 0 });
@@ -239,26 +321,15 @@ export default function AdminLibrariesPage() {
         )}
 
         {scanNote ? (
-          <section className={styles.panel}>
-            <div className={styles.panelHead}>
-              <div>
-                <h2 className={styles.panelTitle}>{scanNote}</h2>
-                <p className={styles.panelHint}>
-                  Matched {scanStats.matched} · Missing {scanStats.missing} · Unmatched {scanStats.unmatched}
-                </p>
-              </div>
-              <button type="button" className={styles.headerBtn} onClick={() => setScanNote(null)}>
-                Close
-              </button>
-            </div>
-            <div className={styles.logs}>
-              {scanLogs.length === 0 ? (
-                <div>Waiting for scan output…</div>
-              ) : (
-                scanLogs.map((line, index) => <div key={`${index}-${line}`}>{line}</div>)
-              )}
-            </div>
-          </section>
+          <ScanResult
+            busy={busy}
+            title={scanNote}
+            matched={scanStats.matched}
+            missing={scanStats.missing}
+            unmatched={scanStats.unmatched}
+            logs={scanLogs}
+            onClose={() => setScanNote(null)}
+          />
         ) : null}
 
         {editing ? (
