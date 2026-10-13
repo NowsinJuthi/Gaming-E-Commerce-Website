@@ -166,6 +166,37 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return this.present(session);
   }
 
+  /** Growing EVENT playlists may list segments before the file exists; drop missing entries and bust segment cache on pack restart. */
+  async playlistForServe(sessionId: string): Promise<string> {
+    if (!/^[a-f0-9]{32}$/.test(sessionId)) throw new NotFoundException();
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new NotFoundException();
+    const playlist = join(session.dir, 'index.m3u8');
+    const root = resolve(session.dir);
+    if (!playlist.startsWith(root + sep) && playlist !== root) throw new NotFoundException();
+    if (!existsSync(playlist)) throw new NotFoundException();
+    session.touchedAt = Date.now();
+    const raw = await readFile(playlist, 'utf8');
+    const gen = session.token;
+    const lines = raw.split(/\r?\n/);
+    const out: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (/^seg\d{5}\.ts$/i.test(trimmed)) {
+        const full = join(session.dir, trimmed);
+        if (!existsSync(full)) {
+          const prev = out[out.length - 1];
+          if (prev?.startsWith('#EXTINF')) out.pop();
+          continue;
+        }
+        out.push(`${trimmed}?g=${gen}`);
+        continue;
+      }
+      out.push(line);
+    }
+    return out.join('\n');
+  }
+
   openFile(sessionId: string, name: string): { path: string; type: string } {
     if (!/^[a-f0-9]{32}$/.test(sessionId)) throw new NotFoundException();
     if (!/^(index\.m3u8|seg\d{5}\.ts|captions-\d+\.vtt)$/.test(name)) throw new NotFoundException();
@@ -479,6 +510,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-hls_time', '4',
       '-hls_init_time', '2',
       '-hls_list_size', '0',
+      '-start_number', '0',
       '-hls_playlist_type', 'event',
       '-hls_flags', 'independent_segments+omit_endlist+temp_file',
       '-avoid_negative_ts', 'make_zero',

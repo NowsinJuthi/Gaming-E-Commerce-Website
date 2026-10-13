@@ -641,7 +641,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       maxBufferHole: 0.5,
       nudgeOffset: 0.2,
       nudgeMaxRetry: 4,
-      startFragPrefetch: true,
+      startFragPrefetch: false,
     });
     hlsRef.current = hls;
     hls.attachMedia(video);

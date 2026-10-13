@@ -56,15 +56,22 @@ export class MediaPlaybackController {
   }
 
   @Get('sessions/:sessionId/:file')
-  file(
+  async file(
     @Param('sessionId') sessionId: string,
     @Param('file') file: string,
     @Res() res: Response,
   ) {
     try {
+      if (file === 'index.m3u8') {
+        const body = await this.playback.playlistForServe(sessionId);
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(body);
+        return;
+      }
       const opened = this.playback.openFile(sessionId, file);
       res.setHeader('Content-Type', opened.type);
-      res.setHeader('Cache-Control', file.endsWith('.m3u8') ? 'no-store' : 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'no-store');
       res.sendFile(opened.path);
     } catch {
       res.status(404).end();
