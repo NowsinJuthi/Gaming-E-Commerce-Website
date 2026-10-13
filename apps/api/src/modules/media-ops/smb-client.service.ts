@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'child_process';
+import { unlink } from 'fs/promises';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -82,7 +83,25 @@ export class SmbClientService {
         if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
       }
     }
-    throw new Error(this.formatLinuxSmbError(lastError));
+
+    const baseAuth = attempts[0] ?? auth;
+    const shares = await this.listDiskShares(baseAuth).catch(() => [] as string[]);
+    const tried = new Set([auth.share.trim().toLowerCase()]);
+    for (const share of shares) {
+      if (tried.has(share.toLowerCase())) continue;
+      tried.add(share.toLowerCase());
+      await unlink(localFile).catch(() => undefined);
+      try {
+        await this.spawnGet({ ...baseAuth, share }, remote, localFile, 'SMB3');
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const message = this.formatLinuxSmbError(lastError);
+    const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
+    throw new Error(`${message}${shareHint}`);
   }
 
   async list(auth: SmbAuth, remotePath = ''): Promise<SmbListedEntry[]> {
