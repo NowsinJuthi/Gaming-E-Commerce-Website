@@ -434,6 +434,36 @@
     min-width: 0;
     max-width: none;
   }
+
+  .filters .control {
+    min-height: 2.15rem;
+    padding: 0.32rem 1.55rem 0.32rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 400;
+  }
+
+  .filters .selectWrap::after {
+    right: 0.55rem;
+    height: 0.35rem;
+    width: 0.35rem;
+  }
+
+  .filters .searchInput {
+    min-height: 2.15rem;
+    padding: 0.32rem 1.65rem 0.32rem 1.85rem;
+    font-size: 0.6875rem;
+    font-weight: 400;
+  }
+
+  .filters .searchInput::placeholder {
+    font-weight: 400;
+  }
+
+  .filters .searchIcon {
+    left: 0.55rem;
+    height: 1rem;
+    width: 1rem;
+  }
 }
 
 @media (min-width: 768px) {
