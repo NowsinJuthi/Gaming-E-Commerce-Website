@@ -9,6 +9,12 @@ export type MediaCard = {
   featured: boolean;
   trending: boolean;
   seasonCount: number | null;
+  libraryId?: string | null;
+};
+
+export type MediaLibraryMenu = {
+  id: string;
+  name: string;
 };
 
 export type MediaRow = {
@@ -21,9 +27,10 @@ export type MediaHome = {
   hero: MediaCard[];
   rows: MediaRow[];
   items: MediaCard[];
+  libraries: MediaLibraryMenu[];
 };
 
-export const EMPTY_MEDIA_HOME: MediaHome = { hero: [], rows: [], items: [] };
+export const EMPTY_MEDIA_HOME: MediaHome = { hero: [], rows: [], items: [], libraries: [] };
 
 export async function getMediaHome(): Promise<MediaHome> {
   try {
@@ -40,6 +47,7 @@ export async function getMediaHome(): Promise<MediaHome> {
       hero: Array.isArray(data.hero) ? data.hero : [],
       rows,
       items,
+      libraries: Array.isArray(data.libraries) ? data.libraries : [],
     };
   } catch {
     return EMPTY_MEDIA_HOME;

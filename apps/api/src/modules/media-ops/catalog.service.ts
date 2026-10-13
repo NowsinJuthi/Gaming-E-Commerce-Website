@@ -6,6 +6,7 @@ import {
   CatalogTitle,
   CatalogTitleDocument,
 } from '../../database/schemas/catalog-title.schema';
+import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media-library.schema';
 
 export type CatalogBulkAction =
   | 'publish'
@@ -13,6 +14,11 @@ export type CatalogBulkAction =
   | 'delete'
   | 'feature'
   | 'trending';
+
+function libraryIdFromSource(sourceKey?: string | null): string | null {
+  const id = sourceKey?.split(':')[0]?.trim() ?? '';
+  return Types.ObjectId.isValid(id) ? id : null;
+}
 
 function serialize(doc: CatalogTitleDocument) {
   return {
@@ -36,6 +42,8 @@ export class CatalogService {
   constructor(
     @InjectModel(CatalogTitle.name)
     private readonly titles: Model<CatalogTitleDocument>,
+    @InjectModel(MediaLibrary.name)
+    private readonly libraries: Model<MediaLibraryDocument>,
   ) {}
 
   async list(kind: CatalogKind, q?: string, page?: number) {
@@ -90,14 +98,19 @@ export class CatalogService {
       { id: 'series', title: 'Series', items: series },
       { id: 'trending', title: 'Trending', items: trending },
     ].filter((row) => row.items.length > 0);
+    const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
-      .sort({ updatedAt: -1 })
-      .limit(300)
+      .sort({ title: 1 })
+      .limit(500)
       .exec();
     return {
       hero: (featured.length > 0 ? featured : items).slice(0, 6),
       rows: shelves,
+      libraries: libraries.map((library) => ({
+        id: String(library._id),
+        name: library.name,
+      })),
       items: catalog.map((doc) => ({
         id: String(doc._id),
         title: doc.title,
@@ -107,6 +120,7 @@ export class CatalogService {
         featured: doc.featured,
         trending: doc.trending,
         seasonCount: doc.seasonCount ?? null,
+        libraryId: libraryIdFromSource(doc.sourceKey),
       })),
     };
   }

@@ -4,42 +4,51 @@ import { useMemo, useState } from "react";
 import styles from "./media-home.module.css";
 import type { MediaCard, MediaHome } from "@/lib/media-home-api";
 
-type SortKey = "newest" | "title" | "year-desc" | "year-asc";
-
 export function MediaHome({ home }: { home: MediaHome }) {
   const source = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
-  const [sort, setSort] = useState<SortKey>("newest");
+  const [libraryId, setLibraryId] = useState(home.libraries[0]?.id ?? "");
   const [year, setYear] = useState("");
   const [info, setInfo] = useState<MediaCard | null>(null);
+  const selected = home.libraries.find((library) => library.id === libraryId) ?? home.libraries[0] ?? null;
+  const activeLibraryId = selected?.id ?? "";
 
-  const years = useMemo(
-    () => [...new Set(source.map((item) => item.year).filter((value) => value > 0))].sort((a, b) => b - a),
-    [source],
+  const libraryItems = useMemo(
+    () => source.filter((item) => item.libraryId === activeLibraryId),
+    [source, activeLibraryId],
   );
 
-  const visible = useMemo(() => {
-    const rows = source.filter((item) => !year || String(item.year) === year);
-    const copy = [...rows];
-    if (sort === "title") copy.sort((a, b) => a.title.localeCompare(b.title));
-    if (sort === "year-desc") copy.sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
-    if (sort === "year-asc") copy.sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
-    return copy;
-  }, [source, sort, year]);
+  const years = useMemo(
+    () => [...new Set(libraryItems.map((item) => item.year).filter((value) => value > 0))].sort((a, b) => b - a),
+    [libraryItems],
+  );
+
+  const visible = useMemo(
+    () => libraryItems.filter((item) => !year || String(item.year) === year),
+    [libraryItems, year],
+  );
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Media</h1>
+      <h1 className={styles.heading}>{selected?.name ?? "Media"}</h1>
 
       <section className={styles.panel}>
         <div className={styles.filters}>
           <label className={styles.field}>
-            <span className={styles.label}>Sort by</span>
+            <span className={styles.label}>Media Menu</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
-                <option value="newest">Recently added</option>
-                <option value="title">Title</option>
-                <option value="year-desc">Year, newest</option>
-                <option value="year-asc">Year, oldest</option>
+              <select
+                className={styles.control}
+                value={activeLibraryId}
+                onChange={(event) => {
+                  setLibraryId(event.target.value);
+                  setYear("");
+                }}
+              >
+                {home.libraries.map((library) => (
+                  <option key={library.id} value={library.id}>
+                    {library.name}
+                  </option>
+                ))}
               </select>
             </span>
           </label>
@@ -76,7 +85,11 @@ export function MediaHome({ home }: { home: MediaHome }) {
       </section>
 
       {visible.length === 0 ? (
-        <p className={styles.empty}>No published titles yet.</p>
+        <p className={styles.empty}>
+          {home.libraries.length === 0
+            ? "No media libraries yet."
+            : "No titles in this library yet."}
+        </p>
       ) : (
         <div className={styles.grid}>
           {visible.map((item) => (
