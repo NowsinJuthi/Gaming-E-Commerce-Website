@@ -24,6 +24,9 @@ import { SmbMountService } from './smb-mount.service';
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
+/** MPEG-TS HLS parts use .m2ts so nginx ".ts source file" deny rules cannot block playback. */
+const HLS_SEGMENT_SUFFIX = '.m2ts';
+const HLS_SEGMENT_NAME = /^seg\d{5}\.m2ts$/i;
 const QUALITIES = ['auto', '1080', '720', '480'] as const;
 
 export type PlaybackQuality = (typeof QUALITIES)[number];
@@ -182,7 +185,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const out: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
-      if (/^seg\d{5}\.ts$/i.test(trimmed)) {
+      if (HLS_SEGMENT_NAME.test(trimmed)) {
         const full = join(session.dir, trimmed);
         if (!existsSync(full)) {
           const prev = out[out.length - 1];
@@ -199,7 +202,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   openFile(sessionId: string, name: string): { path: string; type: string } {
     if (!/^[a-f0-9]{32}$/.test(sessionId)) throw new NotFoundException();
-    if (!/^(index\.m3u8|seg\d{5}\.ts|captions-\d+\.vtt)$/.test(name)) throw new NotFoundException();
+    if (!/^(index\.m3u8|seg\d{5}\.(?:m2ts|ts)|captions-\d+\.vtt)$/.test(name)) throw new NotFoundException();
     const session = this.sessions.get(sessionId);
     if (!session) throw new NotFoundException();
     const full = join(session.dir, name);
@@ -489,7 +492,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.message = 'Starting playback…';
     session.complete = false;
     const playlist = join(session.dir, 'index.m3u8');
-    const segment = join(session.dir, 'seg%05d.ts');
+    const segment = join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
     const audio = session.audioTracks[session.audioIndex];
     const streaming = Boolean(session.incoming);
     const args = [
@@ -537,7 +540,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       session.status = 'error';
       session.message = this.publicError(error);
     });
-    const ready = await this.waitForSegment(join(session.dir, 'seg00000.ts'), child, 90_000);
+    const ready = await this.waitForSegment(join(session.dir, `seg00000${HLS_SEGMENT_SUFFIX}`), child, 90_000);
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);
@@ -741,7 +744,11 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private async clearSegments(session: Session) {
     const files = await readdir(session.dir).catch(() => [] as string[]);
-    await Promise.all(files.filter((name) => name.endsWith('.ts') || name === 'index.m3u8').map((name) => unlink(join(session.dir, name)).catch(() => undefined)));
+    await Promise.all(
+      files
+        .filter((name) => name.endsWith('.m2ts') || name.endsWith('.ts') || name === 'index.m3u8')
+        .map((name) => unlink(join(session.dir, name)).catch(() => undefined)),
+    );
   }
 
   private async clearCaptions(session: Session) {

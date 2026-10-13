@@ -631,8 +631,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       autoStartLoad: false,
       liveDurationInfinity: false,
       startPosition: 0.001,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: Infinity,
+      liveSyncDurationCount: 1,
+      liveMaxLatencyDurationCount: 10,
+      initialLiveManifestSize: 1,
       maxLiveSyncPlaybackRate: 1,
       maxBufferSize: 400_000_000,
       backBufferLength: 180,
@@ -662,7 +663,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         if (!data.fatal || seq !== attachSeqRef.current) return;
         if (data.type === mod.default.ErrorTypes.NETWORK_ERROR && fatalRetries < 6) {
           fatalRetries += 1;
-          hls.startLoad();
+          hls.startLoad(0.001);
           return;
         }
         if (data.type === mod.default.ErrorTypes.MEDIA_ERROR && fatalRetries < 4) {
