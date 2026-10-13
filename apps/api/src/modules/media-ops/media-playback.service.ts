@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { join, resolve, sep } from 'path';
 import {
@@ -307,44 +307,43 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       session.downloaded = ready;
       return finalPath;
     }
-    session.message = 'Starting playback…';
+    session.message = 'Saving the video from storage…';
     session.cacheName = cacheName;
+    session.remote?.close();
+    session.remote = null;
     this.stopIncoming(session);
+    await mkdir(cacheDir, { recursive: true });
+    const partPath = `${finalPath}.part`;
+    await rm(partPath, { force: true }).catch(() => undefined);
+    const total = episode.sizeBytes ?? session.fileSize ?? 0;
+    const progress = setInterval(() => {
+      void stat(partPath)
+        .then((info) => {
+          const pct = total > 0 ? Math.min(99, Math.round((info.size / total) * 100)) : 0;
+          session.message = total > 0 ? `Saving the video from storage… ${pct}%` : 'Saving the video from storage…';
+        })
+        .catch(() => undefined);
+    }, 1000);
     try {
-      const playback = await this.smb.openPlayback(session.auth, episode.remotePath);
-      if (session.token !== token) {
-        playback.close();
-        return finalPath;
+      await this.smb.downloadFile(session.auth, episode.remotePath, partPath);
+      const info = await stat(partPath);
+      if (info.size < 4096) throw new Error('The video file from storage was empty.');
+      if (total > 0 && info.size + 4096 < total) {
+        throw new Error('The video download stopped before the file was complete.');
       }
-      session.remote?.close();
-      session.remote = playback;
-      session.fileSize = playback.size;
-      const port = await this.readyPort();
-      return `http://127.0.0.1:${port}/${session.id}`;
-    } catch (error) {
-      this.logger.warn(`Direct read failed, saving the video first: ${error instanceof Error ? error.message : error}`);
-      session.remote?.close();
-      session.remote = null;
-      await mkdir(cacheDir, { recursive: true });
       await rm(finalPath, { force: true }).catch(() => undefined);
-      const total = episode.sizeBytes ?? session.fileSize ?? 0;
-      const progress = setInterval(() => {
-        void stat(finalPath)
-          .then((info) => {
-            const pct = total > 0 ? Math.min(99, Math.round((info.size / total) * 100)) : 0;
-            session.message = total > 0 ? `Preparing the video… ${pct}%` : 'Preparing the video…';
-          })
-          .catch(() => undefined);
-      }, 1000);
-      try {
-        await this.smb.downloadFile(session.auth, episode.remotePath, finalPath);
-      } finally {
-        clearInterval(progress);
-      }
-      if (session.token !== token) return finalPath;
-      session.message = 'Starting playback…';
-      return finalPath;
+      await rename(partPath, finalPath);
+      session.fileSize = info.size;
+      session.downloaded = info.size;
+    } catch (error) {
+      await rm(partPath, { force: true }).catch(() => undefined);
+      throw error;
+    } finally {
+      clearInterval(progress);
     }
+    if (session.token !== token) return finalPath;
+    session.message = 'Starting playback…';
+    return finalPath;
   }
 
   private async serveRemote(req: IncomingMessage, res: ServerResponse) {
