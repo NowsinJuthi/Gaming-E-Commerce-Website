@@ -7,10 +7,15 @@ import { API_BASE } from "@/lib/api";
 import {
   displayTimelineSeconds,
   isLocalTimeBuffered,
-  isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
 import styles from "./media-player.module.css";
+
+/** Bust CDN/browser cache when ffmpeg starts a new pack (Movie Server uses t= + g=). */
+function hlsPlaylistSource(playlistUrl: string, startSeconds: number, loadToken: number): string {
+  const joiner = playlistUrl.includes("?") ? "&" : "?";
+  return `${playlistUrl}${joiner}t=${Math.floor(startSeconds)}&v=${loadToken}`;
+}
 
 type Quality = "auto" | "1080" | "720" | "480";
 type Aspect = "fit" | "fill" | "stretch";
@@ -602,8 +607,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video || !session || session.status !== "ready") return;
     let destroyed = false;
     let hls: Hls | null = null;
-    const playlist = session.playlistUrl;
-    originRef.current = session.startSeconds;
+    const packStart = session.startSeconds;
+    const playlist = hlsPlaylistSource(session.playlistUrl, packStart, bootId);
+    originRef.current = packStart;
     packRestartRef.current = true;
 
     const showGesture = () => {
@@ -651,7 +657,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       hls.on(mod.default.Events.MANIFEST_PARSED, () => {
         if (destroyed) return;
         hls?.startLoad(0.001);
-        if (video.currentTime > 1.25) video.currentTime = 0.001;
+        video.currentTime = 0.001;
+        originRef.current = packStart;
+        setCurrent(packStart);
+        seekingRef.current = false;
+        setBuffering(false);
         begin();
       });
       hls.on(mod.default.Events.ERROR, (_event, data) => {
@@ -871,7 +881,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const data = (await res.json().catch(() => null)) as PlaybackSession | null;
       if (!res.ok || !data) throw new Error("Seek failed.");
       if (data.status === "error") throw new Error(data.message || "Seek failed.");
-      if (data.status === "ready" && data.startSeconds === startSeconds) return data;
+      if (data.status === "ready" && Math.abs(data.startSeconds - startSeconds) < 1.5) return data;
       await new Promise((resolve) => window.setTimeout(resolve, 500));
     }
     throw new Error("Seek timed out. Try again.");
@@ -930,13 +940,13 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         quality: currentSession.quality,
       });
       setSession(next);
-      setBootId((value) => value + 1);
       const ready =
-        next.status === "ready" && next.startSeconds === absolute
+        next.status === "ready" && Math.abs(next.startSeconds - absolute) < 1.5
           ? next
           : await waitForSessionReady(currentSession.sessionId, absolute);
       originRef.current = ready.startSeconds;
-      setSession(ready);
+      if (ready !== next) setSession(ready);
+      setBootId((value) => value + 1);
     } catch (reason) {
       seekingRef.current = false;
       packRestartRef.current = false;
@@ -951,7 +961,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }
   }
 
-  async function seekTo(target: number, forcePack = false) {
+  async function seekTo(target: number, fromProgressBar = false) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
@@ -967,15 +977,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const previousOrigin = origin;
     const localTarget = localTimelineSeconds(absolute, origin);
     const targetIsInCurrentPack = absolute >= origin - 0.35;
-    const ahead = localTarget > video.currentTime + 0.35;
 
     setCurrent(absolute);
 
-    if (
-      !forcePack &&
-      targetIsInCurrentPack &&
-      (isLocalTimeBuffered(video, localTarget) || (!ahead && isLocalTimeInPack(video, localTarget)))
-    ) {
+    // Progress bar: always start a new ffmpeg pack (Movie Server seekHls + attachHls).
+    // Local currentTime on a live EVENT playlist snaps back to the same place on PC.
+    if (!fromProgressBar && targetIsInCurrentPack && isLocalTimeBuffered(video, localTarget)) {
       const ok = await seekLocal(video, absolute, localTarget, movie);
       if (ok) return;
     }
@@ -1097,7 +1104,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
     const movie = fromSession > 0 ? fromSession : Math.max(duration, fromVideo, 1);
     const clamped = Math.min(1, Math.max(0, ratio));
-    void seekTo(movie * clamped);
+    void seekTo(movie * clamped, true);
   }
 
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
