@@ -24,6 +24,14 @@ type MediaDetails = {
 
 const ALL_LIBRARIES = "all";
 
+function matchesSearch(title: string, query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return true;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const hay = title.toLowerCase();
+  return words.every((word) => hay.includes(word));
+}
+
 export function MediaHome({ home }: { home: MediaHome }) {
   const source = useMemo(() => {
     const raw = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
@@ -35,6 +43,8 @@ export function MediaHome({ home }: { home: MediaHome }) {
     });
   }, [home.items, home.rows]);
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [year, setYear] = useState("");
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
@@ -58,9 +68,18 @@ export function MediaHome({ home }: { home: MediaHome }) {
   );
 
   const visible = useMemo(
-    () => libraryItems.filter((item) => !year || String(item.year) === year),
-    [libraryItems, year],
+    () =>
+      libraryItems.filter(
+        (item) => (!year || String(item.year) === year) && matchesSearch(item.title, searchQuery),
+      ),
+    [libraryItems, year, searchQuery],
   );
+
+  const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
+  const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
+
+  const searchActive = searchQuery.trim().length > 0;
+  const showSearchHints = searchActive && searchFocused;
 
   useEffect(() => {
     if (!info) {
@@ -119,6 +138,74 @@ export function MediaHome({ home }: { home: MediaHome }) {
             ))}
           </div>
         </div>
+        <div className={styles.searchRow}>
+          <label className={`${styles.field} ${styles.searchField}`}>
+            <span className={styles.label}>Search</span>
+            <span className={styles.searchWrap}>
+              <input
+                type="search"
+                className={styles.searchInput}
+                value={searchQuery}
+                placeholder="Type movie or series name…"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchFocused(false), 150);
+                }}
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className={styles.searchClear}
+                  aria-label="Clear search"
+                  onClick={() => setSearchQuery("")}
+                >
+                  ×
+                </button>
+              ) : null}
+            </span>
+          </label>
+          {showSearchHints ? (
+            <div className={styles.searchHints} role="listbox" aria-label="Search results">
+              <div className={styles.searchHintCol}>
+                <p className={styles.searchHintTitle}>Movies ({movies.length})</p>
+                {movies.length === 0 ? (
+                  <p className={styles.searchHintEmpty}>No matches</p>
+                ) : (
+                  <ul className={styles.searchHintList}>
+                    {movies.slice(0, 24).map((item) => (
+                      <li key={item.id}>
+                        <button type="button" className={styles.searchHintBtn} onClick={() => setInfo(item)}>
+                          {item.title}
+                          {item.year ? ` (${item.year})` : ""}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className={styles.searchHintCol}>
+                <p className={styles.searchHintTitle}>Series ({series.length})</p>
+                {series.length === 0 ? (
+                  <p className={styles.searchHintEmpty}>No matches</p>
+                ) : (
+                  <ul className={styles.searchHintList}>
+                    {series.slice(0, 24).map((item) => (
+                      <li key={item.id}>
+                        <button type="button" className={styles.searchHintBtn} onClick={() => setInfo(item)}>
+                          {item.title}
+                          {item.year ? ` (${item.year})` : ""}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <div className={styles.filters}>
           <label className={styles.field}>
             <span className={styles.label}>Genre</span>
@@ -156,37 +243,34 @@ export function MediaHome({ home }: { home: MediaHome }) {
         <p className={styles.empty}>
           {home.libraries.length === 0
             ? "No media libraries yet."
-            : libraryId === ALL_LIBRARIES
-              ? "No movies or series published yet."
-              : "No titles in this library yet."}
+            : searchActive
+              ? "No movies or series match your search."
+              : libraryId === ALL_LIBRARIES
+                ? "No movies or series published yet."
+                : "No titles in this library yet."}
         </p>
       ) : (
-        <div className={styles.grid}>
-          {visible.map((item) => (
-            <article key={item.id} className={styles.card}>
-              <button type="button" className={styles.posterLink} onClick={() => setInfo(item)} aria-label={item.title}>
-                <span className={styles.posterFrame}>
-                  {item.posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
-                  )}
-                  <span className={styles.playOverlay} aria-hidden>
-                    <span className={styles.playButton} />
-                  </span>
-                </span>
-              </button>
-              <button type="button" className={styles.cardTitle} onClick={() => setInfo(item)}>
-                {item.title}
-              </button>
-              <button type="button" className={styles.cardMeta} onClick={() => setInfo(item)}>
-                {[item.kind === "series" ? "Series" : "Movie", item.year ? String(item.year) : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </button>
-            </article>
-          ))}
+        <div className={styles.catalog}>
+          {movies.length > 0 ? (
+            <section className={styles.catalogSection} aria-labelledby="media-movies-heading">
+              <h2 id="media-movies-heading" className={styles.sectionHeading}>
+                Movies <span className={styles.sectionCount}>{movies.length}</span>
+              </h2>
+              <TitleGrid items={movies} onSelect={setInfo} />
+            </section>
+          ) : searchActive ? (
+            <p className={styles.sectionEmpty}>No movies match your search.</p>
+          ) : null}
+          {series.length > 0 ? (
+            <section className={styles.catalogSection} aria-labelledby="media-series-heading">
+              <h2 id="media-series-heading" className={styles.sectionHeading}>
+                Series <span className={styles.sectionCount}>{series.length}</span>
+              </h2>
+              <TitleGrid items={series} onSelect={setInfo} />
+            </section>
+          ) : searchActive ? (
+            <p className={styles.sectionEmpty}>No series match your search.</p>
+          ) : null}
         </div>
       )}
 
@@ -198,6 +282,38 @@ export function MediaHome({ home }: { home: MediaHome }) {
           onClose={() => setInfo(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: MediaCard) => void }) {
+  return (
+    <div className={styles.grid}>
+      {items.map((item) => (
+        <article key={item.id} className={styles.card}>
+          <button type="button" className={styles.posterLink} onClick={() => onSelect(item)} aria-label={item.title}>
+            <span className={styles.posterFrame}>
+              {item.posterUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+              )}
+              <span className={styles.playOverlay} aria-hidden>
+                <span className={styles.playButton} />
+              </span>
+            </span>
+          </button>
+          <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
+            {item.title}
+          </button>
+          <button type="button" className={styles.cardMeta} onClick={() => onSelect(item)}>
+            {[item.kind === "series" ? "Series" : "Movie", item.year ? String(item.year) : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </button>
+        </article>
+      ))}
     </div>
   );
 }
