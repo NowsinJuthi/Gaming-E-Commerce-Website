@@ -126,7 +126,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
             <span className="sr-only">Genre</span>
             <span className={styles.selectWrap}>
               <select className={styles.control} defaultValue="" aria-label="Genre">
-                <option value="">All genres</option>
+                <option value="">Genres</option>
               </select>
             </span>
           </label>
@@ -139,7 +139,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
                 aria-label="Year"
                 onChange={(event) => setYear(event.target.value)}
               >
-                <option value="">All years</option>
+                <option value="">Years</option>
                 {years.map((value) => (
                   <option key={value} value={String(value)}>
                     {value}
@@ -152,7 +152,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
             <span className="sr-only">Min rating</span>
             <span className={styles.selectWrap}>
               <select className={styles.control} defaultValue="" aria-label="Minimum rating">
-                <option value="">Any rating</option>
+                <option value="">Rating</option>
               </select>
             </span>
           </label>
