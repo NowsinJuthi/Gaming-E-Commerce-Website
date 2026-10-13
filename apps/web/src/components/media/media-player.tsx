@@ -19,6 +19,17 @@ type Sheet =
   | "aspect"
   | "repeat"
   | null;
+type DockTab = "info" | "chapters" | "cast";
+type TitleDetails = {
+  posterUrl: string | null;
+  overview: string;
+  runtimeMinutes: number | null;
+  rating: number | null;
+  genres: string[];
+  directors: string[];
+  writers: string[];
+  cast: { name: string; profileUrl: string | null }[];
+};
 
 type PlaybackSession = {
   sessionId: string;
@@ -136,6 +147,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [aspect, setAspect] = useState<Aspect>("fit");
   const [repeat, setRepeat] = useState<RepeatMode>("off");
   const [subtitleIndex, setSubtitleIndex] = useState<number | null>(null);
+  const [dock, setDock] = useState<DockTab | null>(null);
+  const [details, setDetails] = useState<TitleDetails | null>(null);
   const [locked, setLocked] = useState(false);
   const [statsOn, setStatsOn] = useState(false);
   const [notice, setNotice] = useState("");
@@ -149,6 +162,21 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   repeatRef.current = repeat;
   subtitleRef.current = subtitleIndex;
   sessionRef.current = session;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/media/titles/${titleId}`)
+      .then((response) => (response.ok ? (response.json() as Promise<TitleDetails>) : null))
+      .then((data) => {
+        if (!cancelled) setDetails(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDetails(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [titleId]);
 
   const reveal = useCallback(() => {
     setChrome(true);
@@ -802,8 +830,40 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               <div className={styles.timeEnd}>
                 <span>-{formatTime(Math.max(0, duration - shown))}</span>
                 <span className={styles.timeTotal}> / {formatTime(duration)}</span>
+                <span className={styles.qualityTag}>{qualityLabel}</span>
               </div>
             </div>
+          <div className={styles.dock}>
+            <button type="button" className={dock === "info" ? styles.dockOn : ""} onClick={() => setDock(dock === "info" ? null : "info")}>Info</button>
+            <button type="button" className={dock === "chapters" ? styles.dockOn : ""} onClick={() => setDock(dock === "chapters" ? null : "chapters")}>Chapters</button>
+            <button type="button" className={dock === "cast" ? styles.dockOn : ""} onClick={() => setDock(dock === "cast" ? null : "cast")}>Cast & Crew</button>
+            {dock === "info" ? (
+              <button type="button" className={styles.fromStart} onClick={() => void seekTo(0)}>From Beginning</button>
+            ) : null}
+          </div>
+          {dock === "info" ? (
+            <div className={styles.dockPanel}>
+              {details?.posterUrl ? <img src={details.posterUrl} alt="" /> : <div className={styles.posterEmpty}>No poster</div>}
+              <div>
+                <p className={styles.dockMeta}>
+                  {[session?.year || "", details?.runtimeMinutes ? `${details.runtimeMinutes} min` : "", details?.rating ? details.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}
+                </p>
+                <p>{details?.overview || "No description yet."}</p>
+              </div>
+            </div>
+          ) : null}
+          {dock === "chapters" ? <p className={styles.dockEmpty}>No chapters in this file.</p> : null}
+          {dock === "cast" ? (
+            <div className={styles.castRow}>
+              {(details?.cast.length ? details.cast : []).slice(0, 12).map((person) => (
+                <div key={person.name} className={styles.castCard}>
+                  {person.profileUrl ? <img src={person.profileUrl} alt="" /> : <div />}
+                  <span>{person.name}</span>
+                </div>
+              ))}
+              {(details?.cast.length ?? 0) === 0 ? <p className={styles.dockEmpty}>Cast is not available yet.</p> : null}
+            </div>
+          ) : null}
           </div>
 
           <div className={`${styles.mDock} ${styles.mobileOnly}`}>
