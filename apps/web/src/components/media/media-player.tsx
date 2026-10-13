@@ -818,10 +818,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                   <Icon d="M4 10v4h4l5 4V6L8 10H4zM16 9a4 4 0 0 1 0 6" />
                 </button>
                 <button type="button" className={`${styles.icon} ${sheet === "speed" ? styles.iconOn : ""}`} aria-label="Playback speed" onClick={() => setSheet(sheet === "speed" ? null : "speed")}>
-                  <Icon d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 3v3M12 18v3M4.9 6.5l2.1 2.1M17 15.4l2.1 2.1M3 12h3M18 12h3M4.9 17.5l2.1-2.1M17 8.6l2.1-2.1" />
+                  <Icon d="M12 21a9 9 0 1 1 9-9M12 12l4.5-3" />
                 </button>
                 <button type="button" className={`${styles.icon} ${sheet === "settings" ? styles.iconOn : ""}`} aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
-                  <Icon d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.6a8 8 0 0 0-1.7-1L15 4h-4l-.5 2.9a8 8 0 0 0-1.7 1L6.5 7.4l-2 3.4L6.5 12a7.8 7.8 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.6a8 8 0 0 0 1.7 1L11 22h4l.5-2.9a8 8 0 0 0 1.7-1l2.3.6 2-3.4-2-1.3z" />
+                  <Icon d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.4 13.5a7.7 7.7 0 0 0 .1-1.5l1.8-1.1-1.8-3.1-2.1.5a7.4 7.4 0 0 0-1.3-.8L15.6 5h-3.2l-.5 2.5a7.4 7.4 0 0 0-1.3.8l-2.1-.5-1.8 3.1 1.8 1.1a7.7 7.7 0 0 0 .1 1.5l-1.8 1.1 1.8 3.1 2.1-.5c.4.3.8.6 1.3.8l.5 2.5h3.2l.5-2.5c.5-.2.9-.5 1.3-.8l2.1.5 1.8-3.1-1.8-1.1z" />
                 </button>
               </div>
             </div>
@@ -1133,12 +1133,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               ))
             : null}
           {sheet !== "settings" ? (
-            <button type="button" className={styles.choice} onClick={() => setSheet("settings")}>
-              <span>Back</span>
+            <button type="button" className={styles.menuFoot} onClick={() => setSheet("settings")}>
+              Back
             </button>
           ) : (
-            <button type="button" className={styles.choice} onClick={() => setSheet(null)}>
-              <span>Done</span>
+            <button type="button" className={styles.menuFoot} onClick={() => setSheet(null)}>
+              Done
             </button>
           )}
         </div>
