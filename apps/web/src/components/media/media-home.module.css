@@ -156,29 +156,41 @@
 .searchHints {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  max-height: min(18rem, 50vh);
+  gap: 1rem;
+  max-height: min(28rem, 62vh);
   overflow: auto;
-  border-radius: 0.65rem;
-  border: 1px solid rgb(var(--border) / 0.72);
-  background: rgb(var(--bg-elevated));
-  padding: 0.65rem 0.75rem;
-  box-shadow: 0 16px 40px -20px rgb(0 0 0 / 0.55);
+  border-radius: 0.75rem;
+  border: 1px solid rgb(38 191 176 / 0.22);
+  background: linear-gradient(165deg, rgb(var(--bg-muted) / 0.55) 0%, rgb(var(--bg-elevated)) 42%);
+  padding: 0.85rem 0.9rem;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 20px 48px -24px rgb(0 0 0 / 0.65);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .searchHints {
     grid-template-columns: 1fr;
+    max-height: min(32rem, 70vh);
   }
 }
 
+.searchHintCol {
+  min-width: 0;
+}
+
 .searchHintTitle {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.55rem;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgb(38 191 176 / 0.9);
+  color: rgb(38 191 176 / 0.95);
+}
+
+.searchHintCount {
+  font-weight: 650;
+  color: rgb(var(--fg-muted));
 }
 
 .searchHintEmpty {
@@ -187,28 +199,96 @@
   color: rgb(var(--fg-muted));
 }
 
-.searchHintList {
+.searchHintGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem 0.45rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.searchHintBtn {
-  display: block;
-  width: 100%;
-  border: 0;
-  border-radius: 0.35rem;
-  background: transparent;
-  padding: 0.35rem 0.4rem;
-  text-align: left;
-  font-size: 0.8125rem;
-  line-height: 1.35;
-  color: rgb(var(--fg));
-  cursor: pointer;
+@media (min-width: 1024px) {
+  .searchHintGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
-.searchHintBtn:hover {
-  background: rgb(38 191 176 / 0.1);
+.searchHintCard {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: transparent;
+  padding: 0.25rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.searchHintCard:hover {
+  border-color: rgb(38 191 176 / 0.35);
+  background: rgb(38 191 176 / 0.08);
+  transform: translateY(-1px);
+}
+
+.searchHintCard:focus-visible {
+  outline: none;
+  border-color: rgb(38 191 176 / 0.65);
+  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.22);
+}
+
+.searchHintPoster {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 0.35rem;
+  background: linear-gradient(145deg, rgb(var(--bg-muted)), #0a1520);
+  box-shadow: 0 8px 18px -10px rgb(0 0 0 / 0.55);
+}
+
+.searchHintPoster img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.searchHintFallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.searchHintName {
+  display: -webkit-box;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgb(var(--fg));
+}
+
+.searchHintYear {
+  margin-top: 0.1rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: rgb(var(--fg-muted));
 }
 
 .catalog {
