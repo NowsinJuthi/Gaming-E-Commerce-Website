@@ -101,37 +101,6 @@ export function MediaHome({ home }: { home: MediaHome }) {
 
       <section className={styles.panel}>
         <div className={styles.filters}>
-          <label className={`${styles.field} ${styles.searchField}`}>
-            <span className="sr-only">Search</span>
-            <span className={styles.searchWrap}>
-              <span className={styles.searchIcon} aria-hidden>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle className={styles.searchIconLens} cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
-                  <path className={styles.searchIconHandle} d="M16 16l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                type="search"
-                className={styles.searchInput}
-                value={searchQuery}
-                placeholder="Search movie or series…"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Search movie or series"
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  className={styles.searchClear}
-                  aria-label="Clear search"
-                  onClick={() => setSearchQuery("")}
-                >
-                  ×
-                </button>
-              ) : null}
-            </span>
-          </label>
           <label className={styles.field}>
             <span className="sr-only">Media Menu</span>
             <span className={styles.selectWrap}>
@@ -179,12 +148,43 @@ export function MediaHome({ home }: { home: MediaHome }) {
               </select>
             </span>
           </label>
-          <label className={`${styles.field} ${styles.ratingFieldEnd}`}>
+          <label className={styles.field}>
             <span className="sr-only">Min rating</span>
             <span className={styles.selectWrap}>
               <select className={styles.control} defaultValue="" aria-label="Minimum rating">
                 <option value="">Any rating</option>
               </select>
+            </span>
+          </label>
+          <label className={`${styles.field} ${styles.searchField}`}>
+            <span className="sr-only">Search</span>
+            <span className={styles.searchWrap}>
+              <span className={styles.searchIcon} aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle className={styles.searchIconLens} cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
+                  <path className={styles.searchIconHandle} d="M16 16l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                className={styles.searchInput}
+                value={searchQuery}
+                placeholder="Search movie or series…"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Search movie or series"
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className={styles.searchClear}
+                  aria-label="Clear search"
+                  onClick={() => setSearchQuery("")}
+                >
+                  ×
+                </button>
+              ) : null}
             </span>
           </label>
         </div>

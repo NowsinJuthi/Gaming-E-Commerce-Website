@@ -88,8 +88,8 @@
 }
 
 .searchField {
-  flex: 1.4 1 12rem;
-  min-width: 10rem;
+  flex: 1 1 11rem;
+  min-width: 9.5rem;
   max-width: 100%;
 }
 
@@ -399,12 +399,6 @@
   overflow-x: auto;
   padding-bottom: 0.15rem;
   -webkit-overflow-scrolling: touch;
-}
-
-.ratingFieldEnd {
-  margin-left: auto;
-  flex: 0 0 auto;
-  min-width: 7.5rem;
 }
 
 .field {
