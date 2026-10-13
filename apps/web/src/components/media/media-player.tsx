@@ -6,7 +6,6 @@ import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
   displayTimelineSeconds,
-  isLocalTimeBuffered,
   isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
@@ -678,10 +677,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video) return;
     const onTime = () => {
       if (scrubbingRef.current || video.seeking || seekingRef.current) return;
-      if (packRestartRef.current) {
-        if (video.currentTime > 1.5) return;
-        packRestartRef.current = false;
-      }
+      if (packRestartRef.current && video.currentTime < 1.25) return;
+      if (packRestartRef.current) packRestartRef.current = false;
       const origin = originRef.current;
       const movie = sessionRef.current?.durationSeconds ?? 0;
       const mediaTime = displayTimelineSeconds(video.currentTime, origin, movie);
@@ -886,22 +883,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
     setCurrent(absolute);
 
-    // Movie Server: only move the playhead when the pack already contains that time.
-    // Setting currentTime from the live seekable range snaps to the edge and inverts drags.
-    if (targetIsInCurrentPack && isLocalTimeBuffered(video, localTarget)) {
-      try {
-        applyVideoSeek(video, localTarget);
-        return;
-      } catch {
-        /* restart the transcode at the requested movie time */
-      }
-    }
-
-    if (
-      targetIsInCurrentPack &&
-      localTarget + 0.35 < video.currentTime &&
-      isLocalTimeInPack(video, localTarget)
-    ) {
+    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       try {
         applyVideoSeek(video, localTarget);
         return;
@@ -913,18 +895,18 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     seekingRef.current = true;
     pendingSeekRef.current = null;
     setBuffering(true);
-    originRef.current = absolute;
     packRestartRef.current = true;
     remember(absolute);
     try {
       await retarget({ startSeconds: absolute });
     } catch (reason) {
+      seekingRef.current = false;
       packRestartRef.current = false;
       originRef.current = previousOrigin;
       setCurrent(beforeSeek);
       setError(reason instanceof Error ? reason.message : "Could not seek.");
+      setBuffering(false);
     } finally {
-      seekingRef.current = false;
       const queued = pendingSeekRef.current;
       pendingSeekRef.current = null;
       if (queued != null) void seekTo(queued);
@@ -1039,8 +1021,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   function commitSeek(ratio: number) {
     setScrub(null);
     skipAt.current = null;
-    const movie = sessionRef.current?.durationSeconds ?? duration;
-    if (movie <= 0) return;
+    const video = videoRef.current;
+    const fromSession = sessionRef.current?.durationSeconds ?? 0;
+    const fromVideo =
+      video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const movie = fromSession > 0 ? fromSession : Math.max(duration, fromVideo, 1);
     const clamped = Math.min(1, Math.max(0, ratio));
     void seekTo(movie * clamped);
   }
