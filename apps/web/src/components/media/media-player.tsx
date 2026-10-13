@@ -234,6 +234,14 @@ function MinimizeIcon() {
   );
 }
 
+function PlaySpinner() {
+  return (
+    <svg className={styles.playSpin} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+    </svg>
+  );
+}
+
 function BusyMark({ buffering }: { buffering: boolean }) {
   return (
     <div className={`${styles.mark} ${buffering ? styles.markSmall : ""}`} aria-hidden="true">
@@ -261,6 +269,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const startTimer = useRef<number | null>(null);
   const [needsGesture, setNeedsGesture] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -500,11 +510,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     };
     const onPlay = () => {
       setPlaying(true);
-      setBuffering(false);
       reveal();
       if (mobileRef.current) setImmersive(true);
     };
-    const onPause = () => setPlaying(false);
+    const onPause = () => {
+      setPlaying(false);
+      setBuffering(false);
+      if (startTimer.current) window.clearTimeout(startTimer.current);
+      startTimer.current = null;
+      setStarting(false);
+    };
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
     const onEnded = () => {
@@ -543,6 +558,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   useEffect(() => {
     if (session?.durationSeconds) setDuration(session.durationSeconds);
   }, [session?.durationSeconds]);
+
+  useEffect(() => () => {
+    if (startTimer.current) window.clearTimeout(startTimer.current);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => remember(current), 5000);
@@ -604,8 +623,25 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   function togglePlay() {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) void video.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
-    else video.pause();
+    if (video.paused) {
+      if (startTimer.current) window.clearTimeout(startTimer.current);
+      setStarting(true);
+      startTimer.current = window.setTimeout(() => {
+        startTimer.current = null;
+        setStarting(false);
+      }, 700);
+      void video.play().then(() => setNeedsGesture(false)).catch(() => {
+        setNeedsGesture(true);
+        if (startTimer.current) window.clearTimeout(startTimer.current);
+        startTimer.current = null;
+        setStarting(false);
+      });
+    } else {
+      if (startTimer.current) window.clearTimeout(startTimer.current);
+      startTimer.current = null;
+      setStarting(false);
+      video.pause();
+    }
     reveal();
   }
 
@@ -736,6 +772,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const shown = scrub ?? current;
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
   const preparing = !error && session?.status !== "ready";
+  const playBusy = !error && (preparing || buffering || starting);
   const subtitleLabel = session?.subtitles.find((track) => track.index === subtitleIndex)?.label ?? "Off";
   const audioLabel = session?.audioTracks.find((track) => track.index === session.audioIndex)?.label ?? "Default";
   const qualityLabel = QUALITIES.find((item) => item.id === session?.quality)?.label ?? "Auto";
@@ -1018,8 +1055,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.2-5.9M3 4v5h5" /></svg>
                 <span>10</span>
               </button>
-              <button type="button" className={styles.mPlay} aria-label={playing ? "Pause" : "Play"} onClick={togglePlay}>
-                <Icon filled d={playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z"} />
+              <button type="button" className={`${styles.mPlay} ${playBusy ? styles.mPlayBusy : ""}`} aria-label={playBusy ? "Buffering" : playing ? "Pause" : "Play"} aria-busy={playBusy} onClick={togglePlay}>
+                {playBusy ? <PlaySpinner /> : <Icon filled d={playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z"} />}
               </button>
               <button type="button" className={styles.mSkip} aria-label="Forward 10 seconds" onClick={() => skip(10)}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.2-5.9M21 4v5h-5" /></svg>

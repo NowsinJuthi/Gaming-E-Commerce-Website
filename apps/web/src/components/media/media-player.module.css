@@ -953,6 +953,26 @@
   stroke: none;
 }
 
+.mPlayBusy {
+  border-color: rgb(38 191 176 / 0.7);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 0 0 3px rgb(38 191 176 / 0.16),
+    0 0 18px -4px rgb(38 191 176 / 0.7);
+}
+
+.mPlay .playSpin {
+  width: 1.85rem;
+  height: 1.85rem;
+  fill: none;
+  stroke: #26bfb0;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 16 38;
+  transform-origin: center;
+  animation: spin 0.7s linear infinite;
+}
+
 .mSeekRow {
   width: 100%;
   gap: 0.65rem;
