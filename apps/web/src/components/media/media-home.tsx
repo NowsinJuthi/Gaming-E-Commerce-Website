@@ -100,37 +100,6 @@ export function MediaHome({ home }: { home: MediaHome }) {
       <h1 className="sr-only">Media</h1>
 
       <section className={styles.panel}>
-        <div className={styles.librarySection}>
-          <div className={styles.libraryMenu} role="tablist" aria-label="Media libraries">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={libraryId === ALL_LIBRARIES}
-              className={`${styles.menuChip} ${libraryId === ALL_LIBRARIES ? styles.menuChipActive : ""}`}
-              onClick={() => {
-                setLibraryId(ALL_LIBRARIES);
-                setYear("");
-              }}
-            >
-              All
-            </button>
-            {home.libraries.map((library) => (
-              <button
-                key={library.id}
-                type="button"
-                role="tab"
-                aria-selected={libraryId === library.id}
-                className={`${styles.menuChip} ${libraryId === library.id ? styles.menuChipActive : ""}`}
-                onClick={() => {
-                  setLibraryId(library.id);
-                  setYear("");
-                }}
-              >
-                {library.name}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className={styles.searchRow}>
           <label className={`${styles.field} ${styles.searchField}`}>
             <span className={styles.label}>Search</span>
@@ -164,14 +133,36 @@ export function MediaHome({ home }: { home: MediaHome }) {
           ) : null}
         </div>
         <div className={styles.filters}>
-          <label className={styles.field}>
-            <span className={styles.label}>Genre</span>
-            <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="">
-                <option value="">All genres</option>
-              </select>
-            </span>
-          </label>
+          <div className={styles.filterStack}>
+            <label className={styles.field}>
+              <span className={styles.label}>Genre</span>
+              <span className={styles.selectWrap}>
+                <select className={styles.control} defaultValue="">
+                  <option value="">All genres</option>
+                </select>
+              </span>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Media Menu</span>
+              <span className={styles.selectWrap}>
+                <select
+                  className={styles.control}
+                  value={libraryId}
+                  onChange={(event) => {
+                    setLibraryId(event.target.value);
+                    setYear("");
+                  }}
+                >
+                  <option value={ALL_LIBRARIES}>All</option>
+                  {home.libraries.map((library) => (
+                    <option key={library.id} value={library.id}>
+                      {library.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </label>
+          </div>
           <label className={styles.field}>
             <span className={styles.label}>Year</span>
             <span className={styles.selectWrap}>

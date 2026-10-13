@@ -332,6 +332,14 @@
   padding-bottom: 0.15rem;
 }
 
+.filterStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 8.5rem;
+  flex: 1 1 0;
+}
+
 .field {
   display: flex;
   min-width: 8.5rem;
