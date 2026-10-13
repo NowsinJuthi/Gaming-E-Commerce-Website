@@ -100,17 +100,18 @@ export function MediaHome({ home }: { home: MediaHome }) {
       <h1 className="sr-only">Media</h1>
 
       <section className={styles.panel}>
-        <div className={styles.searchRow}>
+        <div className={styles.filters}>
           <label className={`${styles.field} ${styles.searchField}`}>
-            <span className={styles.label}>Search</span>
+            <span className="sr-only">Search</span>
             <span className={styles.searchWrap}>
               <input
                 type="search"
                 className={styles.searchInput}
                 value={searchQuery}
-                placeholder="Type movie or series name…"
+                placeholder="Search movie or series…"
                 autoComplete="off"
                 spellCheck={false}
+                aria-label="Search movie or series"
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
               {searchQuery ? (
@@ -125,28 +126,21 @@ export function MediaHome({ home }: { home: MediaHome }) {
               ) : null}
             </span>
           </label>
-          {showSearchHints ? (
-            <div className={styles.searchHints} role="listbox" aria-label="Search results">
-              <SearchHintSection label="Movies" count={movies.length} items={movies} onSelect={setInfo} />
-              <SearchHintSection label="Series" count={series.length} items={series} onSelect={setInfo} />
-            </div>
-          ) : null}
-        </div>
-        <div className={styles.filters}>
           <label className={styles.field}>
-            <span className={styles.label}>Genre</span>
+            <span className="sr-only">Genre</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="">
+              <select className={styles.control} defaultValue="" aria-label="Genre">
                 <option value="">All genres</option>
               </select>
             </span>
           </label>
           <label className={styles.field}>
-            <span className={styles.label}>Media Menu</span>
+            <span className="sr-only">Media Menu</span>
             <span className={styles.selectWrap}>
               <select
                 className={styles.control}
                 value={libraryId}
+                aria-label="Media Menu"
                 onChange={(event) => {
                   setLibraryId(event.target.value);
                   setYear("");
@@ -162,9 +156,14 @@ export function MediaHome({ home }: { home: MediaHome }) {
             </span>
           </label>
           <label className={styles.field}>
-            <span className={styles.label}>Year</span>
+            <span className="sr-only">Year</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} value={year} onChange={(event) => setYear(event.target.value)}>
+              <select
+                className={styles.control}
+                value={year}
+                aria-label="Year"
+                onChange={(event) => setYear(event.target.value)}
+              >
                 <option value="">All years</option>
                 {years.map((value) => (
                   <option key={value} value={String(value)}>
@@ -175,14 +174,20 @@ export function MediaHome({ home }: { home: MediaHome }) {
             </span>
           </label>
           <label className={styles.field}>
-            <span className={styles.label}>Min rating</span>
+            <span className="sr-only">Min rating</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="">
+              <select className={styles.control} defaultValue="" aria-label="Minimum rating">
                 <option value="">Any rating</option>
               </select>
             </span>
           </label>
         </div>
+        {showSearchHints ? (
+          <div className={styles.searchHints} role="listbox" aria-label="Search results">
+            <SearchHintSection label="Movies" count={movies.length} items={movies} onSelect={setInfo} />
+            <SearchHintSection label="Series" count={series.length} items={series} onSelect={setInfo} />
+          </div>
+        ) : null}
       </section>
 
       {!searchActive && visible.length === 0 ? (

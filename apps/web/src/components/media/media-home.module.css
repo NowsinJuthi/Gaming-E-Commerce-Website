@@ -87,17 +87,9 @@
   }
 }
 
-.searchRow {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
 .searchField {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1.4 1 12rem;
+  min-width: 10rem;
   max-width: 100%;
 }
 
@@ -327,18 +319,11 @@
 .filters {
   display: flex;
   flex-wrap: nowrap;
-  align-items: flex-end;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 0.65rem;
   overflow-x: auto;
   padding-bottom: 0.15rem;
   -webkit-overflow-scrolling: touch;
-}
-
-@media (min-width: 768px) {
-  .filters {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
 }
 
 .field {
