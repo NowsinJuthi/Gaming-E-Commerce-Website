@@ -119,7 +119,7 @@ function volumeReadOnly(): boolean {
 function Icon({ d, filled = false }: { d: string; filled?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={filled ? styles.filled : undefined}>
-      <path d={d} />
+      <path d={d} fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"} />
     </svg>
   );
 }

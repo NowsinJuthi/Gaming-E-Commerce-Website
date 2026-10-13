@@ -194,14 +194,18 @@
 
 .icon svg,
 .transport svg,
-.core svg {
-  width: 1.35rem;
-  height: 1.35rem;
+.core svg,
+.mIcon svg,
+.mBack svg,
+.mSkip svg {
+  width: 1.45rem;
+  height: 1.45rem;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
 }
 
 .icon svg.filled,
@@ -907,6 +911,12 @@
   flex: 1;
   height: 1.15rem;
   accent-color: #26bfb0;
+}
+
+@media (min-width: 769px) {
+  .mobileOnly {
+    display: none !important;
+  }
 }
 
 @keyframes busyGlow {
