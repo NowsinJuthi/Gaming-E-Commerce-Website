@@ -129,6 +129,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [scrub, setScrub] = useState<number | null>(null);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const [rate, setRate] = useState(1);
   const [chrome, setChrome] = useState(true);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -281,15 +282,25 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       }
       hls = new mod.default({
         enableWorker: true,
-        startPosition: 0,
-        maxBufferLength: 30,
-        backBufferLength: 30,
+        lowLatencyMode: false,
+        autoStartLoad: false,
+        startPosition: 0.001,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: Infinity,
+        maxLiveSyncPlaybackRate: 1,
+        maxBufferSize: 400_000_000,
+        backBufferLength: 180,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 180,
+        maxBufferHole: 0.5,
+        startFragPrefetch: true,
       });
       hlsRef.current = hls;
       hls.attachMedia(video);
       hls.loadSource(playlist);
       hls.on(mod.default.Events.MANIFEST_PARSED, () => {
         if (destroyed) return;
+        hls?.startLoad(0.001);
         begin();
       });
       hls.on(mod.default.Events.ERROR, (_event, data) => {
@@ -623,9 +634,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           <Icon d="M8 11V7a4 4 0 0 1 8 0M6 11h12v10H6z" />
         </button>
       ) : (
-        <div className={`${styles.chrome} ${chrome ? "" : styles.hiddenChrome}`}>
+        <div className={`${styles.chrome} ${chrome ? "" : styles.hiddenChrome} ${mobile ? styles.mobileChrome : ""}`}>
           <div className={styles.shade} />
-          <header className={styles.top}>
+          <header className={`${styles.top} ${styles.deskOnly}`}>
             <div className={styles.titleBlock}>
               <Link href="/media" className={`${styles.icon} ${styles.backLink}`} aria-label="Back">
                 <Icon d="M15 18l-6-6 6-6" />
@@ -671,9 +682,67 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
             </div>
           </header>
 
+          <header className={`${styles.mTop} ${styles.mobileOnly}`}>
+            <Link href="/media" className={styles.mBack} aria-label="Back">
+              <Icon d="M15 18l-6-6 6-6" />
+            </Link>
+            <div className={styles.mTitle}>
+              <p>{session?.title || "Video"}</p>
+              {session?.year || session?.episodeName ? (
+                <span>{[session?.year || "", session?.episodeName || ""].filter(Boolean).join(" · ")}</span>
+              ) : null}
+            </div>
+            <div className={styles.mTools}>
+              {volumeLocked ? null : volumeOpen ? (
+                <input
+                  className={styles.mVolume}
+                  aria-label="Volume"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={(event) => changeVolume(Number(event.target.value))}
+                />
+              ) : null}
+              {volumeLocked ? null : (
+                <button
+                  type="button"
+                  className={styles.mIcon}
+                  aria-label={volumeOpen ? (muted ? "Unmute" : "Mute") : "Volume"}
+                  onClick={() => {
+                    if (volumeLocked) return;
+                    if (!volumeOpen) {
+                      setVolumeOpen(true);
+                      return;
+                    }
+                    toggleMute();
+                  }}
+                >
+                  <Icon d={muted || volume === 0 ? "M11 5L6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6" : "M11 5L6 9H3v6h3l5 4V5zM16 9a5 5 0 0 1 0 6"} />
+                </button>
+              )}
+              {volumeOpen ? null : (
+                <>
+                  <button type="button" className={styles.mIcon} aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={() => void toggleFullscreen()}>
+                    <Icon d={fullscreen ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
+                  </button>
+                  {pipSupported ? (
+                    <button type="button" className={styles.mIcon} aria-label="Picture in picture" onClick={() => void togglePip()}>
+                      <Icon d="M4 6h16v12H4zM12 11h6v4h-6z" />
+                    </button>
+                  ) : null}
+                  <button type="button" className={`${styles.mIcon} ${sheet === "settings" ? styles.iconOn : ""}`} aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
+                    <Icon d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.6a8 8 0 0 0-1.7-1L15 4h-4l-.5 2.9a8 8 0 0 0-1.7 1L6.5 7.4l-2 3.4L6.5 12a7.8 7.8 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.6a8 8 0 0 0 1.7 1L11 22h4l.5-2.9a8 8 0 0 0 1.7-1l2.3.6 2-3.4-2-1.3z" />
+                  </button>
+                </>
+              )}
+            </div>
+          </header>
+
           <button type="button" className={styles.skin} aria-label={playing ? "Pause" : "Play"} onClick={mobile ? () => setChrome((value) => !value) : togglePlay} />
 
-          <div className={styles.bottom}>
+          <div className={`${styles.bottom} ${styles.deskOnly}`}>
             <div className={styles.titleRow}>
               <div className={styles.meta}>
                 {session?.year ? <p className={styles.year}>{session.year}</p> : null}
@@ -734,6 +803,49 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 <span>-{formatTime(Math.max(0, duration - shown))}</span>
                 <span className={styles.timeTotal}> / {formatTime(duration)}</span>
               </div>
+            </div>
+          </div>
+
+          <div className={`${styles.mDock} ${styles.mobileOnly}`}>
+            <div className={styles.mCluster}>
+              {(session?.episodes.length ?? 0) > 1 ? (
+                <button type="button" className={styles.mIcon} aria-label="Previous episode" onClick={() => void retarget({ episodeIndex: Math.max(0, (session?.episodeIndex ?? 0) - 1), startSeconds: 0 })}>
+                  <Icon d="M6 6v12M18 6l-8 6 8 6z" filled />
+                </button>
+              ) : null}
+              <button type="button" className={styles.mSkip} aria-label="Rewind 10 seconds" onClick={() => skip(-10)}>
+                <span>10</span>
+              </button>
+              <button type="button" className={styles.mPlay} aria-label={playing ? "Pause" : "Play"} onClick={togglePlay}>
+                <Icon filled d={playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z"} />
+              </button>
+              <button type="button" className={styles.mSkip} aria-label="Forward 10 seconds" onClick={() => skip(10)}>
+                <span>10</span>
+              </button>
+              {(session?.episodes.length ?? 0) > 1 ? (
+                <button type="button" className={styles.mIcon} aria-label="Next episode" onClick={() => void retarget({ episodeIndex: (session?.episodeIndex ?? 0) + 1, startSeconds: 0 })}>
+                  <Icon d="M6 6l8 6-8 6zM18 6v12" filled />
+                </button>
+              ) : null}
+            </div>
+            <div className={styles.mSeekRow}>
+              <span>{formatTime(shown)}</span>
+              <input
+                aria-label="Seek"
+                type="range"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={1}
+                value={Math.min(shown, Math.max(duration, 1))}
+                onPointerDown={() => setScrub(current)}
+                onChange={(event) => setScrub(Number(event.target.value))}
+                onPointerUp={(event) => {
+                  const target = Number((event.target as HTMLInputElement).value);
+                  setScrub(null);
+                  void seekTo(target);
+                }}
+              />
+              <span className={styles.mDuration}>{duration > 0 ? formatTime(duration) : "--:--"}</span>
             </div>
           </div>
         </div>

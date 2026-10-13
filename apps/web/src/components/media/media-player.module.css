@@ -554,6 +554,14 @@
 }
 
 @media (max-width: 768px) {
+  .deskOnly {
+    display: none !important;
+  }
+
+  .mobileOnly {
+    display: flex;
+  }
+
   .volume input,
   .timeDesk {
     display: none;
@@ -594,6 +602,173 @@
   to {
     transform: rotate(-360deg);
   }
+}
+
+.deskOnly {
+  display: flex;
+}
+
+.mobileOnly {
+  display: none;
+}
+
+.mTop,
+.mDock,
+.mTools,
+.mCluster,
+.mSeekRow {
+  display: flex;
+  align-items: center;
+}
+
+.mTop {
+  position: relative;
+  z-index: 2;
+  gap: 0.15rem;
+  width: 100%;
+}
+
+.mBack,
+.mIcon,
+.mSkip,
+.mPlay {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mBack {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+}
+
+.mBack svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.mTitle {
+  min-width: 0;
+  flex: 1;
+}
+
+.mTitle p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.mTitle span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 11px;
+}
+
+.mTools {
+  flex: none;
+}
+
+.mIcon,
+.mSkip {
+  width: 2.75rem;
+  height: 2.75rem;
+  color: rgb(255 255 255 / 0.85);
+}
+
+.mIcon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.mIcon svg.filled {
+  fill: currentColor;
+  stroke: none;
+}
+
+.mVolume {
+  width: 5.75rem;
+  accent-color: #fff;
+}
+
+.mDock {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 0.15rem;
+}
+
+.mCluster {
+  justify-content: center;
+  gap: 1.15rem;
+  width: 100%;
+}
+
+.mSkip {
+  position: relative;
+  border: 1.5px solid rgb(255 255 255 / 0.85);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.mPlay {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 8px 22px -10px rgb(0 0 0 / 0.55),
+    0 0 18px -6px rgb(38 191 176 / 0.4);
+}
+
+.mPlay svg {
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-left: 0.12rem;
+  fill: currentColor;
+  stroke: none;
+}
+
+.mSeekRow {
+  width: 100%;
+  gap: 0.65rem;
+  font-size: 13px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.mSeekRow span {
+  min-width: 2.75rem;
+}
+
+.mDuration {
+  color: rgb(255 255 255 / 0.6);
+  text-align: right;
+}
+
+.mSeekRow input {
+  min-width: 0;
+  flex: 1;
+  accent-color: #26bfb0;
 }
 
 @keyframes busyGlow {
