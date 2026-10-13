@@ -113,7 +113,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
                   setYear("");
                 }}
               >
-                <option value={ALL_LIBRARIES}>All</option>
+                <option value={ALL_LIBRARIES}>All Movies & Series</option>
                 {home.libraries.map((library) => (
                   <option key={library.id} value={library.id}>
                     {library.name}
