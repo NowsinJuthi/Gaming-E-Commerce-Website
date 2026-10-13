@@ -1,5 +1,6 @@
-import { execFile, spawn } from 'child_process';
-import { unlink } from 'fs/promises';
+import { execFile, spawn, type ChildProcess } from 'child_process';
+import { constants } from 'fs';
+import { open, unlink, type FileHandle } from 'fs/promises';
 import type { Readable } from 'stream';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
@@ -20,6 +21,13 @@ export type SmbListedEntry = {
   path: string;
   isDirectory: boolean;
   sizeBytes: number | null;
+};
+
+export type SmbIncoming = {
+  process: ChildProcess;
+  first: Buffer;
+  read: () => Promise<Buffer | null>;
+  close: () => Promise<void>;
 };
 
 export type SmbPlayback = {
@@ -115,6 +123,50 @@ export class SmbClientService {
       }
     }
 
+    const message = this.formatLinuxSmbError(lastError);
+    const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
+    throw new Error(`${message}${shareHint}`);
+  }
+
+  /**
+   * Start reading a share file. Resolves when the first bytes arrive so playback
+   * can begin without copying the whole movie first.
+   */
+  async beginFileStream(auth: SmbAuth, remoteFile: string, fifoPath: string): Promise<SmbIncoming> {
+    const remote = this.normalizeRemotePath(remoteFile);
+    if (!remote || remote.includes('"') || fifoPath.includes('"')) {
+      throw new Error('That file path is not allowed.');
+    }
+    const attempts = this.authAttempts(auth);
+    let lastError: unknown;
+    for (const attempt of attempts) {
+      try {
+        return await this.openGetStream(attempt, remote, fifoPath, 'SMB3');
+      } catch (error) {
+        lastError = error;
+        const raw = this.execText(error);
+        if (this.isUnreachable(raw)) break;
+        if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
+          try {
+            return await this.openGetStream(attempt, remote, fifoPath, 'SMB2');
+          } catch (smb2Error) {
+            lastError = smb2Error;
+          }
+        }
+        if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED|did not send/i.test(raw)) break;
+      }
+    }
+    const baseAuth = attempts[0] ?? auth;
+    const shares = await this.listDiskShares(baseAuth).catch(() => [] as string[]);
+    const known = auth.share.trim().toLowerCase();
+    for (const share of shares) {
+      if (share.toLowerCase() === known) continue;
+      try {
+        return await this.openGetStream({ ...baseAuth, share }, remote, fifoPath, 'SMB3');
+      } catch (error) {
+        lastError = error;
+      }
+    }
     const message = this.formatLinuxSmbError(lastError);
     const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
     throw new Error(`${message}${shareHint}`);
@@ -290,6 +342,112 @@ export class SmbClientService {
       maxBuffer: 4_000_000,
     });
     return stdout;
+  }
+
+  private async openGetStream(
+    auth: SmbAuth,
+    remoteFile: string,
+    fifoPath: string,
+    protocol: 'SMB2' | 'SMB3',
+  ): Promise<SmbIncoming> {
+    if (constants.O_NONBLOCK == null) {
+      throw new Error('Video streaming is available on the website server.');
+    }
+    const handle = await open(fifoPath, constants.O_RDONLY | constants.O_NONBLOCK);
+    const child = this.spawnGetProcess(auth, remoteFile, fifoPath, protocol);
+    let closed = false;
+    const close = async () => {
+      if (closed) return;
+      closed = true;
+      await handle.close().catch(() => undefined);
+    };
+    try {
+      const first = await this.readFirstByte(handle, child);
+      return {
+        process: child,
+        first,
+        read: () => this.readChunk(handle, child),
+        close,
+      };
+    } catch (error) {
+      if (child.exitCode == null && !child.killed) child.kill('SIGKILL');
+      await close();
+      throw error;
+    }
+  }
+
+  private async readFirstByte(handle: FileHandle, child: ChildProcess): Promise<Buffer> {
+    let stderr = '';
+    let failed: Error | null = null;
+    const onStderr = (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
+      if (/NT_STATUS_(?!OK\b)|LOGON_FAILURE|ACCESS_DENIED/i.test(stderr)) {
+        failed = new Error(this.formatLinuxSmbError(stderr));
+      }
+    };
+    const onClose = () => {
+      if (!failed) failed = new Error(this.formatLinuxSmbError(stderr || 'The video could not be opened.'));
+    };
+    child.stderr?.on('data', onStderr);
+    child.on('close', onClose);
+    const started = Date.now();
+    try {
+      while (Date.now() - started < 20_000) {
+        if (failed) throw failed;
+        const chunk = await this.readChunk(handle, child);
+        if (chunk === null) {
+          throw new Error(this.formatLinuxSmbError(stderr || 'The video could not be opened.'));
+        }
+        if (chunk.length > 0) return chunk;
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+      throw new Error(this.formatLinuxSmbError(stderr || 'The storage server did not send the video.'));
+    } finally {
+      child.stderr?.off('data', onStderr);
+      child.off('close', onClose);
+    }
+  }
+
+  /** Bytes from the fifo. An empty buffer means nothing new is waiting. Null means the sender finished. */
+  private async readChunk(handle: FileHandle, child: ChildProcess): Promise<Buffer | null> {
+    const buf = Buffer.alloc(256 * 1024);
+    try {
+      const { bytesRead } = await handle.read(buf, 0, buf.length, null);
+      if (bytesRead === 0) {
+        if (child.exitCode == null && !child.killed) return Buffer.alloc(0);
+        return null;
+      }
+      return Buffer.from(buf.subarray(0, bytesRead));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EAGAIN' || code === 'EWOULDBLOCK') return Buffer.alloc(0);
+      throw error;
+    }
+  }
+
+  private spawnGetProcess(
+    auth: SmbAuth,
+    remoteFile: string,
+    localFile: string,
+    protocol: 'SMB2' | 'SMB3',
+  ): ChildProcess {
+    const share = auth.share.trim().replace(/^[\\/]+|[\\/]+$/g, '');
+    const args = [
+      `//${auth.host}/${share}`,
+      '-U',
+      this.linuxUser(auth),
+      `--password=${auth.password}`,
+      '-p',
+      String(auth.port ?? 445),
+      '-m',
+      protocol,
+    ];
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      args.push('-W', domain);
+    }
+    args.push('-c', `get "${remoteFile}" "${localFile}"`);
+    return spawn('smbclient', args, { stdio: ['ignore', 'pipe', 'pipe'] });
   }
 
   private spawnGet(

@@ -1,4 +1,5 @@
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess, execFile, spawn } from 'child_process';
+import { promisify } from 'util';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
@@ -18,8 +19,9 @@ import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media
 import { SmbServer, SmbServerDocument } from '../../database/schemas/smb-server.schema';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
-import { SmbAuth, SmbClientService, SmbListedEntry, type SmbPlayback } from './smb-client.service';
+import { SmbAuth, SmbClientService, SmbListedEntry, type SmbIncoming, type SmbPlayback } from './smb-client.service';
 
+const execFileAsync = promisify(execFile);
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
@@ -62,6 +64,7 @@ type Session = {
   quality: PlaybackQuality;
   startSeconds: number;
   durationSeconds: number;
+  runtimeSeconds: number;
   videoCodec: string;
   width: number;
   height: number;
@@ -73,6 +76,7 @@ type Session = {
   dir: string;
   cacheName: string | null;
   remote: SmbPlayback | null;
+  incoming: SmbIncoming | null;
   ffmpeg: ChildProcess | null;
   touchedAt: number;
 };
@@ -240,18 +244,20 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       subtitles: [],
       quality: request.quality ?? 'auto',
       startSeconds: Math.max(0, request.startSeconds ?? 0),
-      durationSeconds: 0,
+      durationSeconds: (title.runtimeMinutes ?? 0) > 0 ? (title.runtimeMinutes ?? 0) * 60 : 0,
+      runtimeSeconds: (title.runtimeMinutes ?? 0) > 0 ? (title.runtimeMinutes ?? 0) * 60 : 0,
       videoCodec: '',
       width: 0,
       height: 0,
       fileSize: episodes[episodeIndex]?.sizeBytes ?? title.videoFileSizeBytes ?? null,
       downloaded: 0,
       status: 'preparing',
-      message: 'Opening the video…',
+      message: 'Starting playback…',
       complete: false,
       dir,
       cacheName: null,
       remote: null,
+      incoming: null,
       ffmpeg: null,
       touchedAt: Date.now(),
     };
@@ -260,14 +266,20 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private async materialize(session: Session) {
     const token = session.token;
     try {
+      session.message = 'Starting playback…';
       const file = await this.ensureLocalFile(session, token);
       if (session.token !== token) return;
-      await this.probe(session, file);
+      if (!session.incoming) await this.probe(session, file);
       if (session.token !== token) return;
-      session.startSeconds = this.clampStart(session.startSeconds, session.durationSeconds);
+      if (!session.incoming) {
+        session.startSeconds = this.clampStart(session.startSeconds, session.durationSeconds);
+      } else {
+        session.startSeconds = 0;
+        if (!session.durationSeconds) session.durationSeconds = session.runtimeSeconds;
+      }
       await this.pack(session, file, token);
       if (session.token !== token) return;
-      void this.extractCaptions(session, file, token);
+      if (!session.incoming) void this.extractCaptions(session, file, token);
     } catch (error) {
       if (session.token !== token) return;
       session.status = 'error';
@@ -301,19 +313,20 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       const port = await this.readyPort();
       return `http://127.0.0.1:${port}/${session.id}`;
     }
-    await rm(`${finalPath}.part`, { force: true }).catch(() => undefined);
     session.message = 'Starting playback…';
     session.cacheName = cacheName;
-    session.remote?.close();
-    const playback = await this.smb.openPlayback(session.auth, episode.remotePath);
+    this.stopIncoming(session);
+    const fifo = join(session.dir, 'video.fifo');
+    await rm(fifo, { force: true }).catch(() => undefined);
+    await execFileAsync('mkfifo', [fifo]);
+    const incoming = await this.smb.beginFileStream(session.auth, episode.remotePath, fifo);
     if (session.token !== token) {
-      playback.close();
+      if (incoming.process.exitCode == null) incoming.process.kill('SIGKILL');
       return finalPath;
     }
-    session.remote = playback;
-    session.fileSize = playback.size;
-    const port = await this.readyPort();
-    return `http://127.0.0.1:${port}/${session.id}`;
+    session.incoming = incoming;
+    session.videoCodec = '';
+    return fifo;
   }
 
   private async serveRemote(req: IncomingMessage, res: ServerResponse) {
@@ -464,11 +477,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const playlist = join(session.dir, 'index.m3u8');
     const segment = join(session.dir, 'seg%05d.ts');
     const audio = session.audioTracks[session.audioIndex];
+    const streaming = Boolean(session.incoming);
     const args = [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-      ...(session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
-      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
-      '-i', file,
+      '-hide_banner', '-loglevel', 'error', ...(streaming ? [] : ['-nostdin']), '-y',
+      ...(streaming ? ['-fflags', '+genpts', '-probesize', '5000000', '-analyzeduration', '5000000'] : []),
+      ...(!streaming && session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
+      '-i', streaming ? 'pipe:0' : file,
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
       '-sn', '-dn',
@@ -481,8 +495,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-hls_segment_filename', segment,
       playlist,
     ];
-    const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(this.bin('ffmpeg'), args, { stdio: [streaming ? 'pipe' : 'ignore', 'ignore', 'pipe'] });
     session.ffmpeg = child;
+    if (streaming) this.feedFfmpeg(session, child);
     if (child.pid && process.platform === 'linux') {
       spawn('renice', ['-n', '10', '-p', String(child.pid)], { stdio: 'ignore' }).on('error', () => undefined);
     }
@@ -705,7 +720,56 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     await Promise.all(files.filter((name) => name.endsWith('.vtt')).map((name) => unlink(join(session.dir, name)).catch(() => undefined)));
   }
 
+  private feedFfmpeg(session: Session, child: ChildProcess) {
+    const incoming = session.incoming;
+    const stdin = child.stdin;
+    if (!incoming || !stdin) return;
+    const write = (chunk: Buffer) => new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        stdin.off('drain', onDrain);
+        reject(error);
+      };
+      const onDrain = () => {
+        stdin.off('error', onError);
+        resolve();
+      };
+      stdin.once('error', onError);
+      if (stdin.write(chunk)) {
+        stdin.off('error', onError);
+        resolve();
+      } else stdin.once('drain', onDrain);
+    });
+    void (async () => {
+      try {
+        if (incoming.first.length > 0) await write(incoming.first);
+        while (session.ffmpeg === child && session.incoming === incoming) {
+          const chunk = await incoming.read();
+          if (chunk === null) {
+            stdin.end();
+            return;
+          }
+          if (chunk.length === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            continue;
+          }
+          await write(chunk);
+        }
+      } catch {
+        if (!stdin.destroyed) stdin.destroy();
+      }
+    })();
+  }
+
+  private stopIncoming(session: Session) {
+    const incoming = session.incoming;
+    session.incoming = null;
+    if (!incoming) return;
+    void incoming.close();
+    if (incoming.process.exitCode == null && !incoming.process.killed) incoming.process.kill('SIGKILL');
+  }
+
   private stopFfmpeg(session: Session) {
+    this.stopIncoming(session);
     const child = session.ffmpeg;
     session.ffmpeg = null;
     if (!child || child.killed) return;
