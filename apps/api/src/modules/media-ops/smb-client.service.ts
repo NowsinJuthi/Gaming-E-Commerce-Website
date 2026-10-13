@@ -499,6 +499,10 @@ export class SmbClientService {
     return auth.username;
   }
 
+  listShareNames(auth: SmbAuth): Promise<string[]> {
+    return this.listDiskShares(auth);
+  }
+
   private async listDiskShares(auth: SmbAuth): Promise<string[]> {
     const args = [
       '-L',

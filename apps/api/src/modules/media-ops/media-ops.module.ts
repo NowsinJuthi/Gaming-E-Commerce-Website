@@ -18,6 +18,7 @@ import { LibraryIndexService } from './library-index.service';
 import { MediaPlaybackController } from './media-playback.controller';
 import { MediaPlaybackService } from './media-playback.service';
 import { SmbClientService } from './smb-client.service';
+import { SmbMountService } from './smb-mount.service';
 import { TmdbMetadataService } from './tmdb-metadata.service';
 
 @Module({
@@ -30,6 +31,6 @@ import { TmdbMetadataService } from './tmdb-metadata.service';
     CryptoModule,
   ],
   controllers: [MediaOpsController, CatalogController, MediaPlaybackController],
-  providers: [MediaOpsService, SmbClientService, CatalogService, LibraryIndexService, TmdbMetadataService, MediaPlaybackService],
+  providers: [MediaOpsService, SmbClientService, SmbMountService, CatalogService, LibraryIndexService, TmdbMetadataService, MediaPlaybackService],
 })
 export class MediaOpsModule {}

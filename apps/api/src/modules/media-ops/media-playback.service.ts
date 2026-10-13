@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
-import { createHash, randomBytes } from 'crypto';
+import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { join, resolve, sep } from 'path';
 import {
@@ -19,6 +19,7 @@ import { SmbServer, SmbServerDocument } from '../../database/schemas/smb-server.
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
 import { SmbAuth, SmbClientService, SmbListedEntry, type SmbIncoming, type SmbPlayback } from './smb-client.service';
+import { SmbMountService } from './smb-mount.service';
 
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
@@ -53,6 +54,7 @@ type Session = {
   kind: 'movie' | 'series';
   provider: 'local' | 'smb';
   rootPath: string;
+  smbServerId: string | null;
   auth: SmbAuth | null;
   episodes: EpisodeFile[];
   episodeIndex: number;
@@ -96,6 +98,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     private readonly servers: Model<SmbServerDocument>,
     private readonly crypto: CryptoService,
     private readonly smb: SmbClientService,
+    private readonly mounts: SmbMountService,
   ) {}
 
   onModuleInit() {
@@ -234,6 +237,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       kind: title.kind,
       provider: library.provider,
       rootPath: library.rootPath,
+      smbServerId: library.smbServerId ? String(library.smbServerId) : null,
       auth,
       episodes,
       episodeIndex,
@@ -295,55 +299,14 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (!existsSync(full)) throw new Error('The video file is not on this server.');
       return full;
     }
-    if (!session.auth) throw new Error('This library is not connected to storage.');
-    const cacheDir = join(resolveUploadsRoot(), 'playback-cache');
-    const cacheName = `${createHash('sha1').update(`${session.auth.host}|${session.auth.share}|${episode.remotePath}`).digest('hex')}.bin`;
-    const finalPath = join(cacheDir, cacheName);
-    const ready = await this.cachedSize(finalPath, episode.sizeBytes ?? session.fileSize);
-    if (ready) {
-      session.remote?.close();
-      session.remote = null;
-      session.cacheName = cacheName;
-      session.downloaded = ready;
-      return finalPath;
-    }
-    session.message = 'Saving the video from storage…';
-    session.cacheName = cacheName;
+    if (!session.auth || !session.smbServerId) throw new Error('This library is not connected to storage.');
+    session.message = 'Starting playback…';
     session.remote?.close();
     session.remote = null;
     this.stopIncoming(session);
-    await mkdir(cacheDir, { recursive: true });
-    const partPath = `${finalPath}.part`;
-    await rm(partPath, { force: true }).catch(() => undefined);
-    const total = episode.sizeBytes ?? session.fileSize ?? 0;
-    const progress = setInterval(() => {
-      void stat(partPath)
-        .then((info) => {
-          const pct = total > 0 ? Math.min(99, Math.round((info.size / total) * 100)) : 0;
-          session.message = total > 0 ? `Saving the video from storage… ${pct}%` : 'Saving the video from storage…';
-        })
-        .catch(() => undefined);
-    }, 1000);
-    try {
-      await this.smb.downloadFile(session.auth, episode.remotePath, partPath);
-      const info = await stat(partPath);
-      if (info.size < 4096) throw new Error('The video file from storage was empty.');
-      if (total > 0 && info.size + 4096 < total) {
-        throw new Error('The video download stopped before the file was complete.');
-      }
-      await rm(finalPath, { force: true }).catch(() => undefined);
-      await rename(partPath, finalPath);
-      session.fileSize = info.size;
-      session.downloaded = info.size;
-    } catch (error) {
-      await rm(partPath, { force: true }).catch(() => undefined);
-      throw error;
-    } finally {
-      clearInterval(progress);
-    }
-    if (session.token !== token) return finalPath;
-    session.message = 'Starting playback…';
-    return finalPath;
+    const full = await this.mounts.filePath(session.smbServerId, session.auth, episode.remotePath);
+    if (session.token !== token) return full;
+    return full;
   }
 
   private async serveRemote(req: IncomingMessage, res: ServerResponse) {
