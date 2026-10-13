@@ -192,7 +192,7 @@ export function LiveChatLauncher({
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+    if (!drag.moved && Math.hypot(dx, dy) < 18) return;
     drag.moved = true;
     const x = Math.min(
       window.innerWidth - drag.width - 8,
@@ -210,9 +210,21 @@ export function LiveChatLauncher({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
-    if (!drag.moved) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!drag.moved || event.type === "pointercancel") {
       setDragging(false);
       setDragPoint(null);
+      if (!drag.moved && event.type !== "pointercancel") {
+        const swallow = (clickEvent: Event) => {
+          clickEvent.preventDefault();
+          clickEvent.stopPropagation();
+        };
+        window.addEventListener("click", swallow, true);
+        window.setTimeout(() => window.removeEventListener("click", swallow, true), 400);
+        setOpen(true);
+      }
       return;
     }
     suppressClickRef.current = true;
@@ -241,9 +253,11 @@ export function LiveChatLauncher({
     setDragging(false);
   }
 
-  function openChat() {
+  function openChat(event: React.MouseEvent) {
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
     setOpen(true);
@@ -605,6 +619,7 @@ export function LiveChatLauncher({
           onPointerMove={onDockPointerMove}
           onPointerUp={finishDockDrag}
           onPointerCancel={finishDockDrag}
+          onClick={openChat}
         >
           <span className="admin-chat-launcher-fab-aura" aria-hidden />
           <span className="admin-chat-launcher-fab-halo" aria-hidden />
