@@ -202,18 +202,12 @@ export function MediaHome({ home }: { home: MediaHome }) {
       {!searchActive && visible.length > 0 ? (
         <div className={styles.catalog}>
           {movies.length > 0 ? (
-            <section className={styles.catalogSection} aria-labelledby="media-movies-heading">
-              <h2 id="media-movies-heading" className={styles.sectionHeading}>
-                Movies
-              </h2>
+            <section className={styles.catalogSection} aria-label="Movies">
               <TitleGrid items={movies} onSelect={setInfo} />
             </section>
           ) : null}
           {series.length > 0 ? (
-            <section className={styles.catalogSection} aria-labelledby="media-series-heading">
-              <h2 id="media-series-heading" className={styles.sectionHeading}>
-                Series
-              </h2>
+            <section className={styles.catalogSection} aria-label="Series">
               <TitleGrid items={series} onSelect={setInfo} />
             </section>
           ) : null}
