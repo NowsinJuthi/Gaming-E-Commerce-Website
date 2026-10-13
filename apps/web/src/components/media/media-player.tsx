@@ -799,7 +799,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const target = event.target as HTMLElement | null;
     if (target?.closest("a, input, textarea, select")) return;
     const control = target?.closest("button");
-    if (control && !control.classList.contains(styles.skin) && !control.closest(`.${styles.tapZones}`)) return;
+    const skinClass = styles.skin ?? "";
+    const zoneClass = styles.tapZones ?? "";
+    const inTapZone = zoneClass.length > 0 && Boolean(control?.closest(`.${zoneClass}`));
+    if (control && !control.classList.contains(skinClass) && !inTapZone) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width < 8) return;
     const x = (event.clientX - rect.left) / rect.width;
