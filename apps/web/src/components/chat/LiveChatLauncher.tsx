@@ -32,6 +32,31 @@ import { useChatOverlayLock } from "@/hooks/useChatOverlayLock";
 
 type ChatLauncherRole = "guest" | "customer" | "staff";
 
+const CHAT_DOCK_KEY = "uniqbd.chatLauncherDock";
+
+type ChatDock = { side: "left" | "right"; bottom: number };
+
+function readChatDock(): ChatDock | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CHAT_DOCK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ChatDock>;
+    const bottom = Number(parsed.bottom);
+    if (parsed.side !== "left" && parsed.side !== "right") return null;
+    if (!Number.isFinite(bottom)) return null;
+    return { side: parsed.side, bottom };
+  } catch {
+    return null;
+  }
+}
+
+function clampChatBottom(bottom: number, height: number): number {
+  const margin = 12;
+  const max = Math.max(margin, window.innerHeight - height - margin);
+  return Math.min(max, Math.max(margin, bottom));
+}
+
 function resolveLauncherRole(): ChatLauncherRole {
   if (typeof window === "undefined" || !hasAuthSession()) return "guest";
   if (isChatStaffFromRoles(getSessionRoles())) return "staff";
@@ -68,6 +93,22 @@ export function LiveChatLauncher({
     ChatLauncherRole | "loading"
   >("loading");
   const chatRefreshRef = useRef<(() => Promise<void>) | null>(null);
+  const [dock, setDock] = useState<ChatDock | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    width: number;
+    height: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
 
   const onChatRefreshReady = useCallback(
     (api: { refresh: () => Promise<void> }) => {
@@ -82,6 +123,7 @@ export function LiveChatLauncher({
 
   useEffect(() => {
     setMounted(true);
+    setDock(readChatDock());
     syncRole();
     let cancelled = false;
     if (hasAuthSession() && !isChatStaffFromRoles(getSessionRoles())) {
@@ -114,6 +156,98 @@ export function LiveChatLauncher({
   const unread = role === "staff" ? staffUnread : customerUnread;
 
   const hidden = isLauncherHidden(pathname);
+
+  useEffect(() => {
+    function onResize() {
+      setDock((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          bottom: clampChatBottom(current.bottom, 60),
+        };
+      });
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  function onDockPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onDockPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+    drag.moved = true;
+    const x = Math.min(
+      window.innerWidth - drag.width - 8,
+      Math.max(8, drag.originX + dx),
+    );
+    const y = Math.min(
+      window.innerHeight - drag.height - 8,
+      Math.max(8, drag.originY + dy),
+    );
+    setDragging(true);
+    setDragPoint({ x, y });
+  }
+
+  function finishDockDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (!drag.moved) {
+      setDragging(false);
+      setDragPoint(null);
+      return;
+    }
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 400);
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const x = Math.min(
+      window.innerWidth - drag.width - 8,
+      Math.max(8, drag.originX + dx),
+    );
+    const y = Math.min(
+      window.innerHeight - drag.height - 8,
+      Math.max(8, drag.originY + dy),
+    );
+    const side: ChatDock["side"] =
+      x + drag.width / 2 < window.innerWidth / 2 ? "left" : "right";
+    const next: ChatDock = {
+      side,
+      bottom: clampChatBottom(window.innerHeight - y - drag.height, drag.height),
+    };
+    setDock(next);
+    localStorage.setItem(CHAT_DOCK_KEY, JSON.stringify(next));
+    setDragPoint(null);
+    setDragging(false);
+  }
+
+  function openChat() {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    setOpen(true);
+  }
 
   useLiveChatIconAlerts({
     enabled: chatAllowed && !hidden && role !== "guest",
@@ -450,9 +584,27 @@ export function LiveChatLauncher({
   return (
     <>
       {overlay}
-      <div className="admin-chat-launcher" aria-live="polite">
+      <div
+        className={`admin-chat-launcher${dock?.side === "left" && !dragging ? " admin-chat-launcher--left" : ""}${dragging ? " admin-chat-launcher--dragging" : ""}`}
+        aria-live="polite"
+        style={
+          dragging && dragPoint
+            ? { left: dragPoint.x, top: dragPoint.y, right: "auto", bottom: "auto" }
+            : dock
+              ? {
+                  left: dock.side === "left" ? "max(1rem, env(safe-area-inset-left))" : "auto",
+                  right: dock.side === "right" ? "max(1rem, env(safe-area-inset-right))" : "auto",
+                  bottom: `max(${dock.bottom}px, env(safe-area-inset-bottom))`,
+                }
+              : undefined
+        }
+      >
         <div
           className={`admin-chat-launcher-fab-wrap${unread > 0 ? " admin-chat-launcher-fab-wrap--alert" : ""}${open ? " admin-chat-launcher-fab-wrap--open" : ""}`}
+          onPointerDown={onDockPointerDown}
+          onPointerMove={onDockPointerMove}
+          onPointerUp={finishDockDrag}
+          onPointerCancel={finishDockDrag}
         >
           <span className="admin-chat-launcher-fab-aura" aria-hidden />
           <span className="admin-chat-launcher-fab-halo" aria-hidden />
@@ -496,7 +648,7 @@ export function LiveChatLauncher({
           <button
             type="button"
             className="admin-chat-launcher-fab"
-            onClick={() => setOpen(true)}
+            onClick={openChat}
             aria-label={
               unread > 0
                 ? `Open live chat, ${unread} unread`

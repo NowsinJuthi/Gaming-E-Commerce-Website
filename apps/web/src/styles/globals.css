@@ -16585,6 +16585,22 @@
     bottom: 1.25rem;
     z-index: 60;
     pointer-events: none;
+    touch-action: none;
+  }
+
+  .admin-chat-launcher--dragging {
+    cursor: grabbing;
+    transition: none;
+  }
+
+  .admin-chat-launcher--dragging .admin-chat-launcher-fab-wrap {
+    animation: none;
+  }
+
+  .admin-chat-launcher--left .admin-chat-launcher-fab-hint {
+    right: auto;
+    left: calc(100% + 0.75rem);
+    transform: translateX(-8px);
   }
 
   .admin-chat-launcher > * {
@@ -16596,6 +16612,8 @@
     width: 3.75rem;
     height: 3.75rem;
     overflow: visible;
+    cursor: grab;
+    touch-action: none;
     animation:
       admin-chat-launcher-enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) both,
       admin-chat-launcher-float 5.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) 0.8s
@@ -17083,7 +17101,8 @@
   }
 
   @media (min-width: 768px) {
-    .admin-chat-launcher-fab:hover .admin-chat-launcher-fab-hint {
+    .admin-chat-launcher-fab:hover .admin-chat-launcher-fab-hint,
+    .admin-chat-launcher--left .admin-chat-launcher-fab:hover .admin-chat-launcher-fab-hint {
       display: inline-flex;
       opacity: 1;
       transform: translateX(0);
