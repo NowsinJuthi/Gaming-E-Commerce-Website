@@ -592,7 +592,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
       {preparing || (buffering && !error) ? (
         <div className={styles.busy} role="status" aria-live="polite" aria-label={preparing ? "Loading" : "Buffering"}>
-          <BusyMark buffering={buffering && !preparing} />
+          <div>
+            <BusyMark buffering={buffering && !preparing} />
+            {preparing && session?.message ? <p className={styles.message}>{session.message}</p> : null}
+          </div>
         </div>
       ) : null}
       {error ? (

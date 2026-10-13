@@ -1,5 +1,4 @@
-import { ChildProcess, execFile, spawn } from 'child_process';
-import { promisify } from 'util';
+import { ChildProcess, spawn } from 'child_process';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
@@ -21,7 +20,6 @@ import { CryptoService } from '../../shared/crypto/crypto.service';
 import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
 import { SmbAuth, SmbClientService, SmbListedEntry, type SmbIncoming, type SmbPlayback } from './smb-client.service';
 
-const execFileAsync = promisify(execFile);
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
@@ -301,7 +299,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const cacheDir = join(resolveUploadsRoot(), 'playback-cache');
     const cacheName = `${createHash('sha1').update(`${session.auth.host}|${session.auth.share}|${episode.remotePath}`).digest('hex')}.bin`;
     const finalPath = join(cacheDir, cacheName);
-    const ready = await this.cachedSize(finalPath, episode.sizeBytes);
+    const ready = await this.cachedSize(finalPath, episode.sizeBytes ?? session.fileSize);
     if (ready) {
       session.remote?.close();
       session.remote = null;
@@ -309,24 +307,44 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       session.downloaded = ready;
       return finalPath;
     }
-    if (session.remote && session.cacheName === cacheName) {
-      const port = await this.readyPort();
-      return `http://127.0.0.1:${port}/${session.id}`;
-    }
     session.message = 'Starting playback…';
     session.cacheName = cacheName;
     this.stopIncoming(session);
-    const fifo = join(session.dir, 'video.fifo');
-    await rm(fifo, { force: true }).catch(() => undefined);
-    await execFileAsync('mkfifo', [fifo]);
-    const incoming = await this.smb.beginFileStream(session.auth, episode.remotePath, fifo);
-    if (session.token !== token) {
-      if (incoming.process.exitCode == null) incoming.process.kill('SIGKILL');
+    try {
+      const playback = await this.smb.openPlayback(session.auth, episode.remotePath);
+      if (session.token !== token) {
+        playback.close();
+        return finalPath;
+      }
+      session.remote?.close();
+      session.remote = playback;
+      session.fileSize = playback.size;
+      const port = await this.readyPort();
+      return `http://127.0.0.1:${port}/${session.id}`;
+    } catch (error) {
+      this.logger.warn(`Direct read failed, saving the video first: ${error instanceof Error ? error.message : error}`);
+      session.remote?.close();
+      session.remote = null;
+      await mkdir(cacheDir, { recursive: true });
+      await rm(finalPath, { force: true }).catch(() => undefined);
+      const total = episode.sizeBytes ?? session.fileSize ?? 0;
+      const progress = setInterval(() => {
+        void stat(finalPath)
+          .then((info) => {
+            const pct = total > 0 ? Math.min(99, Math.round((info.size / total) * 100)) : 0;
+            session.message = total > 0 ? `Preparing the video… ${pct}%` : 'Preparing the video…';
+          })
+          .catch(() => undefined);
+      }, 1000);
+      try {
+        await this.smb.downloadFile(session.auth, episode.remotePath, finalPath);
+      } finally {
+        clearInterval(progress);
+      }
+      if (session.token !== token) return finalPath;
+      session.message = 'Starting playback…';
       return finalPath;
     }
-    session.incoming = incoming;
-    session.videoCodec = '';
-    return fifo;
   }
 
   private async serveRemote(req: IncomingMessage, res: ServerResponse) {
@@ -416,8 +434,10 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private async cachedSize(file: string, expected: number | null): Promise<number | null> {
     try {
       const info = await stat(file);
-      if (info.size < 1024) return null;
-      if (expected && expected > 0 && info.size + 4096 < expected) return null;
+      if (!expected || expected <= 0 || info.size + 4096 < expected) {
+        if (info.size > 0) await unlink(file).catch(() => undefined);
+        return null;
+      }
       return info.size;
     } catch {
       return null;
@@ -427,6 +447,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private async probe(session: Session, file: string) {
     const raw = await this.runCapture(this.bin('ffprobe'), [
       '-v', 'error',
+      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
       '-show_entries', 'stream=codec_type,codec_name,width,height:stream_tags=language,title',
       '-show_entries', 'format=duration',
       '-of', 'json',
@@ -481,6 +502,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const args = [
       '-hide_banner', '-loglevel', 'error', ...(streaming ? [] : ['-nostdin']), '-y',
       ...(!streaming && session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
+      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
       '-probesize', '5M',
       '-analyzeduration', '2M',
       '-fflags', '+genpts+discardcorrupt',

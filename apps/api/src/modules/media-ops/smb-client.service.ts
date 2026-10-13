@@ -613,7 +613,13 @@ export class SmbClientService {
   private async openOnShare(auth: SmbAuth, remoteFile: string): Promise<SmbPlayback> {
     const client = await this.createStreamClient(auth);
     try {
-      const size = await client.getSize(remoteFile);
+      const opened = await this.promiseTimeout(
+        client.createReadStream(remoteFile, { start: 0, end: 0 }),
+        8_000,
+        'Timed out opening the video on the storage server.',
+      );
+      const size = opened.fileSize ?? 0;
+      opened.destroy();
       if (!Number.isFinite(size) || size <= 0) {
         client.disconnect();
         throw new Error('The video file is empty.');
@@ -643,10 +649,26 @@ export class SmbClientService {
     }
   }
 
+  private promiseTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      work.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          reject(error instanceof Error ? error : new Error(message));
+        },
+      );
+    });
+  }
+
   private async createStreamClient(auth: SmbAuth): Promise<SmbStreamClient> {
     const SMB2 = await this.loadSmb2();
     const domain = auth.domain?.trim() ? auth.domain.trim() : 'WORKGROUP';
-    return new SMB2({
+    const client = new SMB2({
       share: `\\\\${auth.host}\\${auth.share.trim()}`,
       domain: domain || '.',
       username: auth.username,
@@ -654,7 +676,12 @@ export class SmbClientService {
       port: auth.port ?? 445,
       autoCloseTimeout: 0,
       packetConcurrency: 8,
-    }) as unknown as SmbStreamClient;
+    }) as unknown as SmbStreamClient & {
+      socket?: { setTimeout: (ms: number) => void; destroy: () => void; on: (event: string, cb: () => void) => void };
+    };
+    client.socket?.setTimeout(8_000);
+    client.socket?.on('timeout', () => client.socket?.destroy());
+    return client;
   }
 
   private async loadSmb2(): Promise<
