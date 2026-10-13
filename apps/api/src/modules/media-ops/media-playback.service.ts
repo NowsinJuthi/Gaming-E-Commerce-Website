@@ -882,7 +882,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private clampStart(value: number, duration: number): number {
     const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
-    if (duration > 30 && safe > duration - 10) return 0;
+    if (duration > 30 && safe > duration - 10) {
+      return Math.max(0, Math.floor(duration - 10));
+    }
     return safe;
   }
 

@@ -83,6 +83,13 @@
   pointer-events: none;
 }
 
+/* Keep the seek bar usable while the rest of the chrome auto-hides (PC + phone). */
+.hiddenChrome .bottom,
+.hiddenChrome .mDock {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .top,
 .bottom,
 .iconRow,

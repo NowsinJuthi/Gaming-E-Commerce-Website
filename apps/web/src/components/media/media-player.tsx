@@ -538,24 +538,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     return data;
   }, []);
 
-  const retarget = useCallback(
-    async (patch: Record<string, unknown>) => {
-      const currentSession = sessionRef.current;
-      if (!currentSession) return;
-      setError("");
-      setBuffering(true);
-      attachedPackRef.current = "";
-      const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
-        startSeconds: patch.startSeconds ?? currentSession.startSeconds,
-        episodeIndex: patch.episodeIndex ?? currentSession.episodeIndex,
-        audioIndex: patch.audioIndex ?? currentSession.audioIndex,
-        quality: patch.quality ?? currentSession.quality,
-      });
-      setSession(next);
-    },
-    [post],
-  );
-
   const attachPlaybackPack = useCallback(async (pack: PlaybackSession): Promise<void> => {
     const video = videoRef.current;
     if (!video) throw new Error("Playback failed.");
@@ -691,6 +673,51 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       });
     });
   }, []);
+
+  const waitForSessionReady = useCallback(async (sessionId: string): Promise<PlaybackSession> => {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const res = await fetch(`${API_BASE}/media/playback/sessions/${sessionId}`);
+      const data = (await res.json().catch(() => null)) as PlaybackSession | null;
+      if (!res.ok || !data) throw new Error("Seek failed.");
+      if (data.status === "error") throw new Error(data.message || "Seek failed.");
+      if (data.status === "ready") return data;
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+    }
+    throw new Error("Seek timed out. Try again.");
+  }, []);
+
+  const retarget = useCallback(
+    async (patch: Record<string, unknown>) => {
+      const currentSession = sessionRef.current;
+      if (!currentSession) return;
+      setError("");
+      setBuffering(true);
+      seekLockRef.current = true;
+      attachedPackRef.current = "";
+      try {
+        const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
+          startSeconds: patch.startSeconds ?? currentSession.startSeconds,
+          episodeIndex: patch.episodeIndex ?? currentSession.episodeIndex,
+          audioIndex: patch.audioIndex ?? currentSession.audioIndex,
+          quality: patch.quality ?? currentSession.quality,
+        });
+        setSession(next);
+        const ready = next.status === "ready" ? next : await waitForSessionReady(currentSession.sessionId);
+        await attachPlaybackPack(ready);
+        attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
+        originRef.current = ready.startSeconds;
+        setCurrent(ready.startSeconds);
+        setSession(ready);
+      } catch (reason) {
+        attachedPackRef.current = "";
+        setError(reason instanceof Error ? reason.message : "Playback could not restart.");
+      } finally {
+        seekLockRef.current = false;
+        setBuffering(false);
+      }
+    },
+    [attachPlaybackPack, post, waitForSessionReady],
+  );
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)");
@@ -977,54 +1004,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     reveal();
   }
 
-  async function waitForSessionReady(sessionId: string, startSeconds: number): Promise<PlaybackSession> {
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      const res = await fetch(`${API_BASE}/media/playback/sessions/${sessionId}`);
-      const data = (await res.json().catch(() => null)) as PlaybackSession | null;
-      if (!res.ok || !data) throw new Error("Seek failed.");
-      if (data.status === "error") throw new Error(data.message || "Seek failed.");
-      if (data.status === "ready" && Math.abs(data.startSeconds - startSeconds) < 2) return data;
-      await new Promise((resolve) => window.setTimeout(resolve, 500));
-    }
-    throw new Error("Seek timed out. Try again.");
-  }
-
-  function seekLocal(
-    video: HTMLVideoElement,
-    absolute: number,
-    localTarget: number,
-    movie: number,
-  ): Promise<boolean> {
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (ok: boolean) => {
-        if (done) return;
-        done = true;
-        window.clearTimeout(timer);
-        video.removeEventListener("seeked", onSeeked);
-        seekingRef.current = false;
-        resolve(ok);
-      };
-      const onSeeked = () => {
-        const got = displayTimelineSeconds(video.currentTime, originRef.current, movie);
-        if (Math.abs(got - absolute) <= 1.25) {
-          setCurrent(got);
-          finish(true);
-        } else {
-          finish(false);
-        }
-      };
-      const timer = window.setTimeout(() => finish(false), 2500);
-      seekingRef.current = true;
-      video.addEventListener("seeked", onSeeked);
-      try {
-        applyVideoSeek(video, localTarget);
-      } catch {
-        finish(false);
-      }
-    });
-  }
-
   async function restartPlaybackAt(absolute: number, beforeSeek: number, previousOrigin: number) {
     const currentSession = sessionRef.current;
     if (!currentSession) return;
@@ -1035,6 +1014,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setBuffering(true);
     packRestartRef.current = true;
     attachedPackRef.current = "";
+    originRef.current = target;
     remember(target);
     setCurrent(target);
     let queued: number | null = null;
@@ -1046,12 +1026,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         quality: currentSession.quality,
       });
       setSession(next);
-      const ready =
-        next.status === "ready" && Math.abs(next.startSeconds - target) < 2
-          ? next
-          : await waitForSessionReady(currentSession.sessionId, target);
+      const ready = next.status === "ready" ? next : await waitForSessionReady(currentSession.sessionId);
       await attachPlaybackPack(ready);
       attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
+      originRef.current = ready.startSeconds;
+      setCurrent(ready.startSeconds);
       setSession(ready);
     } catch (reason) {
       attachedPackRef.current = "";
@@ -1079,8 +1058,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   async function seekTo(target: number) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
-    if (!video || !currentSession) return;
-    const movie = currentSession.durationSeconds;
+    if (!video || !currentSession || currentSession.status !== "ready") return;
+    const movie = durationHintRef.current || currentSession.durationSeconds;
     let absolute = movie > 0 ? Math.min(Math.max(0, target), movie) : Math.max(0, target);
     absolute = Math.round(absolute);
     if (seekingRef.current) {
@@ -1095,10 +1074,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const targetIsInCurrentPack = absolute >= origin - 0.35;
 
     setCurrent(absolute);
+    remember(absolute);
 
     if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
-      const ok = await seekLocal(video, absolute, localTarget, movie);
-      if (ok) return;
+      applyVideoSeek(video, localTarget);
+      setCurrent(absolute);
+      return;
     }
 
     await restartPlaybackAt(absolute, beforeSeek, previousOrigin);
@@ -1423,7 +1404,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               <SeekTrack
                 value={shown}
                 max={duration}
-                onScrub={setScrub}
+                onScrub={(seconds) => {
+                  reveal();
+                  setScrub(seconds);
+                }}
                 onCommit={commitSeek}
               />
             </div>
@@ -1515,7 +1499,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 teal
                 value={shown}
                 max={duration}
-                onScrub={setScrub}
+                onScrub={(seconds) => {
+                  reveal();
+                  setScrub(seconds);
+                }}
                 onCommit={commitSeek}
               />
               <span className={styles.mDuration}>{duration > 0 ? formatTime(duration) : "--:--"}</span>
