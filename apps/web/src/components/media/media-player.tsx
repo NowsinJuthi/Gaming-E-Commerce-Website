@@ -7,6 +7,7 @@ import { API_BASE } from "@/lib/api";
 import {
   displayTimelineSeconds,
   isLocalTimeBuffered,
+  isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
 import styles from "./media-player.module.css";
@@ -439,8 +440,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const originRef = useRef(0);
   const packRestartRef = useRef(false);
   const scrubbingRef = useRef(false);
+  const seekLockRef = useRef(false);
+  const loadTokenRef = useRef(0);
+  const attachSeqRef = useRef(0);
+  const attachedPackRef = useRef("");
+  const rateRef = useRef(1);
   const [session, setSession] = useState<PlaybackSession | null>(null);
-  const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
@@ -455,6 +460,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [muted, setMuted] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [rate, setRate] = useState(1);
+  rateRef.current = rate;
   const [chrome, setChrome] = useState(true);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [aspect, setAspect] = useState<Aspect>("fit");
@@ -530,6 +536,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       if (!currentSession) return;
       setError("");
       setBuffering(true);
+      attachedPackRef.current = "";
       const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
         startSeconds: patch.startSeconds ?? currentSession.startSeconds,
         episodeIndex: patch.episodeIndex ?? currentSession.episodeIndex,
@@ -537,10 +544,105 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         quality: patch.quality ?? currentSession.quality,
       });
       setSession(next);
-      setBootId((value) => value + 1);
     },
     [post],
   );
+
+  const attachPlaybackPack = useCallback(async (pack: PlaybackSession): Promise<void> => {
+    const video = videoRef.current;
+    if (!video || pack.status !== "ready") return;
+    const seq = ++attachSeqRef.current;
+    const packStart = pack.startSeconds;
+    const loadToken = ++loadTokenRef.current;
+    const playlist = hlsPlaylistSource(pack.playlistUrl, packStart, loadToken);
+
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    video.removeAttribute("src");
+    video.load();
+
+    originRef.current = packStart;
+    packRestartRef.current = true;
+
+    const finishAttach = () => {
+      if (seq !== attachSeqRef.current) return;
+      video.currentTime = 0.001;
+      setCurrent(packStart);
+      seekingRef.current = false;
+      setBuffering(false);
+      video.playbackRate = rateRef.current;
+      void video.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
+    };
+
+    if (nativeHls(video)) {
+      await new Promise<void>((resolve, reject) => {
+        const onMeta = () => {
+          video.removeEventListener("loadedmetadata", onMeta);
+          finishAttach();
+          resolve();
+        };
+        video.addEventListener("loadedmetadata", onMeta);
+        video.addEventListener("error", () => reject(new Error("Playback failed.")), { once: true });
+        video.src = playlist;
+        video.load();
+      });
+      return;
+    }
+
+    const mod = await import("hls.js");
+    if (seq !== attachSeqRef.current) return;
+    if (!mod.default.isSupported()) {
+      await new Promise<void>((resolve, reject) => {
+        const onMeta = () => {
+          video.removeEventListener("loadedmetadata", onMeta);
+          finishAttach();
+          resolve();
+        };
+        video.addEventListener("loadedmetadata", onMeta);
+        video.addEventListener("error", () => reject(new Error("Playback failed.")), { once: true });
+        video.src = playlist;
+        video.load();
+      });
+      return;
+    }
+
+    const hls = new mod.default({
+      enableWorker: true,
+      lowLatencyMode: false,
+      autoStartLoad: false,
+      liveDurationInfinity: false,
+      startPosition: 0.001,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: Infinity,
+      maxLiveSyncPlaybackRate: 1,
+      maxBufferSize: 400_000_000,
+      backBufferLength: 180,
+      maxBufferLength: 60,
+      maxMaxBufferLength: 180,
+      maxBufferHole: 0.5,
+      nudgeOffset: 0.2,
+      nudgeMaxRetry: 4,
+      startFragPrefetch: true,
+    });
+    hlsRef.current = hls;
+    hls.attachMedia(video);
+    hls.loadSource(playlist);
+
+    await new Promise<void>((resolve, reject) => {
+      hls.on(mod.default.Events.MANIFEST_PARSED, () => {
+        if (seq !== attachSeqRef.current) return;
+        hls.startLoad(0.001);
+        finishAttach();
+        resolve();
+      });
+      hls.on(mod.default.Events.ERROR, (_event, data) => {
+        if (!data.fatal || seq !== attachSeqRef.current) return;
+        if (data.type === mod.default.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+        else if (data.type === mod.default.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else reject(new Error("Playback stopped. Try again."));
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)");
@@ -587,6 +689,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           const data = (await res.json().catch(() => null)) as PlaybackSession | null;
           if (!res.ok || !data) return;
           setSession((previous) => {
+            if (seekLockRef.current) return previous ?? data;
             if (!previous || previous.sessionId !== data.sessionId) return data;
             if (previous.status === "ready" && data.status === "ready" && previous.startSeconds === data.startSeconds) {
               const sameSubtitles = JSON.stringify(previous.subtitles) === JSON.stringify(data.subtitles);
@@ -603,85 +706,31 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   }, [session?.sessionId, session?.status]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !session || session.status !== "ready") return;
-    let destroyed = false;
-    let hls: Hls | null = null;
-    const packStart = session.startSeconds;
-    const playlist = hlsPlaylistSource(session.playlistUrl, packStart, bootId);
-    originRef.current = packStart;
-    packRestartRef.current = true;
+    if (!session || session.status !== "ready") return;
+    if (seekLockRef.current) return;
+    const packKey = `${session.sessionId}:${session.startSeconds}`;
+    if (attachedPackRef.current === packKey) return;
+    attachedPackRef.current = packKey;
+    void attachPlaybackPack(session).catch((reason: unknown) => {
+      attachedPackRef.current = "";
+      setError(reason instanceof Error ? reason.message : "Playback failed.");
+      setBuffering(false);
+      seekingRef.current = false;
+    });
+  }, [attachPlaybackPack, session?.sessionId, session?.status, session?.startSeconds]);
 
-    const showGesture = () => {
-      if (!destroyed) setNeedsGesture(true);
-    };
-    const begin = () => {
-      video.playbackRate = rate;
-      void video.play().then(() => setNeedsGesture(false)).catch(showGesture);
-    };
-
-    void (async () => {
-      if (nativeHls(video)) {
-        video.src = playlist;
-        video.addEventListener("loadedmetadata", begin, { once: true });
-        return;
-      }
-      const mod = await import("hls.js");
-      if (destroyed) return;
-      if (!mod.default.isSupported()) {
-        video.src = playlist;
-        video.addEventListener("loadedmetadata", begin, { once: true });
-        return;
-      }
-      hls = new mod.default({
-        enableWorker: true,
-        lowLatencyMode: false,
-        autoStartLoad: false,
-        liveDurationInfinity: false,
-        startPosition: 0.001,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: Infinity,
-        maxLiveSyncPlaybackRate: 1,
-        maxBufferSize: 400_000_000,
-        backBufferLength: 180,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 180,
-        maxBufferHole: 0.5,
-        nudgeOffset: 0.2,
-        nudgeMaxRetry: 4,
-        startFragPrefetch: true,
-      });
-      hlsRef.current = hls;
-      hls.attachMedia(video);
-      hls.loadSource(playlist);
-      hls.on(mod.default.Events.MANIFEST_PARSED, () => {
-        if (destroyed) return;
-        hls?.startLoad(0.001);
-        video.currentTime = 0.001;
-        originRef.current = packStart;
-        setCurrent(packStart);
-        seekingRef.current = false;
-        setBuffering(false);
-        begin();
-      });
-      hls.on(mod.default.Events.ERROR, (_event, data) => {
-        if (!data.fatal || destroyed) return;
-        if (data.type === mod.default.ErrorTypes.NETWORK_ERROR) hls?.startLoad();
-        else if (data.type === mod.default.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
-        else setError("Playback stopped. Try again.");
-      });
-    })();
-
+  useEffect(() => {
     return () => {
-      destroyed = true;
-      hls?.destroy();
-      if (hlsRef.current === hls) hlsRef.current = null;
-      video.removeAttribute("src");
-      video.load();
+      attachSeqRef.current += 1;
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+      const video = videoRef.current;
+      if (video) {
+        video.removeAttribute("src");
+        video.load();
+      }
     };
-    // Reload only when the server starts a new playlist.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bootId, session?.status, session?.playlistUrl, session?.startSeconds]);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -881,7 +930,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const data = (await res.json().catch(() => null)) as PlaybackSession | null;
       if (!res.ok || !data) throw new Error("Seek failed.");
       if (data.status === "error") throw new Error(data.message || "Seek failed.");
-      if (data.status === "ready" && Math.abs(data.startSeconds - startSeconds) < 1.5) return data;
+      if (data.status === "ready" && Math.abs(data.startSeconds - startSeconds) < 2) return data;
       await new Promise((resolve) => window.setTimeout(resolve, 500));
     }
     throw new Error("Seek timed out. Try again.");
@@ -925,40 +974,45 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   async function restartPlaybackAt(absolute: number, beforeSeek: number, previousOrigin: number) {
     const currentSession = sessionRef.current;
-    const video = videoRef.current;
-    if (!video || !currentSession) return;
+    if (!currentSession) return;
+    const target = Math.round(absolute);
+    seekLockRef.current = true;
     seekingRef.current = true;
     pendingSeekRef.current = null;
     setBuffering(true);
     packRestartRef.current = true;
-    remember(absolute);
+    attachedPackRef.current = "";
+    remember(target);
+    setCurrent(target);
     try {
       const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
-        startSeconds: absolute,
+        startSeconds: target,
         episodeIndex: currentSession.episodeIndex,
         audioIndex: currentSession.audioIndex,
         quality: currentSession.quality,
       });
       setSession(next);
       const ready =
-        next.status === "ready" && Math.abs(next.startSeconds - absolute) < 1.5
+        next.status === "ready" && Math.abs(next.startSeconds - target) < 2
           ? next
-          : await waitForSessionReady(currentSession.sessionId, absolute);
-      originRef.current = ready.startSeconds;
-      if (ready !== next) setSession(ready);
-      setBootId((value) => value + 1);
+          : await waitForSessionReady(currentSession.sessionId, target);
+      await attachPlaybackPack(ready);
+      attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
+      seekLockRef.current = false;
+      setSession(ready);
     } catch (reason) {
+      attachedPackRef.current = "";
       seekingRef.current = false;
       packRestartRef.current = false;
       originRef.current = previousOrigin;
       setCurrent(beforeSeek);
       setError(reason instanceof Error ? reason.message : "Could not seek.");
       setBuffering(false);
-    } finally {
-      const queued = pendingSeekRef.current;
-      pendingSeekRef.current = null;
-      if (queued != null) void seekTo(queued);
+      seekLockRef.current = false;
     }
+    const queued = pendingSeekRef.current;
+    pendingSeekRef.current = null;
+    if (queued != null) void seekTo(queued, true);
   }
 
   async function seekTo(target: number, fromProgressBar = false) {
@@ -966,7 +1020,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
     const movie = currentSession.durationSeconds;
-    const absolute = movie > 0 ? Math.min(Math.max(0, target), movie) : Math.max(0, target);
+    let absolute = movie > 0 ? Math.min(Math.max(0, target), movie) : Math.max(0, target);
+    absolute = Math.round(absolute);
     if (seekingRef.current) {
       pendingSeekRef.current = absolute;
       setCurrent(absolute);
@@ -982,7 +1037,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
     // Progress bar: always start a new ffmpeg pack (Movie Server seekHls + attachHls).
     // Local currentTime on a live EVENT playlist snaps back to the same place on PC.
-    if (!fromProgressBar && targetIsInCurrentPack && isLocalTimeBuffered(video, localTarget)) {
+    if (!fromProgressBar && targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       const ok = await seekLocal(video, absolute, localTarget, movie);
       if (ok) return;
     }
@@ -1098,13 +1153,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   function commitSeek(ratio: number) {
     setScrub(null);
     skipAt.current = null;
-    const video = videoRef.current;
     const fromSession = sessionRef.current?.durationSeconds ?? 0;
-    const fromVideo =
-      video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-    const movie = fromSession > 0 ? fromSession : Math.max(duration, fromVideo, 1);
+    const movie = fromSession > 0 ? fromSession : Math.max(duration, 1);
     const clamped = Math.min(1, Math.max(0, ratio));
-    void seekTo(movie * clamped, true);
+    void seekTo(Math.round(movie * clamped), true);
   }
 
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
