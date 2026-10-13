@@ -11,7 +11,7 @@ import { TmdbMetadataService } from './tmdb-metadata.service';
 
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const FRESH_MS = 10 * 60 * 1000;
-const MAX_TITLES = 80;
+const MAX_TITLES = 1000;
 const ENRICH_LIMIT = 16;
 
 @Injectable()
@@ -61,7 +61,7 @@ export class LibraryIndexService {
     const rows = await this.titles
       .find({ sourceKey: new RegExp(`^${id}:`) })
       .sort({ title: 1 })
-      .limit(200)
+      .limit(MAX_TITLES)
       .exec();
     return {
       items: rows.map((row) => ({
@@ -155,7 +155,9 @@ export class LibraryIndexService {
     allowLookup: () => boolean,
   ): Promise<boolean> {
     const parsed = this.parseTitle(file.name);
-    const meta = allowLookup() ? await this.lookup(kind, parsed.title, parsed.year) : null;
+    const meta = (await this.needsPoster(library, file.path)) && allowLookup()
+      ? await this.lookup(kind, parsed.title, parsed.year)
+      : null;
     await this.upsert(library, file.path, {
       kind,
       title: meta?.title || parsed.title,
@@ -175,7 +177,9 @@ export class LibraryIndexService {
     allowLookup: () => boolean,
   ): Promise<boolean> {
     const parsed = this.parseTitle(folder.name);
-    const meta = allowLookup() ? await this.lookup(kind, parsed.title, parsed.year) : null;
+    const meta = (await this.needsPoster(library, folder.path)) && allowLookup()
+      ? await this.lookup(kind, parsed.title, parsed.year)
+      : null;
     await this.upsert(library, folder.path, {
       kind,
       title: meta?.title || parsed.title,
@@ -186,6 +190,15 @@ export class LibraryIndexService {
       seasonCount: null,
     });
     return Boolean(meta?.posterUrl);
+  }
+
+  private async needsPoster(library: MediaLibraryDocument, relativePath: string): Promise<boolean> {
+    const row = await this.titles
+      .findOne({ sourceKey: this.sourceKey(library, relativePath) })
+      .select('posterUrl')
+      .lean()
+      .exec();
+    return !row?.posterUrl;
   }
 
   private allowLookup(force: boolean, used: number, deadline: number): boolean {
