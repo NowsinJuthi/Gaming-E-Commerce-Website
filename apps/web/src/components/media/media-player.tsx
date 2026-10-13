@@ -810,6 +810,37 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   }
 
   const shown = scrub ?? current;
+
+  function timeFromSeekPointer(event: React.PointerEvent<HTMLInputElement>): number {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const max = Math.max(duration, 1);
+    const rotated = immersive && portrait;
+    const span = Math.max(1, rotated ? rect.height : rect.width);
+    const ratio = rotated ? (event.clientY - rect.top) / span : (event.clientX - rect.left) / span;
+    return Math.round(Math.min(1, Math.max(0, ratio)) * max);
+  }
+
+  function onSeekPointerDown(event: React.PointerEvent<HTMLInputElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setScrub(timeFromSeekPointer(event));
+  }
+
+  function onSeekPointerMove(event: React.PointerEvent<HTMLInputElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    setScrub(timeFromSeekPointer(event));
+  }
+
+  function onSeekPointerUp(event: React.PointerEvent<HTMLInputElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const target = timeFromSeekPointer(event);
+    setScrub(null);
+    skipAt.current = null;
+    void seekTo(target);
+  }
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
   const preparing = !error && session?.status !== "ready";
   const playBusy = !error && (preparing || buffering || starting);
@@ -1018,13 +1049,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 max={Math.max(duration, 1)}
                 step={1}
                 value={Math.min(shown, Math.max(duration, 1))}
-                onPointerDown={() => setScrub(current)}
-                onChange={(event) => setScrub(Number(event.target.value))}
-                onPointerUp={(event) => {
-                  const target = Number((event.target as HTMLInputElement).value);
-                  setScrub(null);
-                  void seekTo(target);
-                }}
+                onChange={() => undefined}
+                onPointerDown={onSeekPointerDown}
+                onPointerMove={onSeekPointerMove}
+                onPointerUp={onSeekPointerUp}
+                onPointerCancel={onSeekPointerUp}
               />
             </div>
             <div className={styles.transport}>
@@ -1118,13 +1147,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 max={Math.max(duration, 1)}
                 step={1}
                 value={Math.min(shown, Math.max(duration, 1))}
-                onPointerDown={() => setScrub(current)}
-                onChange={(event) => setScrub(Number(event.target.value))}
-                onPointerUp={(event) => {
-                  const target = Number((event.target as HTMLInputElement).value);
-                  setScrub(null);
-                  void seekTo(target);
-                }}
+                onChange={() => undefined}
+                onPointerDown={onSeekPointerDown}
+                onPointerMove={onSeekPointerMove}
+                onPointerUp={onSeekPointerUp}
+                onPointerCancel={onSeekPointerUp}
               />
               <span className={styles.mDuration}>{duration > 0 ? formatTime(duration) : "--:--"}</span>
             </div>
