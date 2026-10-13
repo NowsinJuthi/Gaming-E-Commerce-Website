@@ -227,7 +227,7 @@ function SeekTrack({
       ref={trackRef}
       className={`${styles.seekTrack} ${teal ? styles.seekTrackTeal : ""}`}
       role="slider"
-      tabIndex={0}
+      tabIndex={-1}
       aria-label="Seek"
       aria-valuemin={0}
       aria-valuemax={Math.floor(limit)}
