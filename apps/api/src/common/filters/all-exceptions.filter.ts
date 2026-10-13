@@ -88,7 +88,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (
-      status === HttpStatus.BAD_REQUEST &&
+      (status === HttpStatus.BAD_REQUEST ||
+        status === HttpStatus.UNAUTHORIZED ||
+        status === HttpStatus.FORBIDDEN) &&
       req.originalUrl.includes('/api/app/')
     ) {
       const msg = Array.isArray(message) ? message.join('; ') : message;

@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
@@ -257,8 +258,10 @@ export class MfsAppCompatController {
     return { status: 'success', message: 'Logged out' };
   }
 
+  @SkipThrottle()
   @UseGuards(RolesGuard)
   @Roles(Role.Admin, Role.Support)
+  @HttpCode(HttpStatus.OK)
   @Post('sms/store')
   async storeSms(@Body() body: unknown) {
     const legacy = await this.verification.syncSmsLegacyApp(body);

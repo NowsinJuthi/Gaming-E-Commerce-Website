@@ -9,6 +9,23 @@ import { accessTokenVersionMatches } from '../access-token-version';
 import { ACCESS_COOKIE_NAME, readNamedCookie } from '../auth-cookies';
 import type { AuthenticatedUser, JwtPayload } from '../auth.types';
 
+/** Paymently sends the access token as a raw Authorization value or a token header. */
+function readRawJwt(
+  headers: Record<string, unknown> | undefined,
+): string | null {
+  if (!headers) return null;
+  const tokenHeader = headers.token ?? headers.Token;
+  const authorization = headers.authorization ?? headers.Authorization;
+  const candidates = [tokenHeader, authorization];
+  for (const candidate of candidates) {
+    const value = Array.isArray(candidate) ? candidate[0] : candidate;
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim().replace(/^bearer\s+/i, '');
+    if (trimmed.split('.').length === 3) return trimmed;
+  }
+  return null;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -22,6 +39,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: { headers?: Record<string, unknown> } | null) =>
+          readRawJwt(req?.headers),
         (req: { headers?: { cookie?: string } } | null) =>
           readNamedCookie(req?.headers?.cookie, ACCESS_COOKIE_NAME) ?? null,
       ]),

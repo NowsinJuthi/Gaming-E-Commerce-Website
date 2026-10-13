@@ -477,6 +477,7 @@ export class MfsVerificationService {
     const formats = await this.smsFormats.getActiveFormats();
     const payloads = flattenSmsPayloads(raw);
     let processed = 0;
+    let alreadyStored = 0;
     let rejectedDump = '';
 
     for (const payload of payloads) {
@@ -504,6 +505,7 @@ export class MfsVerificationService {
           .exists({ trxId: normalizedTrx })
           .exec();
         if (duplicate) {
+          alreadyStored += 1;
           continue;
         }
       }
@@ -523,7 +525,7 @@ export class MfsVerificationService {
       }
     }
 
-    if (processed === 0) {
+    if (processed === 0 && alreadyStored === 0) {
       return {
         httpStatus: 403,
         body: {
