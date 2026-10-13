@@ -48,11 +48,6 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const castRow = useRef<HTMLDivElement>(null);
-  const selected =
-    libraryId === ALL_LIBRARIES
-      ? null
-      : (home.libraries.find((library) => library.id === libraryId) ?? null);
-
   const libraryItems = useMemo(
     () =>
       libraryId === ALL_LIBRARIES
@@ -102,11 +97,10 @@ export function MediaHome({ home }: { home: MediaHome }) {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>{selected?.name ?? "Media"}</h1>
+      <h1 className="sr-only">Media</h1>
 
       <section className={styles.panel}>
         <div className={styles.librarySection}>
-          <span className={styles.label}>Media Menu</span>
           <div className={styles.libraryMenu} role="tablist" aria-label="Media libraries">
             <button
               type="button"
