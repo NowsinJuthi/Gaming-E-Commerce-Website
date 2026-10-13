@@ -22,19 +22,34 @@ type MediaDetails = {
   cast: { name: string; profileUrl: string | null }[];
 };
 
+const ALL_LIBRARIES = "all";
+
 export function MediaHome({ home }: { home: MediaHome }) {
-  const source = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
-  const [libraryId, setLibraryId] = useState(home.libraries[0]?.id ?? "");
+  const source = useMemo(() => {
+    const raw = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
+    const seen = new Set<string>();
+    return raw.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [home.items, home.rows]);
+  const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [year, setYear] = useState("");
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const castRow = useRef<HTMLDivElement>(null);
-  const selected = home.libraries.find((library) => library.id === libraryId) ?? home.libraries[0] ?? null;
-  const activeLibraryId = selected?.id ?? "";
+  const selected =
+    libraryId === ALL_LIBRARIES
+      ? null
+      : (home.libraries.find((library) => library.id === libraryId) ?? null);
 
   const libraryItems = useMemo(
-    () => source.filter((item) => item.libraryId === activeLibraryId),
-    [source, activeLibraryId],
+    () =>
+      libraryId === ALL_LIBRARIES
+        ? source
+        : source.filter((item) => item.libraryId === libraryId),
+    [source, libraryId],
   );
 
   const years = useMemo(
@@ -72,26 +87,39 @@ export function MediaHome({ home }: { home: MediaHome }) {
       <h1 className={styles.heading}>{selected?.name ?? "Media"}</h1>
 
       <section className={styles.panel}>
-        <div className={styles.filters}>
-          <label className={styles.field}>
-            <span className={styles.label}>Media Menu</span>
-            <span className={styles.selectWrap}>
-              <select
-                className={styles.control}
-                value={activeLibraryId}
-                onChange={(event) => {
-                  setLibraryId(event.target.value);
+        <div className={styles.librarySection}>
+          <span className={styles.label}>Media Menu</span>
+          <div className={styles.libraryMenu} role="tablist" aria-label="Media libraries">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={libraryId === ALL_LIBRARIES}
+              className={`${styles.menuChip} ${libraryId === ALL_LIBRARIES ? styles.menuChipActive : ""}`}
+              onClick={() => {
+                setLibraryId(ALL_LIBRARIES);
+                setYear("");
+              }}
+            >
+              All
+            </button>
+            {home.libraries.map((library) => (
+              <button
+                key={library.id}
+                type="button"
+                role="tab"
+                aria-selected={libraryId === library.id}
+                className={`${styles.menuChip} ${libraryId === library.id ? styles.menuChipActive : ""}`}
+                onClick={() => {
+                  setLibraryId(library.id);
                   setYear("");
                 }}
               >
-                {home.libraries.map((library) => (
-                  <option key={library.id} value={library.id}>
-                    {library.name}
-                  </option>
-                ))}
-              </select>
-            </span>
-          </label>
+                {library.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={styles.filters}>
           <label className={styles.field}>
             <span className={styles.label}>Genre</span>
             <span className={styles.selectWrap}>
@@ -128,7 +156,9 @@ export function MediaHome({ home }: { home: MediaHome }) {
         <p className={styles.empty}>
           {home.libraries.length === 0
             ? "No media libraries yet."
-            : "No titles in this library yet."}
+            : libraryId === ALL_LIBRARIES
+              ? "No movies or series published yet."
+              : "No titles in this library yet."}
         </p>
       ) : (
         <div className={styles.grid}>
@@ -150,11 +180,11 @@ export function MediaHome({ home }: { home: MediaHome }) {
               <button type="button" className={styles.cardTitle} onClick={() => setInfo(item)}>
                 {item.title}
               </button>
-              {item.year ? (
-                <button type="button" className={styles.cardYear} onClick={() => setInfo(item)}>
-                  {item.year}
-                </button>
-              ) : null}
+              <button type="button" className={styles.cardMeta} onClick={() => setInfo(item)}>
+                {[item.kind === "series" ? "Series" : "Movie", item.year ? String(item.year) : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </button>
             </article>
           ))}
         </div>

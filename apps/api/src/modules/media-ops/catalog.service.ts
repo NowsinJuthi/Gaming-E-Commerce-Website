@@ -151,7 +151,8 @@ export class CatalogService {
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
       .sort({ title: 1 })
-      .limit(500)
+      .select('title year kind posterUrl featured trending seasonCount sourceKey')
+      .lean()
       .exec();
     return {
       hero: (featured.length > 0 ? featured : items).slice(0, 6),
