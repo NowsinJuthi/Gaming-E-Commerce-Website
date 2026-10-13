@@ -118,10 +118,6 @@ function volumeReadOnly(): boolean {
 
 /** 0 at the start of the bar, 1 at the end, including a CSS-rotated phone player. */
 function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number): number {
-  const rect = el.getBoundingClientRect();
-  if (rect.width >= rect.height) {
-    return Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1)));
-  }
   let angle = 0;
   if (typeof DOMMatrixReadOnly === "function") {
     for (let node: HTMLElement | null = el; node; node = node.parentElement) {
@@ -135,6 +131,7 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
       }
     }
   }
+  const rect = el.getBoundingClientRect();
   const dx = clientX - (rect.left + rect.width / 2);
   const dy = clientY - (rect.top + rect.height / 2);
   const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
@@ -144,6 +141,21 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
 
 function isLocalTimeBuffered(video: HTMLVideoElement, localSeconds: number, slack = 0.35): boolean {
   const ranges = video.buffered;
+  if (ranges.length === 0) return false;
+  for (let i = 0; i < ranges.length; i += 1) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
+  }
+  return false;
+}
+
+/** Finite seekable only. An open live range is not the whole movie. */
+function isLocalTimeInPack(video: HTMLVideoElement, localSeconds: number, slack = 0.5): boolean {
+  if (isLocalTimeBuffered(video, localSeconds, slack)) return true;
+  if (!Number.isFinite(localSeconds) || localSeconds < -slack) return false;
+  const ranges = video.seekable;
   if (ranges.length === 0) return false;
   for (let i = 0; i < ranges.length; i += 1) {
     const start = ranges.start(i);
@@ -444,6 +456,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const seekHoldTimer = useRef<number | null>(null);
   const seekingRef = useRef(false);
   const pendingSeekRef = useRef<number | null>(null);
+  const originRef = useRef(0);
+  const packRestartRef = useRef(false);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
@@ -656,6 +670,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       hls.on(mod.default.Events.MANIFEST_PARSED, () => {
         if (destroyed) return;
         hls?.startLoad(0.001);
+        if (video.currentTime > 1.25) video.currentTime = 0.001;
         begin();
       });
       hls.on(mod.default.Events.ERROR, (_event, data) => {
@@ -682,15 +697,19 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video) return;
     const onTime = () => {
       if (video.seeking || seekingRef.current) return;
-      const start = sessionRef.current?.startSeconds ?? 0;
-      const mediaTime = start + video.currentTime;
+      if (packRestartRef.current) {
+        if (video.currentTime > 1.5) return;
+        packRestartRef.current = false;
+      }
+      const origin = originRef.current;
+      const mediaTime = origin + video.currentTime;
       if (seekHold.current != null) {
         if (Math.abs(mediaTime - seekHold.current) > 1.25) return;
         seekHold.current = null;
       }
       setCurrent(mediaTime);
       const known = sessionRef.current?.durationSeconds ?? 0;
-      setDuration(known > 0 ? known : start + (Number.isFinite(video.duration) ? video.duration : 0));
+      setDuration(known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0));
     };
     const onPlay = () => {
       setPlaying(true);
@@ -742,6 +761,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   useEffect(() => {
     if (session?.durationSeconds) setDuration(session.durationSeconds);
   }, [session?.durationSeconds]);
+
+  useEffect(() => {
+    if (!session || seekingRef.current || packRestartRef.current) return;
+    originRef.current = session.startSeconds;
+  }, [session]);
 
   useEffect(() => () => {
     if (startTimer.current) window.clearTimeout(startTimer.current);
@@ -853,7 +877,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video || !currentSession) return;
     setSkipFlash(delta < 0 ? "back" : "forward");
     window.setTimeout(() => setSkipFlash(null), 700);
-    const display = skipAt.current ?? currentSession.startSeconds + video.currentTime;
+    const display = skipAt.current ?? originRef.current + video.currentTime;
     const movie = currentSession.durationSeconds;
     let next = Math.max(0, display + delta);
     if (movie > 0) next = Math.min(movie, next);
@@ -879,7 +903,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }, 8000);
   }
 
-  async function seekTo(target: number, forceRestart = false) {
+  async function seekTo(target: number) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
@@ -891,43 +915,33 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setCurrent(absolute);
       return;
     }
-    const start = currentSession.startSeconds;
-    const local = Math.max(0, absolute - start);
-    const before = start + video.currentTime;
+    const origin = originRef.current || currentSession.startSeconds;
+    const local = Math.max(0, absolute - origin);
     holdSeek(absolute);
     setCurrent(absolute);
-    seekingRef.current = true;
-    // Only a position already in the decoder buffer can be a direct playhead move.
-    // A live event playlist's seekable range is not the movie: setting currentTime
-    // there snaps to the live edge, so a forward drag lands backward.
-    const inBuffer = !forceRestart && absolute >= start - 0.35 && isLocalTimeBuffered(video, local, 0.35);
-    if (inBuffer) {
+    // Inside this pack, move the playhead. Before the pack, or past the parts
+    // already built, start a new pack at that movie time. A time before the
+    // current origin cannot be stored as local 0 or the picture jumps forward.
+    if (absolute >= origin - 0.35 && isLocalTimeInPack(video, local)) {
       try {
         applyVideoSeek(video, local);
-        const onSeeked = () => {
-          video.removeEventListener("seeked", onSeeked);
-          const after = (sessionRef.current?.startSeconds ?? start) + video.currentTime;
-          const wanted = absolute - before;
-          const got = after - before;
-          const wrongWay = wanted * got < 0 && Math.abs(wanted) > 2 && Math.abs(got) > 2;
-          const queued = pendingSeekRef.current;
-          pendingSeekRef.current = null;
-          seekingRef.current = false;
-          if (queued != null) void seekTo(queued);
-          else if (wrongWay) void seekTo(absolute, true);
-        };
-        video.addEventListener("seeked", onSeeked);
         return;
       } catch {
-        /* restart the transcode at the requested time */
+        /* start a new pack at the requested time */
       }
     }
+    seekingRef.current = true;
     pendingSeekRef.current = null;
+    originRef.current = absolute;
+    packRestartRef.current = true;
     remember(absolute);
     try {
       await retarget({ startSeconds: absolute });
     } catch (reason) {
+      packRestartRef.current = false;
+      originRef.current = origin;
       seekHold.current = null;
+      setCurrent(origin + video.currentTime);
       setError(reason instanceof Error ? reason.message : "Could not seek.");
     } finally {
       seekingRef.current = false;
