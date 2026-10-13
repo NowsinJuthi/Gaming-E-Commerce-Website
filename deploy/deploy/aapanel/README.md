@@ -41,7 +41,8 @@ The complete Ubuntu installation and deployment guide is at
 
 The storefront vhost proxies to `127.0.0.1:3000`; the API vhost proxies to
 `127.0.0.1:4000`. Both include Socket.IO upgrade handling and standard proxy
-headers. The storefront also proxies `/api/uploads/` and `/api/app/` to the API.
+headers. The storefront also proxies `/api/uploads/`, `/api/app/`, and `/api/media/playback/`
+(HLS `seg*.ts` segments) to the API. The `.ts` deny rule must not apply to those URLs.
 
 ## Cloudflare and proxy trust (required in production)
 
