@@ -6,6 +6,7 @@ import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
   displayTimelineSeconds,
+  isLocalTimeBuffered,
   isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
@@ -864,7 +865,93 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     reveal();
   }
 
-  async function seekTo(target: number) {
+  async function waitForSessionReady(sessionId: string, startSeconds: number): Promise<PlaybackSession> {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const res = await fetch(`${API_BASE}/media/playback/sessions/${sessionId}`);
+      const data = (await res.json().catch(() => null)) as PlaybackSession | null;
+      if (!res.ok || !data) throw new Error("Seek failed.");
+      if (data.status === "error") throw new Error(data.message || "Seek failed.");
+      if (data.status === "ready" && data.startSeconds === startSeconds) return data;
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+    }
+    throw new Error("Seek timed out. Try again.");
+  }
+
+  function seekLocal(
+    video: HTMLVideoElement,
+    absolute: number,
+    localTarget: number,
+    movie: number,
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (ok: boolean) => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        video.removeEventListener("seeked", onSeeked);
+        seekingRef.current = false;
+        resolve(ok);
+      };
+      const onSeeked = () => {
+        const got = displayTimelineSeconds(video.currentTime, originRef.current, movie);
+        if (Math.abs(got - absolute) <= 1.25) {
+          setCurrent(got);
+          finish(true);
+        } else {
+          finish(false);
+        }
+      };
+      const timer = window.setTimeout(() => finish(false), 2500);
+      seekingRef.current = true;
+      video.addEventListener("seeked", onSeeked);
+      try {
+        applyVideoSeek(video, localTarget);
+      } catch {
+        finish(false);
+      }
+    });
+  }
+
+  async function restartPlaybackAt(absolute: number, beforeSeek: number, previousOrigin: number) {
+    const currentSession = sessionRef.current;
+    const video = videoRef.current;
+    if (!video || !currentSession) return;
+    seekingRef.current = true;
+    pendingSeekRef.current = null;
+    setBuffering(true);
+    packRestartRef.current = true;
+    remember(absolute);
+    try {
+      const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
+        startSeconds: absolute,
+        episodeIndex: currentSession.episodeIndex,
+        audioIndex: currentSession.audioIndex,
+        quality: currentSession.quality,
+      });
+      setSession(next);
+      setBootId((value) => value + 1);
+      const ready =
+        next.status === "ready" && next.startSeconds === absolute
+          ? next
+          : await waitForSessionReady(currentSession.sessionId, absolute);
+      originRef.current = ready.startSeconds;
+      setSession(ready);
+    } catch (reason) {
+      seekingRef.current = false;
+      packRestartRef.current = false;
+      originRef.current = previousOrigin;
+      setCurrent(beforeSeek);
+      setError(reason instanceof Error ? reason.message : "Could not seek.");
+      setBuffering(false);
+    } finally {
+      const queued = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      if (queued != null) void seekTo(queued);
+    }
+  }
+
+  async function seekTo(target: number, forcePack = false) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
@@ -880,37 +967,20 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const previousOrigin = origin;
     const localTarget = localTimelineSeconds(absolute, origin);
     const targetIsInCurrentPack = absolute >= origin - 0.35;
+    const ahead = localTarget > video.currentTime + 0.35;
 
     setCurrent(absolute);
 
-    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
-      try {
-        applyVideoSeek(video, localTarget);
-        return;
-      } catch {
-        /* restart the transcode at the requested movie time */
-      }
+    if (
+      !forcePack &&
+      targetIsInCurrentPack &&
+      (isLocalTimeBuffered(video, localTarget) || (!ahead && isLocalTimeInPack(video, localTarget)))
+    ) {
+      const ok = await seekLocal(video, absolute, localTarget, movie);
+      if (ok) return;
     }
 
-    seekingRef.current = true;
-    pendingSeekRef.current = null;
-    setBuffering(true);
-    packRestartRef.current = true;
-    remember(absolute);
-    try {
-      await retarget({ startSeconds: absolute });
-    } catch (reason) {
-      seekingRef.current = false;
-      packRestartRef.current = false;
-      originRef.current = previousOrigin;
-      setCurrent(beforeSeek);
-      setError(reason instanceof Error ? reason.message : "Could not seek.");
-      setBuffering(false);
-    } finally {
-      const queued = pendingSeekRef.current;
-      pendingSeekRef.current = null;
-      if (queued != null) void seekTo(queued);
-    }
+    await restartPlaybackAt(absolute, beforeSeek, previousOrigin);
   }
 
   useEffect(() => {
