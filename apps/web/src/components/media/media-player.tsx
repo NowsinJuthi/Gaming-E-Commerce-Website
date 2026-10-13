@@ -167,7 +167,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [dock, setDock] = useState<DockTab | null>(null);
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [locked, setLocked] = useState(false);
-  const [statsOn, setStatsOn] = useState(false);
+  const statsOn = false;
   const [notice, setNotice] = useState("");
   const [skipFlash, setSkipFlash] = useState<"back" | "forward" | null>(null);
   const [mobile, setMobile] = useState(false);
@@ -952,10 +952,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           {sheet === "settings" ? (
             <>
               <h2>Settings</h2>
-              <button type="button" className={styles.choice} onClick={() => setSheet("quality")}>
-                <span>Quality</span>
-                <span>{qualityLabel}</span>
-              </button>
               <button type="button" className={styles.choice} onClick={() => setSheet("aspect")}>
                 <span>Aspect ratio</span>
                 <span>{aspect === "fit" ? "Fit" : aspect === "fill" ? "Fill" : "Stretch"}</span>
@@ -978,40 +974,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                   <span>{session?.episodeName}</span>
                 </button>
               ) : null}
-              <button type="button" className={styles.choice} onClick={() => setSheet("repeat")}>
-                <span>Repeat</span>
-                <span>{repeat === "off" ? "Off" : repeat === "one" ? "One" : "All"}</span>
-              </button>
-              <button
-                type="button"
-                className={styles.choice}
-                onClick={() => {
-                  setStatsOn((value) => !value);
-                  setSheet(null);
-                }}
-              >
-                <span>Stats for nerds</span>
-                <span>{statsOn ? "On" : "Off"}</span>
-              </button>
             </>
           ) : null}
-          {sheet === "quality"
-            ? QUALITIES.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`${styles.choice} ${session?.quality === item.id ? styles.selected : ""}`}
-                  onClick={() => {
-                    setSheet(null);
-                    void retarget({ quality: item.id, startSeconds: current }).catch((reason) =>
-                      setError(reason instanceof Error ? reason.message : "Could not change quality."),
-                    );
-                  }}
-                >
-                  <span>{item.label}</span>
-                </button>
-              ))
-            : null}
           {sheet === "speed"
             ? SPEEDS.map((speed) => (
                 <button
@@ -1104,27 +1068,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                   className={`${styles.choice} ${aspect === id ? styles.selected : ""}`}
                   onClick={() => {
                     setAspect(id);
-                    setSheet(null);
-                  }}
-                >
-                  <span>{label}</span>
-                </button>
-              ))
-            : null}
-          {sheet === "repeat"
-            ? (
-                [
-                  ["off", "Off"],
-                  ["one", "Repeat one"],
-                  ["all", "Repeat all"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`${styles.choice} ${repeat === id ? styles.selected : ""}`}
-                  onClick={() => {
-                    setRepeat(id);
                     setSheet(null);
                   }}
                 >
