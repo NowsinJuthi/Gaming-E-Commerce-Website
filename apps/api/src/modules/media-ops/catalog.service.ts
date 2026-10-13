@@ -38,14 +38,30 @@ export class CatalogService {
     private readonly titles: Model<CatalogTitleDocument>,
   ) {}
 
-  async list(kind: CatalogKind, q?: string) {
+  async list(kind: CatalogKind, q?: string, page?: number) {
+    const pageSize = 20;
     const filter: Record<string, unknown> = { kind };
     const term = q?.trim();
     if (term) {
       filter.title = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
-    const rows = await this.titles.find(filter).sort({ updatedAt: -1 }).limit(50).lean().exec();
-    return { items: rows.map((doc) => serialize(doc as CatalogTitleDocument)), total: rows.length };
+    const total = await this.titles.countDocuments(filter).exec();
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const current = Math.min(Math.max(1, Math.floor(page || 1)), pageCount);
+    const rows = await this.titles
+      .find(filter)
+      .sort({ title: 1 })
+      .skip((current - 1) * pageSize)
+      .limit(pageSize)
+      .lean()
+      .exec();
+    return {
+      items: rows.map((doc) => serialize(doc as CatalogTitleDocument)),
+      total,
+      page: current,
+      pageSize,
+      pageCount,
+    };
   }
 
   async publicHome() {

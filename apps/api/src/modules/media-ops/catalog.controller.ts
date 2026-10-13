@@ -89,8 +89,8 @@ export class CatalogController {
   }
 
   @Get('admin/movie-collections')
-  listMovies(@Query('q') q?: string) {
-    return this.catalog.list('movie', q);
+  listMovies(@Query('q') q?: string, @Query('page') page?: string) {
+    return this.catalog.list('movie', q, Number(page));
   }
 
   @Post('admin/movie-collections/bulk')
@@ -104,8 +104,8 @@ export class CatalogController {
   }
 
   @Get('admin/series-collections')
-  listSeries(@Query('q') q?: string) {
-    return this.catalog.list('series' satisfies CatalogKind, q);
+  listSeries(@Query('q') q?: string, @Query('page') page?: string) {
+    return this.catalog.list('series' satisfies CatalogKind, q, Number(page));
   }
 
   @Post('admin/series-collections/bulk')

@@ -15,6 +15,14 @@ export type CatalogItem = {
   seasonCount?: number | null;
 };
 
+export type CatalogPage = {
+  items: CatalogItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+};
+
 export type CatalogBulkAction =
   | "publish"
   | "unpublish"
@@ -22,11 +30,16 @@ export type CatalogBulkAction =
   | "feature"
   | "trending";
 
-export function listMovieCollections(q?: string) {
-  const qs = q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
-  return authRequest<{ items: CatalogItem[]; total: number }>(
-    `/admin/movie-collections${qs}`,
-  );
+function catalogQuery(q?: string, page = 1): string {
+  const params = new URLSearchParams();
+  if (q?.trim()) params.set("q", q.trim());
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function listMovieCollections(q?: string, page = 1) {
+  return authRequest<CatalogPage>(`/admin/movie-collections${catalogQuery(q, page)}`);
 }
 
 export function bulkMovieCollections(ids: string[], action: CatalogBulkAction) {
@@ -46,11 +59,8 @@ export function updateMovieCollection(
   });
 }
 
-export function listSeriesCollections(q?: string) {
-  const qs = q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
-  return authRequest<{ items: CatalogItem[]; total: number }>(
-    `/admin/series-collections${qs}`,
-  );
+export function listSeriesCollections(q?: string, page = 1) {
+  return authRequest<CatalogPage>(`/admin/series-collections${catalogQuery(q, page)}`);
 }
 
 export function bulkSeriesCollections(ids: string[], action: CatalogBulkAction) {

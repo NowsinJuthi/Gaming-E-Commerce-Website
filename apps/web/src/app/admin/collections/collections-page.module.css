@@ -308,6 +308,30 @@
   color: var(--muted-foreground);
 }
 
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+  padding: 0.85rem 1rem;
+  font-size: 0.85rem;
+}
+
+.pager button {
+  border-radius: 999px;
+  border: 1px solid rgb(38 191 176 / 0.35);
+  background: rgb(38 191 176 / 0.12);
+  padding: 0.4rem 0.85rem;
+  color: #9be8df;
+  font-weight: 650;
+}
+
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .checkbox {
   height: 1rem;
   width: 1rem;

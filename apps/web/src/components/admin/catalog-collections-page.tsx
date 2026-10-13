@@ -19,7 +19,7 @@ type Props = {
   emptyHint: string;
   yearLabel: "releaseYear" | "firstAirYear";
   showSeasons?: boolean;
-  load: (q?: string) => Promise<{ items: CatalogItem[] }>;
+  load: (q?: string, page?: number) => Promise<{ items: CatalogItem[]; total: number; page: number; pageCount: number }>;
   bulk: (ids: string[], action: CatalogBulkAction) => Promise<unknown>;
   save: (id: string, body: Record<string, unknown>) => Promise<unknown>;
 };
@@ -35,6 +35,9 @@ export function CatalogCollectionsPage({
   save,
 }: Props) {
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(0);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,9 +47,12 @@ export function CatalogCollectionsPage({
   const [edit, setEdit] = useState<CatalogItem | null>(null);
 
   const reload = useCallback(async () => {
-    const data = await load(q);
+    const data = await load(q, page);
     setItems(data.items);
-  }, [load, q]);
+    setTotal(data.total);
+    setPageCount(data.pageCount);
+    if (data.page !== page) setPage(data.page);
+  }, [load, q, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -62,7 +68,6 @@ export function CatalogCollectionsPage({
 
   const stats = useMemo(
     () => ({
-      total: items.length,
       published: items.filter((item) => item.published).length,
       available: items.filter((item) => item.availability === "available").length,
       featured: items.filter((item) => item.featured).length,
@@ -102,7 +107,7 @@ export function CatalogCollectionsPage({
           </p>
         ) : null}
         <div className={styles.stats}>
-          <Stat label="On page" value={stats.total} />
+          <Stat label="Total" value={total} />
           <Stat label="Published" value={stats.published} />
           <Stat label="Available" value={stats.available} />
           <Stat label="Featured" value={stats.featured} />
@@ -111,7 +116,10 @@ export function CatalogCollectionsPage({
           <div className={styles.searchWrap}>
             <input
               value={q}
-              onChange={(event) => setQ(event.target.value)}
+              onChange={(event) => {
+                setQ(event.target.value);
+                setPage(1);
+              }}
               placeholder="Search titles..."
               className={styles.searchInput}
             />
@@ -252,6 +260,23 @@ export function CatalogCollectionsPage({
                 {title.startsWith("Series") ? "No series found" : "No movies found"}
               </p>
               <p className={styles.emptyText}>{q ? "Try a different search." : emptyHint}</p>
+            </div>
+          ) : null}
+          {pageCount > 1 ? (
+            <div className={styles.pager}>
+              <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>
+                Previous
+              </button>
+              <span>
+                Page {page} of {pageCount}
+              </span>
+              <button
+                type="button"
+                disabled={page >= pageCount || loading}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Next
+              </button>
             </div>
           ) : null}
         </div>
