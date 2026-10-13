@@ -492,6 +492,22 @@
   right: 12%;
 }
 
+.landscapeEmulate .skipLeft {
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 22%;
+  transform: translateX(-50%);
+}
+
+.landscapeEmulate .skipRight {
+  left: 50%;
+  right: auto;
+  top: 22%;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
 .busy,
 .error {
   position: absolute;

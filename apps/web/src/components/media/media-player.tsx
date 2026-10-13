@@ -264,6 +264,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const sessionRef = useRef<PlaybackSession | null>(null);
   const hideTimer = useRef<number | null>(null);
   const lastTap = useRef<{ zone: string; at: number } | null>(null);
+  const zoneTimer = useRef<number | null>(null);
+  const skipAt = useRef<number | null>(null);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
@@ -561,6 +563,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   useEffect(() => () => {
     if (startTimer.current) window.clearTimeout(startTimer.current);
+    if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
   }, []);
 
   useEffect(() => {
@@ -665,10 +668,22 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
-    const target = Math.max(0, (currentSession.startSeconds + video.currentTime) + delta);
     setSkipFlash(delta < 0 ? "back" : "forward");
-    window.setTimeout(() => setSkipFlash(null), 600);
-    void seekTo(target);
+    window.setTimeout(() => setSkipFlash(null), 700);
+    const base = skipAt.current ?? video.currentTime;
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : base + Math.max(delta, 0);
+    const local = Math.min(duration, Math.max(0, base + delta));
+    skipAt.current = local;
+    window.setTimeout(() => {
+      if (skipAt.current === local) skipAt.current = null;
+    }, 500);
+    try {
+      video.currentTime = local;
+    } catch {
+      const target = Math.max(0, currentSession.startSeconds + local);
+      void seekTo(target);
+    }
+    setCurrent(currentSession.startSeconds + local);
     reveal();
   }
 
@@ -757,16 +772,38 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const now = Date.now();
     const previous = lastTap.current;
     lastTap.current = { zone, at: now };
-    if (previous && previous.zone === zone && now - previous.at < 320) {
-      if (zone === "left") skip(-10);
-      else if (zone === "right") skip(10);
-      else togglePlay();
+    if (zone === "left" || zone === "right") {
+      if (previous && previous.zone === zone && now - previous.at < 450) {
+        if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+        zoneTimer.current = null;
+        skip(zone === "left" ? -10 : 10);
+        return;
+      }
+      if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+      zoneTimer.current = window.setTimeout(() => {
+        zoneTimer.current = null;
+        if (needsGesture) togglePlay();
+        else setChrome((value) => !value);
+      }, 450);
       return;
     }
-    if (zone === "middle") {
-      if (needsGesture) togglePlay();
-      else setChrome((value) => !value);
-    }
+    if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+    zoneTimer.current = null;
+    if (needsGesture) togglePlay();
+    else setChrome((value) => !value);
+  }
+
+  function onShellPointerUp(event: React.PointerEvent<HTMLElement>) {
+    if (!mobile || locked || sheet) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a, input, textarea, select")) return;
+    const control = target?.closest("button");
+    if (control && !control.classList.contains(styles.skin) && !control.closest(`.${styles.tapZones}`)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width < 8) return;
+    const x = (event.clientX - rect.left) / rect.width;
+    onZone(x < 0.3 ? "left" : x > 0.7 ? "right" : "middle");
   }
 
   const shown = scrub ?? current;
@@ -790,6 +827,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       onMouseMove={() => {
         if (!locked) reveal();
       }}
+      onPointerUp={onShellPointerUp}
     >
       <video
         ref={videoRef}
@@ -802,9 +840,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
       {mobile && !locked ? (
         <div className={styles.tapZones}>
-          <button type="button" className={styles.side} aria-label="Rewind 10 seconds" onClick={() => onZone("left")} />
-          <button type="button" className={styles.middle} aria-label="Show controls" onClick={() => onZone("middle")} />
-          <button type="button" className={styles.side} aria-label="Forward 10 seconds" onClick={() => onZone("right")} />
+          <button type="button" className={styles.side} aria-label="Rewind 10 seconds" tabIndex={-1} />
+          <button type="button" className={styles.middle} aria-label="Show controls" tabIndex={-1} />
+          <button type="button" className={styles.side} aria-label="Forward 10 seconds" tabIndex={-1} />
         </div>
       ) : null}
 
@@ -946,7 +984,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
             </div>
           </header>
 
-          <button type="button" className={styles.skin} aria-label={playing ? "Pause" : "Play"} onClick={mobile ? () => setChrome((value) => !value) : togglePlay} />
+          <button type="button" className={styles.skin} aria-label={playing ? "Pause" : "Play"} onClick={() => { if (!mobile) togglePlay(); }} />
 
           <div className={`${styles.bottom} ${styles.deskOnly}`}>
             <div className={styles.titleRow}>
