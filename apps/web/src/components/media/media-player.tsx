@@ -483,6 +483,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const mobileRef = useRef(false);
   mobileRef.current = mobile;
   const [pipOn, setPipOn] = useState(false);
+  const [pipSupported, setPipSupported] = useState(false);
   const [volumeLocked, setVolumeLocked] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const repeatRef = useRef(repeat);
@@ -724,6 +725,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const sync = () => setMobile(media.matches);
     sync();
     setVolumeLocked(volumeReadOnly());
+    setPipSupported(document.pictureInPictureEnabled || appleMobile());
     media.addEventListener("change", sync);
     const portraitMedia = window.matchMedia("(orientation: portrait)");
     const syncPortrait = () => setPortrait(portraitMedia.matches);
@@ -1200,7 +1202,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     reveal();
   }
 
-  const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
   const preparing = !error && session?.status !== "ready";
   const playBusy = !error && (preparing || buffering || starting);
   const subtitleLabel = session?.subtitles.find((track) => track.index === subtitleIndex)?.label ?? "Off";

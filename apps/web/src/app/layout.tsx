@@ -188,7 +188,7 @@ export default async function RootLayout({
           googleAnalyticsId={seo.analytics.googleAnalyticsId}
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <GtmNoScript gtmId={seo.analytics.gtmId} />
         {schemas.length > 0 ? <JsonLd data={schemas} nonce={nonce} /> : null}
         <SeoScripts
