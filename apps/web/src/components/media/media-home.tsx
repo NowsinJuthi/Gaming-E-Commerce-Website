@@ -133,14 +133,6 @@ export function MediaHome({ home }: { home: MediaHome }) {
             </span>
           </label>
           <label className={styles.field}>
-            <span className="sr-only">Genre</span>
-            <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="" aria-label="Genre">
-                <option value="">All genres</option>
-              </select>
-            </span>
-          </label>
-          <label className={styles.field}>
             <span className="sr-only">Media Menu</span>
             <span className={styles.selectWrap}>
               <select
@@ -158,6 +150,14 @@ export function MediaHome({ home }: { home: MediaHome }) {
                     {library.name}
                   </option>
                 ))}
+              </select>
+            </span>
+          </label>
+          <label className={styles.field}>
+            <span className="sr-only">Genre</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} defaultValue="" aria-label="Genre">
+                <option value="">All genres</option>
               </select>
             </span>
           </label>
