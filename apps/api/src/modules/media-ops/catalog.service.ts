@@ -90,9 +90,24 @@ export class CatalogService {
       { id: 'series', title: 'Series', items: series },
       { id: 'trending', title: 'Trending', items: trending },
     ].filter((row) => row.items.length > 0);
+    const catalog = await this.titles
+      .find({ published: true, availability: 'available' })
+      .sort({ updatedAt: -1 })
+      .limit(300)
+      .exec();
     return {
       hero: (featured.length > 0 ? featured : items).slice(0, 6),
       rows: shelves,
+      items: catalog.map((doc) => ({
+        id: String(doc._id),
+        title: doc.title,
+        year: doc.year,
+        kind: doc.kind,
+        posterUrl: doc.posterUrl ?? null,
+        featured: doc.featured,
+        trending: doc.trending,
+        seasonCount: doc.seasonCount ?? null,
+      })),
     };
   }
 

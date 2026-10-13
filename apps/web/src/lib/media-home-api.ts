@@ -20,9 +20,10 @@ export type MediaRow = {
 export type MediaHome = {
   hero: MediaCard[];
   rows: MediaRow[];
+  items: MediaCard[];
 };
 
-export const EMPTY_MEDIA_HOME: MediaHome = { hero: [], rows: [] };
+export const EMPTY_MEDIA_HOME: MediaHome = { hero: [], rows: [], items: [] };
 
 export async function getMediaHome(): Promise<MediaHome> {
   try {
@@ -31,9 +32,14 @@ export async function getMediaHome(): Promise<MediaHome> {
     });
     if (!res.ok) return EMPTY_MEDIA_HOME;
     const data = (await res.json()) as MediaHome;
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    const items = Array.isArray(data.items)
+      ? data.items
+      : rows.flatMap((row) => row.items ?? []);
     return {
       hero: Array.isArray(data.hero) ? data.hero : [],
-      rows: Array.isArray(data.rows) ? data.rows : [],
+      rows,
+      items,
     };
   } catch {
     return EMPTY_MEDIA_HOME;

@@ -12,7 +12,6 @@ export default async function MediaPage() {
   const home = await getMediaHome();
   return (
     <main className={`pb-8 pt-2 sm:pb-12 sm:pt-4 ${HOME_PAGE_BG}`}>
-      <h1 className="sr-only">Media</h1>
       <div className={HOME_CONTAINER_CLS}>
         <MediaHome home={home} />
       </div>

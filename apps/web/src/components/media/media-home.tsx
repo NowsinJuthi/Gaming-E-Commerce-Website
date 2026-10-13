@@ -1,89 +1,108 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import styles from "./media-home.module.css";
 import type { MediaCard, MediaHome } from "@/lib/media-home-api";
 
-export function MediaHome({ home }: { home: MediaHome }) {
-  const slides = home.hero;
-  const [index, setIndex] = useState(0);
-  const [info, setInfo] = useState<MediaCard | null>(null);
-  const active = slides[index] ?? null;
+type SortKey = "newest" | "title" | "year-desc" | "year-asc";
 
-  useEffect(() => {
-    if (slides.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setIndex((value) => (value + 1) % slides.length);
-    }, 7000);
-    return () => window.clearInterval(timer);
-  }, [slides.length]);
+export function MediaHome({ home }: { home: MediaHome }) {
+  const source = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [year, setYear] = useState("");
+  const [info, setInfo] = useState<MediaCard | null>(null);
+
+  const years = useMemo(
+    () => [...new Set(source.map((item) => item.year).filter((value) => value > 0))].sort((a, b) => b - a),
+    [source],
+  );
+
+  const visible = useMemo(() => {
+    const rows = source.filter((item) => !year || String(item.year) === year);
+    const copy = [...rows];
+    if (sort === "title") copy.sort((a, b) => a.title.localeCompare(b.title));
+    if (sort === "year-desc") copy.sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+    if (sort === "year-asc") copy.sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
+    return copy;
+  }, [source, sort, year]);
 
   return (
-    <>
-      <section className={styles.hero} aria-label="Media">
-        {slides.map((slide, slideIndex) => (
-          <div
-            key={slide.id}
-            className={styles.slide}
-            style={{ opacity: slideIndex === index ? 1 : 0 }}
-            aria-hidden={slideIndex !== index}
-          >
-            {slide.posterUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className={styles.slideImage} src={slide.posterUrl} alt="" referrerPolicy="no-referrer" />
-            ) : null}
-          </div>
-        ))}
-        <div className={styles.shade} />
-        <div className={styles.heroCopy}>
-          <p className={styles.kicker}>Media</p>
-          <h2 className={styles.title}>{active?.title ?? "Movies and series"}</h2>
-          <p className={styles.meta}>
-            {active
-              ? [active.year, active.kind === "series" ? "Series" : "Movie", active.seasonCount ? `${active.seasonCount} seasons` : null]
-                  .filter(Boolean)
-                  .join(" · ")
-              : "Featured titles, movies, and series in one place."}
-          </p>
-          <p className={styles.summary}>
-            {active
-              ? active.trending
-                ? "Trending on UniQbd Media."
-                : "Watch this title from the UniQbd media library."
-              : "Published movies and series show up here, in the same shelves as a streaming home page."}
-          </p>
-          {active ? (
-            <div className={styles.actions}>
-              <button type="button" className={styles.play} onClick={() => setInfo(active)}>
-                Play
-              </button>
-              <button type="button" className={styles.info} onClick={() => setInfo(active)}>
-                More info
-              </button>
-            </div>
-          ) : null}
+    <div className={styles.page}>
+      <h1 className={styles.heading}>Media</h1>
+
+      <section className={styles.panel}>
+        <div className={styles.filters}>
+          <label className={styles.field}>
+            <span className={styles.label}>Sort by</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
+                <option value="newest">Recently added</option>
+                <option value="title">Title</option>
+                <option value="year-desc">Year, newest</option>
+                <option value="year-asc">Year, oldest</option>
+              </select>
+            </span>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Genre</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} defaultValue="">
+                <option value="">All genres</option>
+              </select>
+            </span>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Year</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} value={year} onChange={(event) => setYear(event.target.value)}>
+                <option value="">All years</option>
+                {years.map((value) => (
+                  <option key={value} value={String(value)}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Min rating</span>
+            <span className={styles.selectWrap}>
+              <select className={styles.control} defaultValue="">
+                <option value="">Any rating</option>
+              </select>
+            </span>
+          </label>
         </div>
-        {slides.length > 1 ? (
-          <div className={styles.dots}>
-            {slides.map((slide, slideIndex) => (
-              <button
-                key={slide.id}
-                type="button"
-                className={`${styles.dot} ${slideIndex === index ? styles.dotActive : ""}`}
-                aria-label={`Go to ${slide.title}`}
-                onClick={() => setIndex(slideIndex)}
-              />
-            ))}
-          </div>
-        ) : null}
       </section>
 
-      {home.rows.length === 0 ? (
-        <p className={styles.empty}>No published titles yet. Publish a movie or series from Movie Server to fill this page.</p>
+      {visible.length === 0 ? (
+        <p className={styles.empty}>No published titles yet.</p>
       ) : (
-        <div className={styles.rows}>
-          {home.rows.map((row) => (
-            <MediaRowView key={row.id} title={row.title} items={row.items} onOpen={setInfo} />
+        <div className={styles.grid}>
+          {visible.map((item) => (
+            <article key={item.id} className={styles.card}>
+              <button type="button" className={styles.posterLink} onClick={() => setInfo(item)} aria-label={item.title}>
+                <span className={styles.posterFrame}>
+                  {item.posterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+                  )}
+                  <span className={styles.playOverlay} aria-hidden>
+                    <span className={styles.playButton} />
+                  </span>
+                </span>
+              </button>
+              <button type="button" className={styles.cardTitle} onClick={() => setInfo(item)}>
+                {item.title}
+              </button>
+              {item.year ? (
+                <button type="button" className={styles.cardYear} onClick={() => setInfo(item)}>
+                  {item.year}
+                </button>
+              ) : null}
+            </article>
           ))}
         </div>
       )}
@@ -101,69 +120,14 @@ export function MediaHome({ home }: { home: MediaHome }) {
               <h2>{info.title}</h2>
               <p>
                 {info.year} · {info.kind === "series" ? "Series" : "Movie"}
-                {info.seasonCount ? ` · ${info.seasonCount} seasons` : ""}
               </p>
-              <div className={styles.actions}>
-                <button type="button" className={styles.info} onClick={() => setInfo(null)}>
-                  Close
-                </button>
-              </div>
+              <button type="button" className={styles.close} onClick={() => setInfo(null)}>
+                Close
+              </button>
             </div>
           </div>
         </div>
       ) : null}
-    </>
-  );
-}
-
-function MediaRowView({
-  title,
-  items,
-  onOpen,
-}: {
-  title: string;
-  items: MediaCard[];
-  onOpen: (card: MediaCard) => void;
-}) {
-  const scroller = useRef<HTMLDivElement>(null);
-
-  function scroll(direction: number) {
-    const node = scroller.current;
-    if (!node) return;
-    node.scrollBy({ left: direction * Math.max(node.clientWidth * 0.8, 240), behavior: "smooth" });
-  }
-
-  return (
-    <section>
-      <div className={styles.rowHead}>
-        <h2 className={styles.rowTitle}>{title}</h2>
-      </div>
-      <div className={styles.scrollerWrap}>
-        <button type="button" className={`${styles.scrollBtn} ${styles.scrollLeft}`} aria-label={`Scroll ${title} left`} onClick={() => scroll(-1)}>
-          ‹
-        </button>
-        <div className={styles.scroller} ref={scroller}>
-          {items.map((item) => (
-            <button key={item.id} type="button" className={styles.card} onClick={() => onOpen(item)}>
-              <span className={styles.poster}>
-                {item.posterUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className={styles.fallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
-                )}
-              </span>
-              <span className={styles.cardName}>{item.title}</span>
-              <span className={styles.cardMeta}>
-                {item.year} · {item.kind === "series" ? "Series" : "Movie"}
-              </span>
-            </button>
-          ))}
-        </div>
-        <button type="button" className={`${styles.scrollBtn} ${styles.scrollRight}`} aria-label={`Scroll ${title} right`} onClick={() => scroll(1)}>
-          ›
-        </button>
-      </div>
-    </section>
+    </div>
   );
 }
