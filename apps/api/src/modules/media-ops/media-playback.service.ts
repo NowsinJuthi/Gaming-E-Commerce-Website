@@ -2,7 +2,6 @@ import { ChildProcess, spawn } from 'child_process';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises';
-import { tmpdir } from 'os';
 import { join, resolve, sep } from 'path';
 import {
   Injectable,
@@ -203,7 +202,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
         username: server.username,
         password,
         domain: server.domain,
-        share: library.smbShare || server.share,
+        share: server.share,
       };
     }
 
@@ -211,7 +210,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (episodes.length === 0) throw new NotFoundException('No video file was found for this title.');
     const episodeIndex = Math.min(Math.max(Math.floor(request.episodeIndex ?? 0), 0), episodes.length - 1);
     const id = randomBytes(16).toString('hex');
-    const dir = join(tmpdir(), 'uniqbd-hls', id);
+    const dir = join(resolveUploadsRoot(), 'hls-pack', id);
     await mkdir(dir, { recursive: true });
     return {
       id,
@@ -432,7 +431,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);
       this.logger.warn(`ffmpeg produced no segment: ${stderr.slice(0, 400)}`);
-      throw new Error(this.ffmpegMissing(stderr) ? 'ffmpeg is not installed on the website server.' : 'The video could not be opened.');
+      throw new Error(this.shortMediaError(stderr));
     }
     session.status = 'ready';
     session.message = '';
@@ -718,29 +717,30 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private bin(name: 'ffmpeg' | 'ffprobe'): string {
     const env = name === 'ffmpeg' ? process.env.FFMPEG_PATH : process.env.FFPROBE_PATH;
-    return env?.trim() || name;
+    if (env?.trim()) return env.trim();
+    const absolute = join('/usr/bin', name);
+    return existsSync(absolute) ? absolute : name;
   }
 
   private publicError(error: unknown): string {
-    if (this.isEnoent(error) || this.ffmpegMissing(error instanceof Error ? error.message : '')) {
+    const message = error instanceof Error ? error.message : '';
+    return this.shortMediaError(message);
+  }
+
+  private shortMediaError(text: string): string {
+    const cleaned = text.replace(/--password=\S+/gi, '--password=***').trim();
+    if (this.isMissingBinary(cleaned)) {
       return 'ffmpeg is not installed on the website server.';
     }
-    if (error instanceof Error && error.message) {
-      const message = error.message.replace(/--password=\S+/gi, '--password=***');
-      if (/smbclient is not installed/i.test(message)) return message;
-      if (/video file|not allowed|could not be opened|storage|password|timed out|Login failure|Access denied|Share name|port 445|No space left/i.test(message)) {
-        return message.slice(0, 300);
-      }
-    }
-    return 'The video could not be opened.';
+    const line = cleaned
+      .split('\n')
+      .map((part) => part.trim())
+      .find((part) => part && !/^ffmpeg version/i.test(part));
+    return (line || 'The video could not be opened.').slice(0, 300);
   }
 
-  private ffmpegMissing(text: string): boolean {
-    return /not found|ENOENT|ffmpeg is not installed/i.test(text);
-  }
-
-  private isEnoent(error: unknown): boolean {
-    return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'ENOENT');
+  private isMissingBinary(text: string): boolean {
+    return /spawn (?:\/usr\/bin\/)?(?:ffmpeg|ffprobe) ENOENT/i.test(text);
   }
 
   private clampStart(value: number, duration: number): number {
