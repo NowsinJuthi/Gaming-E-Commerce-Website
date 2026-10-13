@@ -490,7 +490,7 @@ export function Header({
     <>
       <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
         <div
-          className={`site-header-inner grid h-14 grid-cols-[auto_1fr_auto] items-center gap-0 sm:h-16 sm:gap-3 ${HOME_CONTAINER_CLS}`}
+          className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
@@ -556,7 +556,7 @@ export function Header({
             ) : null}
 
             {/* Logo — desktop only */}
-            <div className="hidden lg:block">
+            <div className="hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
@@ -578,7 +578,7 @@ export function Header({
 
             {/* Desktop nav links */}
             <nav
-              className="scrollbar-none hidden min-w-0 items-center justify-center gap-2 overflow-visible text-sm font-bold lg:flex lg:gap-3 xl:gap-5"
+              className="site-header-nav scrollbar-none hidden min-w-0 max-w-full flex-nowrap items-center justify-center overflow-visible text-sm font-bold lg:flex"
               aria-label="Main"
             >
               <Suspense
@@ -604,7 +604,7 @@ export function Header({
           </div>
 
           {/* ── Right column ───────────────────────────────────────────── */}
-          <div className="flex items-center justify-end gap-1 justify-self-end sm:gap-2 md:gap-3">
+          <div className="flex shrink-0 items-center justify-end gap-1 justify-self-end sm:gap-1.5 lg:gap-2">
             {/* Theme toggle or refresh — desktop only */}
             {isAdminRoute ? (
               <button
@@ -719,7 +719,7 @@ export function Header({
                   aria-haspopup="menu"
                 >
                   <AvatarInner />
-                  <span className="max-w-[100px] truncate text-sm font-semibold text-foreground">
+                  <span className="hidden max-w-[7.5rem] truncate text-sm font-semibold text-foreground xl:inline">
                     {displayName}
                   </span>
                   <ChevronIcon
