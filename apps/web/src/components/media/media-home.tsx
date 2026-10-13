@@ -101,6 +101,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
 
       <section className={styles.panel}>
         <div className={styles.filters}>
+          <div className={styles.filterRowMobile1}>
           <label className={styles.field}>
             <span className="sr-only">Media Menu</span>
             <span className={styles.selectWrap}>
@@ -130,6 +131,8 @@ export function MediaHome({ home }: { home: MediaHome }) {
               </select>
             </span>
           </label>
+          </div>
+          <div className={styles.filterRowMobile2}>
           <label className={styles.field}>
             <span className="sr-only">Year</span>
             <span className={styles.selectWrap}>
@@ -187,6 +190,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
               ) : null}
             </span>
           </label>
+          </div>
         </div>
         {showSearchHints ? (
           <div className={styles.searchHints} role="listbox" aria-label="Search results">
