@@ -71,12 +71,12 @@ export const validationSchema = Joi.object({
   MFS_APP_ACCESS_TTL_SECONDS: Joi.number()
     .integer()
     .min(300)
-    .max(24 * 60 * 60)
+    .max(10 * 365 * 24 * 60 * 60)
     .optional(),
   MFS_APP_REFRESH_TTL_SECONDS: Joi.number()
     .integer()
     .min(300)
-    .max(30 * 24 * 60 * 60)
+    .max(10 * 365 * 24 * 60 * 60)
     .optional(),
   MFS_SMS_SYNC_TOKEN: Joi.when('NODE_ENV', {
     is: 'production',

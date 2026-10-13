@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import {
-  LONG_SESSION_TTL_SECONDS,
+  MFS_APP_SESSION_TTL_SECONDS,
   parsePositiveSeconds,
 } from '../session-ttl';
 
@@ -32,13 +32,13 @@ export const paymentsConfig = registerAs('payments', () => ({
    */
   mfsAppAccessTtlSeconds: parsePositiveSeconds(
     process.env.MFS_APP_ACCESS_TTL_SECONDS,
-    LONG_SESSION_TTL_SECONDS,
+    MFS_APP_SESSION_TTL_SECONDS,
   ),
   /** Refresh-session TTL for the same app; independent of JWT_REFRESH_TTL. */
   mfsAppRefreshTtlSeconds: parsePositiveSeconds(
     process.env.MFS_APP_REFRESH_TTL_SECONDS ??
       process.env.MFS_APP_ACCESS_TTL_SECONDS,
-    LONG_SESSION_TTL_SECONDS,
+    MFS_APP_SESSION_TTL_SECONDS,
   ),
 
   bkash: {

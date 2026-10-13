@@ -10,9 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
-import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
+import { MFS_APP_SESSION_TTL_SECONDS } from '../../config/session-ttl';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
@@ -74,8 +73,7 @@ type MfsAppSessionTtl = {
  * Drop-in compatibility for the legacy pay.uniqbd.com Android SMS app.
  * Same paths and JSON shapes — only change the app's base URL.
  *
- * Session length is controlled by MFS_APP_* env vars (payments config), not
- * JWT_ACCESS_TTL / JWT_REFRESH_TTL used by the web storefront.
+ * The phone stays signed in for 10 years. Web JWT_ACCESS_TTL does not apply.
  */
 @Controller('app')
 export class MfsAppCompatController {
@@ -83,17 +81,12 @@ export class MfsAppCompatController {
     private readonly auth: AuthService,
     private readonly users: UsersService,
     private readonly verification: MfsVerificationService,
-    private readonly config: ConfigService,
   ) {}
 
   private mfsAppSessionTtl(): MfsAppSessionTtl {
     return {
-      accessTtlSeconds:
-        this.config.get<number>('payments.mfsAppAccessTtlSeconds') ??
-        LONG_SESSION_TTL_SECONDS,
-      refreshTtlSeconds:
-        this.config.get<number>('payments.mfsAppRefreshTtlSeconds') ??
-        LONG_SESSION_TTL_SECONDS,
+      accessTtlSeconds: MFS_APP_SESSION_TTL_SECONDS,
+      refreshTtlSeconds: MFS_APP_SESSION_TTL_SECONDS,
     };
   }
 
