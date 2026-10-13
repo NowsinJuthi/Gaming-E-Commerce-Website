@@ -6,7 +6,6 @@ import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
   displayTimelineSeconds,
-  isLocalTimeBuffered,
   isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
@@ -15,7 +14,9 @@ import styles from "./media-player.module.css";
 /** Bust CDN/browser cache when ffmpeg starts a new pack (Movie Server uses t= + g=). */
 function hlsPlaylistSource(playlistUrl: string, startSeconds: number, loadToken: number): string {
   const joiner = playlistUrl.includes("?") ? "&" : "?";
-  return `${playlistUrl}${joiner}t=${Math.floor(startSeconds)}&v=${loadToken}`;
+  const path = `${playlistUrl}${joiner}t=${Math.floor(startSeconds)}&v=${loadToken}`;
+  if (/^https?:\/\//i.test(path) || typeof window === "undefined") return path;
+  return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 type Quality = "auto" | "1080" | "720" | "480";
@@ -264,6 +265,9 @@ function SeekTrack({
         event.stopPropagation();
         endScrub();
       }}
+      onLostPointerCapture={() => {
+        if (dragId.current != null) endScrub();
+      }}
       onKeyDown={(event) => {
         const step = event.shiftKey ? 30 : 5;
         if (event.key === "ArrowRight" || event.key === "ArrowUp") {
@@ -445,6 +449,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const attachSeqRef = useRef(0);
   const attachedPackRef = useRef("");
   const rateRef = useRef(1);
+  const durationHintRef = useRef(0);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
@@ -485,6 +490,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   repeatRef.current = repeat;
   subtitleRef.current = subtitleIndex;
   sessionRef.current = session;
+  if (session?.durationSeconds && session.durationSeconds > 0) {
+    durationHintRef.current = session.durationSeconds;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -550,7 +558,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   const attachPlaybackPack = useCallback(async (pack: PlaybackSession): Promise<void> => {
     const video = videoRef.current;
-    if (!video || pack.status !== "ready") return;
+    if (!video) throw new Error("Playback failed.");
+    if (pack.status !== "ready") throw new Error("Playback is still preparing.");
     const seq = ++attachSeqRef.current;
     const packStart = pack.startSeconds;
     const loadToken = ++loadTokenRef.current;
@@ -574,10 +583,33 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       void video.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
     };
 
+    const waitForAttach = (bind: (resolve: () => void, reject: (error: Error) => void) => void) =>
+      new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = (fn: () => void) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          fn();
+        };
+        const timer = window.setTimeout(
+          () => finish(() => reject(new Error("Playback timed out. Try again."))),
+          90_000,
+        );
+        bind(
+          () => finish(resolve),
+          (error) => finish(() => reject(error)),
+        );
+      });
+
     if (nativeHls(video)) {
-      await new Promise<void>((resolve, reject) => {
+      await waitForAttach((resolve, reject) => {
         const onMeta = () => {
           video.removeEventListener("loadedmetadata", onMeta);
+          if (seq !== attachSeqRef.current) {
+            reject(new Error("Playback cancelled."));
+            return;
+          }
           finishAttach();
           resolve();
         };
@@ -590,11 +622,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }
 
     const mod = await import("hls.js");
-    if (seq !== attachSeqRef.current) return;
+    if (seq !== attachSeqRef.current) throw new Error("Playback cancelled.");
     if (!mod.default.isSupported()) {
-      await new Promise<void>((resolve, reject) => {
+      await waitForAttach((resolve, reject) => {
         const onMeta = () => {
           video.removeEventListener("loadedmetadata", onMeta);
+          if (seq !== attachSeqRef.current) {
+            reject(new Error("Playback cancelled."));
+            return;
+          }
           finishAttach();
           resolve();
         };
@@ -628,18 +664,30 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     hls.attachMedia(video);
     hls.loadSource(playlist);
 
-    await new Promise<void>((resolve, reject) => {
+    await waitForAttach((resolve, reject) => {
+      let fatalRetries = 0;
       hls.on(mod.default.Events.MANIFEST_PARSED, () => {
-        if (seq !== attachSeqRef.current) return;
+        if (seq !== attachSeqRef.current) {
+          reject(new Error("Playback cancelled."));
+          return;
+        }
         hls.startLoad(0.001);
         finishAttach();
         resolve();
       });
       hls.on(mod.default.Events.ERROR, (_event, data) => {
         if (!data.fatal || seq !== attachSeqRef.current) return;
-        if (data.type === mod.default.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-        else if (data.type === mod.default.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-        else reject(new Error("Playback stopped. Try again."));
+        if (data.type === mod.default.ErrorTypes.NETWORK_ERROR && fatalRetries < 6) {
+          fatalRetries += 1;
+          hls.startLoad();
+          return;
+        }
+        if (data.type === mod.default.ErrorTypes.MEDIA_ERROR && fatalRetries < 4) {
+          fatalRetries += 1;
+          hls.recoverMediaError();
+          return;
+        }
+        reject(new Error("Playback stopped. Try again."));
       });
     });
   }, []);
@@ -744,7 +792,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const mediaTime = displayTimelineSeconds(video.currentTime, origin, movie);
       setCurrent(mediaTime);
       const known = sessionRef.current?.durationSeconds ?? 0;
-      setDuration(known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0));
+      const nextDuration = known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0);
+      if (nextDuration > 0) durationHintRef.current = nextDuration;
+      setDuration(nextDuration);
     };
     const onPlay = () => {
       setPlaying(true);
@@ -797,7 +847,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   }, [retarget, reveal]);
 
   useEffect(() => {
-    if (session?.durationSeconds) setDuration(session.durationSeconds);
+    if (session?.durationSeconds && session.durationSeconds > 0) {
+      durationHintRef.current = session.durationSeconds;
+      setDuration(session.durationSeconds);
+    }
   }, [session?.durationSeconds]);
 
   useEffect(() => () => {
@@ -984,6 +1037,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     attachedPackRef.current = "";
     remember(target);
     setCurrent(target);
+    let queued: number | null = null;
     try {
       const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
         startSeconds: target,
@@ -998,24 +1052,31 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           : await waitForSessionReady(currentSession.sessionId, target);
       await attachPlaybackPack(ready);
       attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
-      seekLockRef.current = false;
       setSession(ready);
     } catch (reason) {
       attachedPackRef.current = "";
-      seekingRef.current = false;
       packRestartRef.current = false;
       originRef.current = previousOrigin;
       setCurrent(beforeSeek);
       setError(reason instanceof Error ? reason.message : "Could not seek.");
-      setBuffering(false);
+      try {
+        const res = await fetch(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`);
+        const data = (await res.json().catch(() => null)) as PlaybackSession | null;
+        if (res.ok && data?.status === "ready") setSession(data);
+      } catch {
+        /* keep error state */
+      }
+    } finally {
       seekLockRef.current = false;
+      seekingRef.current = false;
+      setBuffering(false);
+      queued = pendingSeekRef.current;
+      pendingSeekRef.current = null;
     }
-    const queued = pendingSeekRef.current;
-    pendingSeekRef.current = null;
-    if (queued != null) void seekTo(queued, true);
+    if (queued != null) void seekTo(queued);
   }
 
-  async function seekTo(target: number, fromProgressBar = false) {
+  async function seekTo(target: number) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
@@ -1035,9 +1096,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
     setCurrent(absolute);
 
-    // Progress bar: always start a new ffmpeg pack (Movie Server seekHls + attachHls).
-    // Local currentTime on a live EVENT playlist snaps back to the same place on PC.
-    if (!fromProgressBar && targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
+    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       const ok = await seekLocal(video, absolute, localTarget, movie);
       if (ok) return;
     }
@@ -1153,10 +1212,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   function commitSeek(ratio: number) {
     setScrub(null);
     skipAt.current = null;
-    const fromSession = sessionRef.current?.durationSeconds ?? 0;
-    const movie = fromSession > 0 ? fromSession : Math.max(duration, 1);
+    const movie = durationHintRef.current || sessionRef.current?.durationSeconds || duration;
+    if (movie <= 0) return;
     const clamped = Math.min(1, Math.max(0, ratio));
-    void seekTo(Math.round(movie * clamped), true);
+    void seekTo(Math.round(movie * clamped));
+    reveal();
   }
 
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
