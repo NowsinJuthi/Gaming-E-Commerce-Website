@@ -461,33 +461,36 @@
   }
 
   .filters .control {
-    min-height: 2.15rem;
-    padding: 0.32rem 1.55rem 0.32rem 0.5rem;
-    font-size: 0.6875rem;
+    min-height: 1.9rem;
+    padding: 0.28rem 1.35rem 0.28rem 0.42rem;
+    font-size: 0.5625rem;
+    line-height: 1.25;
     font-weight: 400;
   }
 
   .filters .selectWrap::after {
-    right: 0.55rem;
-    height: 0.35rem;
-    width: 0.35rem;
+    right: 0.48rem;
+    height: 0.3rem;
+    width: 0.3rem;
   }
 
   .filters .searchInput {
-    min-height: 2.15rem;
-    padding: 0.32rem 1.65rem 0.32rem 1.85rem;
-    font-size: 0.6875rem;
+    min-height: 1.9rem;
+    padding: 0.28rem 1.45rem 0.28rem 1.55rem;
+    font-size: 0.5625rem;
+    line-height: 1.25;
     font-weight: 400;
   }
 
   .filters .searchInput::placeholder {
+    font-size: 0.5625rem;
     font-weight: 400;
   }
 
   .filters .searchIcon {
-    left: 0.55rem;
-    height: 1rem;
-    width: 1rem;
+    left: 0.48rem;
+    height: 0.85rem;
+    width: 0.85rem;
   }
 }
 
