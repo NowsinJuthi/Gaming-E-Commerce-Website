@@ -319,6 +319,13 @@ export class Order {
   @Prop({ type: OrderAdminTelegramSchema, default: {} })
   adminTelegram!: OrderAdminTelegram;
 
+  /**
+   * SHA-256 of delivered gift-card codes, serials, and pins.
+   * Lets admin order search match a code without reading the ciphertext.
+   */
+  @Prop({ type: [String], select: false })
+  giftCodeHashes?: string[];
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -329,3 +336,4 @@ OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
 // Revenue aggregations filter by payment.status + date range — compound index speeds them up.
 OrderSchema.index({ 'payment.status': 1, createdAt: -1 });
+OrderSchema.index({ giftCodeHashes: 1 });

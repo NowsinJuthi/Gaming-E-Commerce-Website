@@ -12,6 +12,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Queue } from 'bullmq';
@@ -121,8 +122,13 @@ interface Reservation {
 }
 
 @Injectable()
-export class OrderService {
+export class OrderService implements OnModuleInit {
   private readonly logger = new Logger(OrderService.name);
+  private giftCodeHashBackfill?: Promise<void>;
+
+  onModuleInit(): void {
+    this.giftCodeHashBackfill = this.backfillGiftCodeHashes();
+  }
 
   constructor(
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
@@ -657,7 +663,7 @@ export class OrderService {
       });
     }
 
-    // Redeem codes, customer notes, and line item titles (product names).
+    // Plaintext notes, product names, and legacy unencrypted codes.
     if (term.length >= 2) {
       or.push(
         { deliveryMessage: rxOpts },
@@ -670,6 +676,17 @@ export class OrderService {
     }
 
     const lookupTasks: Promise<void>[] = [];
+
+    // Encrypted gift-card codes are stored as ciphertext, so match the hash.
+    if (term.length >= 4) {
+      lookupTasks.push(
+        this.ensureGiftCodeHashes().then(() => {
+          const codeHash = this.crypto.inventoryValueHash(term);
+          or.push({ giftCodeHashes: codeHash });
+          return this.appendOrdersForGiftCode(term, codeHash, or);
+        }),
+      );
+    }
 
     // Registered customer lookup — only for meaningful terms.
     const looksLikePhone = phoneDigits.length >= 4;
@@ -757,6 +774,124 @@ export class OrderService {
     }
 
     return or;
+  }
+
+  /** Index plaintext gift-card codes already saved on orders so search can match them. */
+  private ensureGiftCodeHashes(): Promise<void> {
+    if (!this.giftCodeHashBackfill) {
+      this.giftCodeHashBackfill = this.backfillGiftCodeHashes().catch(
+        (error) => {
+          this.giftCodeHashBackfill = undefined;
+          this.logger.error(
+            `Gift card code search index was not finished: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        },
+      );
+    }
+    return this.giftCodeHashBackfill;
+  }
+
+  private async backfillGiftCodeHashes(): Promise<void> {
+    const cursor = this.orderModel
+      .find({
+        giftCodeHashes: { $exists: false },
+        $or: [
+          { 'items.deliveredCodes.0': { $exists: true } },
+          { 'manualGiftCards.0': { $exists: true } },
+        ],
+      })
+      .select('+giftCodeHashes items.deliveredCodes manualGiftCards')
+      .cursor();
+
+    const batch: Array<{ id: Types.ObjectId; hashes: string[] }> = [];
+    const flush = async () => {
+      if (batch.length === 0) return;
+      const rows = batch.splice(0, batch.length);
+      await this.orderModel.bulkWrite(
+        rows.map((row) => ({
+          updateOne: {
+            filter: { _id: row.id, giftCodeHashes: { $exists: false } },
+            update: { $set: { giftCodeHashes: row.hashes } },
+          },
+        })),
+      );
+    };
+
+    for await (const order of cursor) {
+      batch.push({
+        id: order._id,
+        hashes: this.collectStoredGiftCodeHashes(order),
+      });
+      if (batch.length >= 100) {
+        await flush();
+      }
+    }
+    await flush();
+  }
+
+  /** Recompute searchable hashes from the codes currently stored on the order. */
+  rememberGiftCodeHashes(order: OrderDocument): void {
+    order.giftCodeHashes = this.collectStoredGiftCodeHashes(order);
+    order.markModified('giftCodeHashes');
+  }
+
+  private collectStoredGiftCodeHashes(order: {
+    items?: Array<{
+      deliveredCodes?: Array<{ code: string; serial?: string; pin?: string }>;
+    }>;
+    manualGiftCards?: Array<{ code: string }>;
+  }): string[] {
+    const hashes = new Set<string>();
+    const add = (value?: string) => {
+      const plain = value?.trim();
+      if (!plain || plain.startsWith('enc:v1:') || plain === '••••') return;
+      hashes.add(this.crypto.inventoryValueHash(plain));
+    };
+
+    for (const item of order.items ?? []) {
+      for (const stored of item.deliveredCodes ?? []) {
+        const opened = this.safeOpenDeliveredSecret(stored);
+        add(opened.code);
+        add(opened.serial);
+        add(opened.pin);
+      }
+    }
+    for (const card of order.manualGiftCards ?? []) {
+      add(this.safeOpenDeliveredSecret({ code: card.code }).code);
+    }
+    return [...hashes];
+  }
+
+  private async appendOrdersForGiftCode(
+    term: string,
+    codeHash: string,
+    or: Record<string, unknown>[],
+  ): Promise<void> {
+    const rows = await this.inventoryModel
+      .find({
+        $or: [
+          { valueHash: codeHash },
+          { valueHash: { $exists: false }, value: term },
+        ],
+      })
+      .select('_id orderId')
+      .limit(50)
+      .lean()
+      .exec();
+    if (rows.length === 0) return;
+
+    const itemIds = rows.map((row) => row._id);
+    or.push({ 'items.inventoryItemIds': { $in: itemIds } });
+    or.push({ 'manualGiftCards.inventoryItemId': { $in: itemIds } });
+
+    const orderIds = rows
+      .map((row) => row.orderId)
+      .filter((id): id is Types.ObjectId => Boolean(id));
+    if (orderIds.length > 0) {
+      or.push({ _id: { $in: orderIds } });
+    }
   }
 
   async getOne(user: AuthenticatedUser, orderId: string): Promise<OrderDocument> {
@@ -2263,6 +2398,7 @@ export class OrderService {
     }
     this.appendTimelineEntry(order, order.status, deliveryNote);
     await this.markManualGiftInventorySold(order);
+    this.rememberGiftCodeHashes(order);
     await order.save();
   }
 
@@ -2295,6 +2431,7 @@ export class OrderService {
       item.delivered = false;
       item.deliveredCodes = [];
     }
+    this.rememberGiftCodeHashes(order);
   }
 
   private collectManualGiftInventoryIds(
@@ -2468,6 +2605,7 @@ export class OrderService {
       this.crypto.sealDeliveredSecret({ code: card.code }),
     );
     target.delivered = true;
+    this.rememberGiftCodeHashes(order);
   }
 
   private buildCustomerDeliveryEmailMessage(

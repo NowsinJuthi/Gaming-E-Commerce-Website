@@ -109,6 +109,7 @@ export class DeliveryService {
       supplierDelivered = true;
     }
 
+    this.orders.rememberGiftCodeHashes(order);
     await order.save();
 
     const allDelivered = order.items.every((item) => item.delivered);

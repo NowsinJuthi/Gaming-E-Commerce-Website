@@ -777,7 +777,7 @@ export default function AdminOrdersPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applySearch();
                 }}
-                placeholder="Search"
+                placeholder="Order, mobile, email, TrxID, gift card code"
                 className="admin-input admin-orders-search-input min-w-0 flex-1 max-sm:min-w-[3.25rem] sm:flex-1"
               />
               <button
