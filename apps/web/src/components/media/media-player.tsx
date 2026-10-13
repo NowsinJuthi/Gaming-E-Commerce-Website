@@ -810,7 +810,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
       {skipFlash ? <div className={`${styles.skipFlash} ${skipFlash === "back" ? styles.skipLeft : styles.skipRight}`}>{skipFlash === "back" ? "-10s" : "+10s"}</div> : null}
 
-      {preparing || (buffering && !error) ? (
+      {!mobile && (preparing || (buffering && !error)) ? (
         <div className={styles.busy} role="status" aria-live="polite" aria-label={preparing ? "Loading" : "Buffering"}>
           <BusyMark buffering={buffering && !preparing} />
         </div>
