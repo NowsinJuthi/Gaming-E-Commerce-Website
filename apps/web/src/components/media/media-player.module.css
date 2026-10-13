@@ -72,11 +72,54 @@
   gap: 0.75rem;
 }
 
+.bottom {
+  position: relative;
+  z-index: 2;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.top {
+  position: relative;
+  z-index: 2;
+}
+
 .titleBlock {
   min-width: 0;
+  max-width: 60%;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.15rem;
+}
+
+.brand {
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brandTitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.brandSub {
+  display: block;
+  margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 0.45);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .titleBlock button,
@@ -135,9 +178,9 @@
 
 .icon svg,
 .transport svg,
-.bigPlay svg {
-  width: 1.45rem;
-  height: 1.45rem;
+.core svg {
+  width: 1.35rem;
+  height: 1.35rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -145,9 +188,14 @@
   stroke-linejoin: round;
 }
 
-.bigPlay svg {
+.icon svg.filled,
+.core svg {
   fill: currentColor;
   stroke: none;
+}
+
+.iconOn {
+  background: rgb(255 255 255 / 0.16);
 }
 
 .volume {
@@ -156,31 +204,39 @@
   gap: 0.35rem;
 }
 
-.volume input,
-.seek input {
+.volume input {
   accent-color: #fff;
   width: 7.5rem;
   height: 2.75rem;
   cursor: pointer;
 }
 
-.center {
+.skin {
+  position: relative;
+  z-index: 1;
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 30vh;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
-.bigPlay {
-  width: 4.5rem;
-  height: 4.5rem;
-  background: rgb(0 0 0 / 0.45);
-  border: 2px solid rgb(255 255 255 / 0.85);
+.titleRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .meta {
   min-width: 0;
-  margin-bottom: 0.35rem;
+}
+
+.year {
+  margin: 0 0 0.15rem;
+  color: rgb(255 255 255 / 0.7);
+  font-size: 0.9rem;
 }
 
 .meta h1 {
@@ -188,16 +244,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(1.15rem, 2.4vw, 1.8rem);
-}
-
-.times {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  color: rgb(255 255 255 / 0.8);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-transform: none;
 }
 
 .seek {
@@ -208,21 +258,67 @@
 
 .seek input {
   width: 100%;
-}
-
-.bottomMain {
-  min-width: 0;
-  flex: 1;
+  height: 1.6rem;
+  accent-color: #26bfb0;
+  cursor: pointer;
 }
 
 .transport {
-  margin-top: 0.2rem;
+  margin-top: 0.35rem;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.transport button {
-  font-size: 0.95rem;
-  font-weight: 650;
-  padding: 0 0.7rem;
+.transportLeft,
+.timeEnd {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.timeDesk,
+.timeMobile,
+.timeEnd {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: rgb(255 255 255 / 0.85);
+}
+
+.timeMobile,
+.timeTotal {
+  color: rgb(255 255 255 / 0.45);
+}
+
+.timeMobile {
+  display: none;
+  margin-left: 0.35rem;
+  color: rgb(255 255 255 / 0.85);
+}
+
+.skipIcon {
+  display: inline-flex;
+  width: 1.7rem;
+  height: 1.7rem;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
+.pill {
+  display: none;
+  min-height: 2.5rem;
+  margin-left: 0.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255 / 0.9);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14);
+  padding: 0 0.9rem;
+  cursor: pointer;
 }
 
 .skipFlash {
@@ -259,19 +355,86 @@
 
 .busy {
   pointer-events: none;
+  z-index: 30;
+  background: transparent;
 }
 
-.spinner {
-  width: 3rem;
-  height: 3rem;
+.mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6.25rem;
+  height: 6.25rem;
+}
+
+.markSmall {
+  width: 5.25rem;
+  height: 5.25rem;
+}
+
+.glow {
+  position: absolute;
+  inset: 12%;
   border-radius: 999px;
-  border: 3px solid rgb(255 255 255 / 0.25);
-  border-top-color: #fff;
-  animation: spin 0.8s linear infinite;
+  background: radial-gradient(circle, rgb(38 191 176 / 0.42) 0%, transparent 70%);
+  animation: busyGlow 1.6s ease-in-out infinite;
+}
+
+.rings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.track {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.12);
+  stroke-width: 3.5;
+}
+
+.arc,
+.arcInner {
+  fill: none;
+  stroke-linecap: round;
+  transform-origin: center;
+}
+
+.arc {
+  stroke: #26bfb0;
+  stroke-width: 3.5;
+  stroke-dasharray: 58 160;
+  filter: drop-shadow(0 0 6px rgb(38 191 176 / 0.7));
+  animation: spin 0.95s linear infinite;
+}
+
+.arcInner {
+  stroke: rgb(255 255 255 / 0.55);
+  stroke-width: 2;
+  stroke-dasharray: 28 140;
+  animation: spinReverse 1.55s linear infinite;
+}
+
+.core {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #26bfb0 0%, #0a6258 100%);
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.08), 0 0 22px rgb(38 191 176 / 0.5);
+}
+
+.core svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.12rem;
 }
 
 .message {
-  margin-top: 0.8rem;
+  margin: 0.8rem 1rem 0;
   max-width: 24rem;
   color: rgb(255 255 255 / 0.86);
 }
@@ -383,9 +546,26 @@
   right: calc(0.8rem + env(safe-area-inset-right));
 }
 
+@media (min-width: 768px) {
+  .pill {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
 @media (max-width: 768px) {
-  .volume input {
+  .volume input,
+  .timeDesk {
     display: none;
+  }
+
+  .timeMobile {
+    display: inline;
+  }
+
+  .brandTitle {
+    letter-spacing: 0.08em;
+    font-size: 0.82rem;
   }
 
   .title {
@@ -407,5 +587,23 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes spinReverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes busyGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
   }
 }

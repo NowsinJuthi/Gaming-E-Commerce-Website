@@ -88,11 +88,27 @@ function volumeReadOnly(): boolean {
   return probe.volume === before;
 }
 
-function Icon({ d }: { d: string }) {
+function Icon({ d, filled = false }: { d: string; filled?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={filled ? styles.filled : undefined}>
       <path d={d} />
     </svg>
+  );
+}
+
+function BusyMark({ buffering }: { buffering: boolean }) {
+  return (
+    <div className={`${styles.mark} ${buffering ? styles.markSmall : ""}`} aria-hidden="true">
+      <span className={styles.glow} />
+      <svg className={styles.rings} viewBox="0 0 80 80">
+        <circle className={styles.track} cx="40" cy="40" r="34" />
+        <circle className={styles.arc} cx="40" cy="40" r="34" />
+        <circle className={styles.arcInner} cx="40" cy="40" r="26" />
+      </svg>
+      <span className={styles.core}>
+        <Icon d="M8 5v14l11-7z" filled />
+      </span>
+    </div>
   );
 }
 
@@ -574,17 +590,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
       {skipFlash ? <div className={`${styles.skipFlash} ${skipFlash === "back" ? styles.skipLeft : styles.skipRight}`}>{skipFlash === "back" ? "-10s" : "+10s"}</div> : null}
 
-      {preparing ? (
-        <div className={styles.busy}>
-          <div>
-            <div className={styles.spinner} />
-            <p className={styles.message}>{session?.message || "Opening the video…"}</p>
-          </div>
-        </div>
-      ) : null}
-      {buffering && !preparing && !error ? (
-        <div className={styles.busy}>
-          <div className={styles.spinner} />
+      {preparing || (buffering && !error) ? (
+        <div className={styles.busy} role="status" aria-live="polite" aria-label={preparing ? "Loading" : "Buffering"}>
+          <BusyMark buffering={buffering && !preparing} />
         </div>
       ) : null}
       {error ? (
@@ -614,15 +622,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       ) : (
         <div className={`${styles.chrome} ${chrome ? "" : styles.hiddenChrome}`}>
           <div className={styles.shade} />
-          <div className={styles.top}>
+          <header className={styles.top}>
             <div className={styles.titleBlock}>
               <Link href="/media" className={`${styles.icon} ${styles.backLink}`} aria-label="Back">
                 <Icon d="M15 18l-6-6 6-6" />
               </Link>
-              <div>
-                <p className={styles.kicker}>{session?.year || ""}</p>
-                <h1 className={styles.title}>{session?.title || "Video"}</h1>
-              </div>
+              <Link href="/media" className={styles.brand} aria-label={`Back from ${session?.title || "video"}`}>
+                <span className={styles.brandTitle}>{session?.title || "Video"}</span>
+                {session?.episodeName ? <span className={styles.brandSub}>{session.episodeName}</span> : null}
+              </Link>
             </div>
             <div className={styles.iconRow}>
               {volumeLocked ? null : (
@@ -637,12 +645,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                     onChange={(event) => changeVolume(Number(event.target.value))}
                   />
                   <button type="button" className={styles.icon} aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
-                    <Icon d={muted ? "M11 5L6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6" : "M11 5L6 9H3v6h3l5 4V5zM16 9a5 5 0 0 1 0 6M19 7a8 8 0 0 1 0 10"} />
+                    <Icon d={muted || volume === 0 ? "M11 5L6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6" : "M11 5L6 9H3v6h3l5 4V5zM16 9a5 5 0 0 1 0 6"} />
                   </button>
                 </div>
               )}
               <button type="button" className={styles.icon} aria-label="Cast" onClick={cast}>
-                <Icon d="M3 7h18v10H3zM7 17v2h10v-2" />
+                <Icon d="M2 16V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v11M7 20h10M12 16v4" />
               </button>
               {pipSupported ? (
                 <button type="button" className={styles.icon} aria-label="Picture in picture" aria-pressed={pipOn} onClick={() => void togglePip()}>
@@ -658,75 +666,70 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 <Icon d={fullscreen ? "M9 9H5V5M15 9h4V5M9 15H5v4M15 15h4v4" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"} />
               </button>
             </div>
-          </div>
+          </header>
 
-          <div className={styles.center}>
-            {needsGesture || !playing ? (
-              <button type="button" className={styles.bigPlay} aria-label="Play" onClick={togglePlay}>
-                <Icon d="M8 5v14l12-7z" />
-              </button>
-            ) : (
-              <button type="button" className={styles.bigPlay} aria-label="Pause" onClick={togglePlay}>
-                <Icon d="M7 5h4v14H7zM13 5h4v14h-4z" />
-              </button>
-            )}
-          </div>
+          <button type="button" className={styles.skin} aria-label={playing ? "Pause" : "Play"} onClick={mobile ? () => setChrome((value) => !value) : togglePlay} />
 
           <div className={styles.bottom}>
-            <div className={styles.bottomMain}>
+            <div className={styles.titleRow}>
               <div className={styles.meta}>
-                <h1>{session?.episodeName || session?.title}</h1>
+                {session?.year ? <p className={styles.year}>{session.year}</p> : null}
+                <h1>{session?.title || "Video"}</h1>
               </div>
-              <div className={styles.times}>
-                <span>{formatTime(shown)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
-              <div className={styles.seek}>
-                <input
-                  aria-label="Seek"
-                  type="range"
-                  min={0}
-                  max={Math.max(duration, 1)}
-                  step={1}
-                  value={Math.min(shown, Math.max(duration, 1))}
-                  onPointerDown={() => setScrub(current)}
-                  onChange={(event) => setScrub(Number(event.target.value))}
-                  onPointerUp={(event) => {
-                    const target = Number((event.target as HTMLInputElement).value);
-                    setScrub(null);
-                    void seekTo(target);
-                  }}
-                />
-              </div>
-              <div className={styles.transport}>
-                <button type="button" aria-label="Rewind 10 seconds" onClick={() => skip(-10)}>
-                  -10
+              <div className={styles.iconRow}>
+                <button type="button" className={`${styles.icon} ${sheet === "subtitles" ? styles.iconOn : ""}`} aria-label="Subtitles" onClick={() => setSheet(sheet === "subtitles" ? null : "subtitles")}>
+                  <Icon d="M4 6h16v12H4zM7 11h4M7 15h2M13 15h4" />
                 </button>
-                <button type="button" aria-label={playing ? "Pause" : "Play"} onClick={togglePlay}>
-                  {playing ? "Pause" : "Play"}
+                <button type="button" className={`${styles.icon} ${sheet === "audio" ? styles.iconOn : ""}`} aria-label="Audio" onClick={() => setSheet(sheet === "audio" ? null : "audio")}>
+                  <Icon d="M4 10v4h4l5 4V6L8 10H4zM16 9a4 4 0 0 1 0 6" />
                 </button>
-                <button type="button" aria-label="Forward 10 seconds" onClick={() => skip(10)}>
-                  +10
+                <button type="button" className={`${styles.icon} ${sheet === "speed" ? styles.iconOn : ""}`} aria-label="Playback speed" onClick={() => setSheet(sheet === "speed" ? null : "speed")}>
+                  <Icon d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 3v3M12 18v3M4.9 6.5l2.1 2.1M17 15.4l2.1 2.1M3 12h3M18 12h3M4.9 17.5l2.1-2.1M17 8.6l2.1-2.1" />
+                </button>
+                <button type="button" className={`${styles.icon} ${sheet === "settings" ? styles.iconOn : ""}`} aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
+                  <Icon d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.6a8 8 0 0 0-1.7-1L15 4h-4l-.5 2.9a8 8 0 0 0-1.7 1L6.5 7.4l-2 3.4L6.5 12a7.8 7.8 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.6a8 8 0 0 0 1.7 1L11 22h4l.5-2.9a8 8 0 0 0 1.7-1l2.3.6 2-3.4-2-1.3z" />
+                </button>
+              </div>
+            </div>
+            <div className={styles.seek}>
+              <input
+                aria-label="Seek"
+                type="range"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={1}
+                value={Math.min(shown, Math.max(duration, 1))}
+                onPointerDown={() => setScrub(current)}
+                onChange={(event) => setScrub(Number(event.target.value))}
+                onPointerUp={(event) => {
+                  const target = Number((event.target as HTMLInputElement).value);
+                  setScrub(null);
+                  void seekTo(target);
+                }}
+              />
+            </div>
+            <div className={styles.transport}>
+              <div className={styles.transportLeft}>
+                <span className={styles.timeDesk}>{formatTime(shown)}</span>
+                <button type="button" className={styles.icon} aria-label="Rewind 10 seconds" onClick={() => skip(-10)}>
+                  <span className={styles.skipIcon}>10</span>
+                </button>
+                <button type="button" className={styles.icon} aria-label={playing ? "Pause" : "Play"} onClick={togglePlay}>
+                  <Icon filled d={playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z"} />
+                </button>
+                <button type="button" className={styles.icon} aria-label="Forward 10 seconds" onClick={() => skip(10)}>
+                  <span className={styles.skipIcon}>10</span>
                 </button>
                 {(session?.episodes.length ?? 0) > 1 ? (
-                  <>
-                    <button type="button" aria-label="Previous episode" onClick={() => void retarget({ episodeIndex: Math.max(0, (session?.episodeIndex ?? 0) - 1), startSeconds: 0 })}>
-                      Prev
-                    </button>
-                    <button type="button" aria-label="Next episode" onClick={() => void retarget({ episodeIndex: (session?.episodeIndex ?? 0) + 1, startSeconds: 0 })}>
-                      Next
-                    </button>
-                  </>
+                  <button type="button" className={styles.pill} aria-label="Next episode" onClick={() => void retarget({ episodeIndex: (session?.episodeIndex ?? 0) + 1, startSeconds: 0 })}>
+                    Next
+                  </button>
                 ) : null}
-                <button type="button" aria-label="Subtitles" onClick={() => setSheet(sheet === "subtitles" ? null : "subtitles")}>
-                  CC
-                </button>
-                <button type="button" aria-label="Playback speed" onClick={() => setSheet(sheet === "speed" ? null : "speed")}>
-                  {rate === 1 ? "1x" : `${rate}x`}
-                </button>
-                <button type="button" aria-label="Settings" onClick={() => setSheet(sheet === "settings" ? null : "settings")}>
-                  Settings
-                </button>
+                <span className={styles.timeMobile}>{formatTime(shown)}</span>
+              </div>
+              <div className={styles.timeEnd}>
+                <span>-{formatTime(Math.max(0, duration - shown))}</span>
+                <span className={styles.timeTotal}> / {formatTime(duration)}</span>
               </div>
             </div>
           </div>

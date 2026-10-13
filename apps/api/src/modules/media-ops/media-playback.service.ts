@@ -480,18 +480,24 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const streaming = Boolean(session.incoming);
     const args = [
       '-hide_banner', '-loglevel', 'error', ...(streaming ? [] : ['-nostdin']), '-y',
-      ...(streaming ? ['-fflags', '+genpts', '-probesize', '5000000', '-analyzeduration', '5000000'] : []),
       ...(!streaming && session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
+      '-probesize', '5M',
+      '-analyzeduration', '2M',
+      '-fflags', '+genpts+discardcorrupt',
       '-i', streaming ? 'pipe:0' : file,
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
       '-sn', '-dn',
+      '-muxdelay', '0',
+      '-muxpreload', '0',
       ...this.codecArgs(session, audio?.codec ?? ''),
       '-f', 'hls',
       '-hls_time', '4',
+      '-hls_init_time', '2',
       '-hls_list_size', '0',
       '-hls_playlist_type', 'event',
-      '-hls_flags', 'independent_segments+temp_file',
+      '-hls_flags', 'independent_segments+omit_endlist+temp_file',
+      '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
     ];
@@ -532,22 +538,29 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const copyAudio = audioCodec === 'aac' || audioCodec === 'mp3';
     if (copyVideo && copyAudio) {
       return audioCodec === 'aac'
-        ? ['-c:v', 'copy', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
-        : ['-c:v', 'copy', '-c:a', 'copy'];
+        ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
+        : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy'];
     }
     if (copyVideo) {
-      return ['-c:v', 'copy', '-c:a', 'aac', '-ac', '2', '-b:a', '160k', '-ar', '48000'];
+      return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000'];
     }
     const target = height || 720;
     return [
-      '-vf', `scale=-2:min(${target}\\,ih)`,
+      '-vf', `scale=-2:'min(ih,${target})'`,
       '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-crf', '23',
+      '-preset', 'ultrafast',
+      '-crf', '26',
       '-pix_fmt', 'yuv420p',
+      '-profile:v', 'main',
+      '-g', '96',
+      '-keyint_min', '96',
+      '-sc_threshold', '0',
+      '-bf', '0',
+      '-refs', '1',
+      '-x264-params', 'rc-lookahead=0:sync-lookahead=0',
       '-c:a', 'aac',
       '-ac', '2',
-      '-b:a', '160k',
+      '-b:a', '192k',
       '-ar', '48000',
     ];
   }
