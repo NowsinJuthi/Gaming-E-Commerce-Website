@@ -533,14 +533,29 @@
   border-bottom: 1.5px solid rgb(38 191 176 / 0.85);
 }
 
-.filters .searchInput {
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
 .filters .searchInput::placeholder {
   font-size: inherit;
   font-weight: inherit;
+}
+
+@media (min-width: 768px) {
+  .filters .control,
+  .filters .searchInput,
+  .filters .searchInput::placeholder {
+    font-size: 1rem;
+    line-height: 1.35;
+    font-weight: 500;
+  }
+
+  .filters .control {
+    min-height: 2.65rem;
+    padding: 0.45rem 2.05rem 0.45rem 0.75rem;
+  }
+
+  .filters .searchInput {
+    min-height: 2.65rem;
+    padding: 0.45rem 2rem 0.45rem 2.2rem;
+  }
 }
 
 .control {
