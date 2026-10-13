@@ -20,18 +20,28 @@ export class SmbMountService {
 
   /** Local path of a share file. The file stays on the Samba server. */
   async filePath(serverId: string, auth: SmbAuth, remoteFile: string): Promise<string> {
-    const primary = await this.mountedFile(serverId, auth, remoteFile);
-    if (primary) return primary;
-    const shares = await this.smb.listShareNames(auth).catch(() => [] as string[]);
-    const known = auth.share.trim().toLowerCase();
-    for (const share of shares) {
-      if (share.toLowerCase() === known) continue;
+    const stored = auth.share.trim();
+    const listed = await this.smb.listShareNames(auth).catch(() => [] as string[]);
+    const names = listed.length
+      ? [
+          ...listed.filter((share) => share.toLowerCase() === stored.toLowerCase()),
+          ...listed.filter((share) => share.toLowerCase() !== stored.toLowerCase()),
+        ]
+      : [stored];
+    let last = 'The storage share could not be opened.';
+    for (const share of names) {
       const slug = share.replace(/[^A-Za-z0-9._-]/g, '').slice(0, 40);
-      if (!slug) continue;
-      const found = await this.mountedFile(`${serverId}-${slug}`, { ...auth, share }, remoteFile);
-      if (found) return found;
+      const mountId = share.toLowerCase() === stored.toLowerCase() || !slug ? serverId : `${serverId}-${slug}`;
+      try {
+        const found = await this.mountedFile(mountId, { ...auth, share }, remoteFile);
+        if (found) return found;
+        last = 'The video file was not found on the storage share.';
+      } catch (error) {
+        last = error instanceof Error ? error.message : last;
+      }
     }
-    throw new Error('The video file was not found on the storage share.');
+    const hint = listed.length ? ` Shares on this server: ${listed.join(', ')}.` : '';
+    throw new Error(`${last}${hint}`);
   }
 
   private async mountedFile(mountId: string, auth: SmbAuth, remoteFile: string): Promise<string | null> {

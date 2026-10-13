@@ -218,7 +218,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
         username: server.username,
         password,
         domain: server.domain,
-        share: library.smbShare || server.share,
+        share: server.share || library.smbShare || '',
       };
     }
 
