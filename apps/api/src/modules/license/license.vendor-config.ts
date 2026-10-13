@@ -19,14 +19,10 @@ const SEALED_SITE_SECRET =
 
 export function getLicenseVendorConfig(): LicenseVendorConfig {
   return {
-    apiUrl:
-      process.env.LICENSE_API_URL?.trim() ||
-      openSeal(SEALED_API_URL) ||
-      'https://license.amarpin.com/api',
+    apiUrl: openSeal(SEALED_API_URL) || 'https://license.amarpin.com/api',
     productId: '',
     websiteId: '',
-    siteSecret:
-      process.env.LICENSE_SITE_SECRET?.trim() || openSeal(SEALED_SITE_SECRET),
+    siteSecret: openSeal(SEALED_SITE_SECRET),
   };
 }
 

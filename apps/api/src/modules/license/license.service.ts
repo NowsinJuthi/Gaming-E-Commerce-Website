@@ -382,11 +382,16 @@ export class LicenseService implements OnModuleInit {
 
     if (result.valid !== true) {
 
-      throw new ForbiddenException(
+      const code = String(result.code || '').toUpperCase();
 
-        result.message || result.code || 'License activation failed',
+      const message =
+        code === 'UNAUTHORIZED'
+          ? 'This license key was not generated for this website.'
+          : code === 'INVALID_LICENSE'
+            ? 'This license key was not found.'
+            : result.message || result.code || 'License activation failed';
 
-      );
+      throw new ForbiddenException(message);
 
     }
 

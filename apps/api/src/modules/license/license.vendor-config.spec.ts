@@ -12,13 +12,14 @@ describe('license vendor config', () => {
   });
 
   it('opens the sealed API address and website secret from code', () => {
-    delete process.env.LICENSE_SITE_SECRET;
-    delete process.env.LICENSE_API_URL;
+    process.env.LICENSE_SITE_SECRET = 'env-secret-must-not-override';
+    process.env.LICENSE_API_URL = 'https://example.invalid/api';
     const config = getLicenseVendorConfig();
     expect(config.apiUrl).toBe('https://license.amarpin.com/api');
     expect(config.productId).toBe('');
     expect(config.websiteId).toBe('');
     expect(config.siteSecret.length).toBeGreaterThan(20);
+    expect(config.siteSecret).not.toBe('env-secret-must-not-override');
     expect(isLicenseVendorReady(config)).toBe(true);
   });
 });
