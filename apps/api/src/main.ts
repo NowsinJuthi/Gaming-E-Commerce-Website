@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import type { Redis } from 'ioredis';
 import { Logger } from 'nestjs-pino';
@@ -91,6 +91,14 @@ async function bootstrap(): Promise<void> {
 
   const uploadsDir =
     config.get<string>('app.uploadsDir') ?? resolveUploadsRoot();
+  app.use(`/${globalPrefix}/uploads`, (req: Request, res: Response, next: NextFunction) => {
+    const pathOnly = (req.path ?? '').split('?')[0] ?? '';
+    if (pathOnly === '/hls-pack' || pathOnly.startsWith('/hls-pack/')) {
+      res.status(404).end();
+      return;
+    }
+    next();
+  });
   app.use(
     `/${globalPrefix}/uploads`,
     express.static(uploadsDir, {

@@ -171,22 +171,22 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   /** Growing EVENT playlists may list segments before the file exists; drop missing entries and bust segment cache on pack restart. */
   async playlistForServe(sessionId: string): Promise<string> {
-    if (!/^[a-f0-9]{32}$/.test(sessionId)) throw new NotFoundException();
-    const session = this.sessions.get(sessionId);
-    if (!session) throw new NotFoundException();
-    const playlist = join(session.dir, 'index.m3u8');
-    const root = resolve(session.dir);
+    const resolved = this.resolvePack(sessionId);
+    if (!resolved) throw new NotFoundException();
+    const { session, dir } = resolved;
+    const playlist = join(dir, 'index.m3u8');
+    const root = resolve(dir);
     if (!playlist.startsWith(root + sep) && playlist !== root) throw new NotFoundException();
     if (!existsSync(playlist)) throw new NotFoundException();
-    session.touchedAt = Date.now();
+    if (session) session.touchedAt = Date.now();
     const raw = await readFile(playlist, 'utf8');
-    const gen = session.token;
+    const gen = session?.token ?? 1;
     const lines = raw.split(/\r?\n/);
     const out: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
       if (HLS_SEGMENT_NAME.test(trimmed)) {
-        const full = join(session.dir, trimmed);
+        const full = join(dir, trimmed);
         if (!existsSync(full)) {
           const prev = out[out.length - 1];
           if (prev?.startsWith('#EXTINF')) out.pop();
@@ -201,21 +201,34 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   }
 
   openFile(sessionId: string, name: string): { path: string; type: string } {
-    if (!/^[a-f0-9]{32}$/.test(sessionId)) throw new NotFoundException();
-    if (!/^(index\.m3u8|seg\d{5}\.(?:m2ts|ts)|captions-\d+\.vtt)$/.test(name)) throw new NotFoundException();
-    const session = this.sessions.get(sessionId);
-    if (!session) throw new NotFoundException();
-    const full = join(session.dir, name);
-    const root = resolve(session.dir);
+    const baseName = decodeURIComponent(name.split('?')[0]?.split('#')[0] ?? name);
+    if (!/^(index\.m3u8|seg\d{5}\.(?:m2ts|ts)|captions-\d+\.vtt)$/.test(baseName)) throw new NotFoundException();
+    const resolved = this.resolvePack(sessionId);
+    if (!resolved) throw new NotFoundException();
+    const { session, dir } = resolved;
+    const full = join(dir, baseName);
+    const root = resolve(dir);
     if (!full.startsWith(root + sep) && full !== root) throw new NotFoundException();
     if (!existsSync(full)) throw new NotFoundException();
-    session.touchedAt = Date.now();
-    const type = name.endsWith('.m3u8')
+    if (session) session.touchedAt = Date.now();
+    const type = baseName.endsWith('.m3u8')
       ? 'application/vnd.apple.mpegurl'
-      : name.endsWith('.vtt')
+      : baseName.endsWith('.vtt')
         ? 'text/vtt; charset=utf-8'
         : 'video/MP2T';
     return { path: full, type };
+  }
+
+  /** In-memory session or on-disk pack dir (same id) so segment GETs survive brief API restarts. */
+  private resolvePack(sessionId: string): { session: Session | null; dir: string } | null {
+    if (!/^[a-f0-9]{32}$/.test(sessionId)) return null;
+    const session = this.sessions.get(sessionId) ?? null;
+    const dir = session?.dir ?? join(resolveUploadsRoot(), 'hls-pack', sessionId);
+    const root = resolve(join(resolveUploadsRoot(), 'hls-pack'));
+    const resolved = resolve(dir);
+    if (resolved !== root && !resolved.startsWith(root + sep)) return null;
+    if (!existsSync(resolved)) return null;
+    return { session, dir: resolved };
   }
 
   private async createSession(titleId: string, request: PlaybackRequest): Promise<Session> {

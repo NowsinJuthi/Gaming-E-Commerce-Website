@@ -539,6 +539,27 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     return data;
   }, []);
 
+  /** Stop segment requests before API clears the pack (seek/retarget would otherwise 404 old seg*.m2ts). */
+  const stopActivePlayback = useCallback(() => {
+    attachSeqRef.current += 1;
+    const hls = hlsRef.current;
+    if (hls) {
+      try {
+        hls.stopLoad();
+      } catch {
+        /* destroyed */
+      }
+      hls.destroy();
+    }
+    hlsRef.current = null;
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+  }, []);
+
   const attachPlaybackPack = useCallback(async (pack: PlaybackSession): Promise<void> => {
     const video = videoRef.current;
     if (!video) throw new Error("Playback failed.");
@@ -696,6 +717,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setBuffering(true);
       seekLockRef.current = true;
       attachedPackRef.current = "";
+      stopActivePlayback();
       try {
         const next = await post(`${API_BASE}/media/playback/sessions/${currentSession.sessionId}`, {
           startSeconds: patch.startSeconds ?? currentSession.startSeconds,
@@ -718,7 +740,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         setBuffering(false);
       }
     },
-    [attachPlaybackPack, post, waitForSessionReady],
+    [attachPlaybackPack, post, stopActivePlayback, waitForSessionReady],
   );
 
   useEffect(() => {
@@ -1017,6 +1039,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setBuffering(true);
     packRestartRef.current = true;
     attachedPackRef.current = "";
+    stopActivePlayback();
     originRef.current = target;
     remember(target);
     setCurrent(target);

@@ -62,14 +62,15 @@ export class MediaPlaybackController {
     @Res() res: Response,
   ) {
     try {
-      if (file === 'index.m3u8') {
+      const baseFile = decodeURIComponent(file.split('?')[0]?.split('#')[0] ?? file);
+      if (baseFile === 'index.m3u8') {
         const body = await this.playback.playlistForServe(sessionId);
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
         res.setHeader('Cache-Control', 'no-store');
         res.send(body);
         return;
       }
-      const opened = this.playback.openFile(sessionId, file);
+      const opened = this.playback.openFile(sessionId, baseFile);
       res.setHeader('Content-Type', opened.type);
       res.setHeader('Cache-Control', 'no-store');
       res.sendFile(opened.path);
