@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
+import {
+  displayTimelineSeconds,
+  isLocalTimeBuffered,
+  isLocalTimeInPack,
+  localTimelineSeconds,
+} from "@/lib/media-playback-timeline";
 import styles from "./media-player.module.css";
 
 type Quality = "auto" | "1080" | "720" | "480";
@@ -139,33 +145,6 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
   return Math.min(1, Math.max(0, localX / width + 0.5));
 }
 
-function isLocalTimeBuffered(video: HTMLVideoElement, localSeconds: number, slack = 0.35): boolean {
-  const ranges = video.buffered;
-  if (ranges.length === 0) return false;
-  for (let i = 0; i < ranges.length; i += 1) {
-    const start = ranges.start(i);
-    const end = ranges.end(i);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
-  }
-  return false;
-}
-
-/** Finite seekable only. An open live range is not the whole movie. */
-function isLocalTimeInPack(video: HTMLVideoElement, localSeconds: number, slack = 0.5): boolean {
-  if (isLocalTimeBuffered(video, localSeconds, slack)) return true;
-  if (!Number.isFinite(localSeconds) || localSeconds < -slack) return false;
-  const ranges = video.seekable;
-  if (ranges.length === 0) return false;
-  for (let i = 0; i < ranges.length; i += 1) {
-    const start = ranges.start(i);
-    const end = ranges.end(i);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-    if (localSeconds >= start - slack && localSeconds <= end + slack) return true;
-  }
-  return false;
-}
-
 function applyVideoSeek(video: HTMLVideoElement, target: number) {
   video.currentTime = target;
 }
@@ -181,11 +160,11 @@ function SeekTrack({
   max: number;
   teal?: boolean;
   onScrub: (seconds: number) => void;
-  onCommit: (seconds: number) => void;
+  onCommit: (ratio: number) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<number | null>(null);
-  const previewRef = useRef<number | null>(null);
+  const previewRatioRef = useRef<number | null>(null);
   const onScrubRef = useRef(onScrub);
   const onCommitRef = useRef(onCommit);
   const [dragging, setDragging] = useState(false);
@@ -194,27 +173,23 @@ function SeekTrack({
   const limit = Math.max(max, 1);
   const ratio = Math.min(1, Math.max(0, value / limit));
 
-  const secondsFrom = useCallback((clientX: number, clientY: number) => {
-    const el = trackRef.current;
-    if (!el) return 0;
-    return Math.round(sliderRatioFromClient(el, clientX, clientY) * Math.max(max, 1));
-  }, [max]);
-
   const endScrub = useCallback(() => {
-    const finalSeconds = previewRef.current;
+    const finalRatio = previewRatioRef.current;
     dragId.current = null;
-    previewRef.current = null;
+    previewRatioRef.current = null;
     setDragging(false);
-    if (finalSeconds != null) onCommitRef.current(finalSeconds);
+    if (finalRatio != null) onCommitRef.current(finalRatio);
   }, []);
 
   useEffect(() => {
     if (!dragging) return;
     const onMove = (event: PointerEvent) => {
       if (dragId.current == null || event.pointerId !== dragId.current) return;
-      const seconds = secondsFrom(event.clientX, event.clientY);
-      previewRef.current = seconds;
-      onScrubRef.current(seconds);
+      const el = trackRef.current;
+      if (!el) return;
+      const ratio = sliderRatioFromClient(el, event.clientX, event.clientY);
+      previewRatioRef.current = ratio;
+      onScrubRef.current(Math.round(ratio * Math.max(max, 1)));
     };
     const onUp = (event: PointerEvent) => {
       if (dragId.current == null || event.pointerId !== dragId.current) return;
@@ -230,12 +205,14 @@ function SeekTrack({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, endScrub, secondsFrom]);
+  }, [dragging, endScrub, max]);
 
   function pointAt(clientX: number, clientY: number) {
-    const seconds = secondsFrom(clientX, clientY);
-    previewRef.current = seconds;
-    onScrubRef.current(seconds);
+    const el = trackRef.current;
+    if (!el) return;
+    const ratio = sliderRatioFromClient(el, clientX, clientY);
+    previewRatioRef.current = ratio;
+    onScrubRef.current(Math.round(ratio * Math.max(max, 1)));
   }
 
   return (
@@ -286,11 +263,11 @@ function SeekTrack({
         if (event.key === "ArrowRight" || event.key === "ArrowUp") {
           event.preventDefault();
           event.stopPropagation();
-          onCommit(Math.min(limit, value + step));
+          onCommit(Math.min(1, (value + step) / limit));
         } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
           event.preventDefault();
           event.stopPropagation();
-          onCommit(Math.max(0, value - step));
+          onCommit(Math.max(0, (value - step) / limit));
         }
       }}
     >
@@ -452,12 +429,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const lastTap = useRef<{ zone: string; at: number } | null>(null);
   const zoneTimer = useRef<number | null>(null);
   const skipAt = useRef<number | null>(null);
-  const seekHold = useRef<number | null>(null);
-  const seekHoldTimer = useRef<number | null>(null);
   const seekingRef = useRef(false);
   const pendingSeekRef = useRef<number | null>(null);
   const originRef = useRef(0);
   const packRestartRef = useRef(false);
+  const scrubbingRef = useRef(false);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
@@ -469,6 +445,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [scrub, setScrub] = useState<number | null>(null);
+  scrubbingRef.current = scrub !== null;
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
@@ -626,6 +603,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     let destroyed = false;
     let hls: Hls | null = null;
     const playlist = session.playlistUrl;
+    originRef.current = session.startSeconds;
+    packRestartRef.current = true;
 
     const showGesture = () => {
       if (!destroyed) setNeedsGesture(true);
@@ -662,6 +641,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         maxBufferLength: 60,
         maxMaxBufferLength: 180,
         maxBufferHole: 0.5,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 4,
         startFragPrefetch: true,
       });
       hlsRef.current = hls;
@@ -696,17 +677,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const video = videoRef.current;
     if (!video) return;
     const onTime = () => {
-      if (video.seeking || seekingRef.current) return;
+      if (scrubbingRef.current || video.seeking || seekingRef.current) return;
       if (packRestartRef.current) {
         if (video.currentTime > 1.5) return;
         packRestartRef.current = false;
       }
       const origin = originRef.current;
-      const mediaTime = origin + video.currentTime;
-      if (seekHold.current != null) {
-        if (Math.abs(mediaTime - seekHold.current) > 1.25) return;
-        seekHold.current = null;
-      }
+      const movie = sessionRef.current?.durationSeconds ?? 0;
+      const mediaTime = displayTimelineSeconds(video.currentTime, origin, movie);
       setCurrent(mediaTime);
       const known = sessionRef.current?.durationSeconds ?? 0;
       setDuration(known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0));
@@ -724,7 +702,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setStarting(false);
     };
     const onWaiting = () => setBuffering(true);
-    const onPlaying = () => setBuffering(false);
+    const onPlaying = () => {
+      seekingRef.current = false;
+      setBuffering(false);
+    };
     const onEnded = () => {
       const currentSession = sessionRef.current;
       if (!currentSession) return;
@@ -762,15 +743,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (session?.durationSeconds) setDuration(session.durationSeconds);
   }, [session?.durationSeconds]);
 
-  useEffect(() => {
-    if (!session || seekingRef.current || packRestartRef.current) return;
-    originRef.current = session.startSeconds;
-  }, [session]);
-
   useEffect(() => () => {
     if (startTimer.current) window.clearTimeout(startTimer.current);
     if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
-    if (seekHoldTimer.current) window.clearTimeout(seekHoldTimer.current);
   }, []);
 
   useEffect(() => {
@@ -877,7 +852,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (!video || !currentSession) return;
     setSkipFlash(delta < 0 ? "back" : "forward");
     window.setTimeout(() => setSkipFlash(null), 700);
-    const display = skipAt.current ?? originRef.current + video.currentTime;
+    const movieLen = currentSession.durationSeconds;
+    const display =
+      skipAt.current ??
+      displayTimelineSeconds(video.currentTime, originRef.current, movieLen);
     const movie = currentSession.durationSeconds;
     let next = Math.max(0, display + delta);
     if (movie > 0) next = Math.min(movie, next);
@@ -889,20 +867,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     reveal();
   }
 
-  function holdSeek(absolute: number) {
-    seekHold.current = absolute;
-    if (seekHoldTimer.current) window.clearTimeout(seekHoldTimer.current);
-    seekHoldTimer.current = window.setTimeout(() => {
-      if (seekHold.current !== absolute) return;
-      seekHold.current = null;
-      if (!seekingRef.current) return;
-      seekingRef.current = false;
-      const queued = pendingSeekRef.current;
-      pendingSeekRef.current = null;
-      if (queued != null) void seekTo(queued);
-    }, 8000);
-  }
-
   async function seekTo(target: number) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
@@ -911,27 +875,44 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const absolute = movie > 0 ? Math.min(Math.max(0, target), movie) : Math.max(0, target);
     if (seekingRef.current) {
       pendingSeekRef.current = absolute;
-      holdSeek(absolute);
       setCurrent(absolute);
       return;
     }
-    const origin = originRef.current || currentSession.startSeconds;
-    const local = Math.max(0, absolute - origin);
-    holdSeek(absolute);
+    const origin = originRef.current;
+    const beforeSeek = displayTimelineSeconds(video.currentTime, origin, movie);
+    const previousOrigin = origin;
+    const localTarget = localTimelineSeconds(absolute, origin);
+    const targetIsInCurrentPack = absolute >= origin - 0.35;
+
     setCurrent(absolute);
-    // Inside this pack, move the playhead. Before the pack, or past the parts
-    // already built, start a new pack at that movie time. A time before the
-    // current origin cannot be stored as local 0 or the picture jumps forward.
-    if (absolute >= origin - 0.35 && isLocalTimeInPack(video, local)) {
+
+    // Movie Server: only move the playhead when the pack already contains that time.
+    // Setting currentTime from the live seekable range snaps to the edge and inverts drags.
+    if (targetIsInCurrentPack && isLocalTimeBuffered(video, localTarget)) {
       try {
-        applyVideoSeek(video, local);
+        applyVideoSeek(video, localTarget);
         return;
       } catch {
-        /* start a new pack at the requested time */
+        /* restart the transcode at the requested movie time */
       }
     }
+
+    if (
+      targetIsInCurrentPack &&
+      localTarget + 0.35 < video.currentTime &&
+      isLocalTimeInPack(video, localTarget)
+    ) {
+      try {
+        applyVideoSeek(video, localTarget);
+        return;
+      } catch {
+        /* restart the transcode at the requested movie time */
+      }
+    }
+
     seekingRef.current = true;
     pendingSeekRef.current = null;
+    setBuffering(true);
     originRef.current = absolute;
     packRestartRef.current = true;
     remember(absolute);
@@ -939,9 +920,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       await retarget({ startSeconds: absolute });
     } catch (reason) {
       packRestartRef.current = false;
-      originRef.current = origin;
-      seekHold.current = null;
-      setCurrent(origin + video.currentTime);
+      originRef.current = previousOrigin;
+      setCurrent(beforeSeek);
       setError(reason instanceof Error ? reason.message : "Could not seek.");
     } finally {
       seekingRef.current = false;
@@ -1056,11 +1036,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   const shown = scrub ?? current;
 
-  function commitSeek(target: number) {
+  function commitSeek(ratio: number) {
     setScrub(null);
     skipAt.current = null;
-    void seekTo(target);
+    const movie = sessionRef.current?.durationSeconds ?? duration;
+    if (movie <= 0) return;
+    const clamped = Math.min(1, Math.max(0, ratio));
+    void seekTo(movie * clamped);
   }
+
   const pipSupported = typeof document !== "undefined" && (document.pictureInPictureEnabled || appleMobile());
   const preparing = !error && session?.status !== "ready";
   const playBusy = !error && (preparing || buffering || starting);
