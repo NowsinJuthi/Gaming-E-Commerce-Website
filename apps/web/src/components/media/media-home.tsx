@@ -210,7 +210,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
           {movies.length > 0 ? (
             <section className={styles.catalogSection} aria-labelledby="media-movies-heading">
               <h2 id="media-movies-heading" className={styles.sectionHeading}>
-                Movies <span className={styles.sectionCount}>{movies.length}</span>
+                Movies
               </h2>
               <TitleGrid items={movies} onSelect={setInfo} />
             </section>
@@ -218,7 +218,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
           {series.length > 0 ? (
             <section className={styles.catalogSection} aria-labelledby="media-series-heading">
               <h2 id="media-series-heading" className={styles.sectionHeading}>
-                Series <span className={styles.sectionCount}>{series.length}</span>
+                Series
               </h2>
               <TitleGrid items={series} onSelect={setInfo} />
             </section>
