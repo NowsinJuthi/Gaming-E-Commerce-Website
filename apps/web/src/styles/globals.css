@@ -17017,7 +17017,7 @@
     position: absolute;
     top: -0.3rem;
     right: -0.3rem;
-    z-index: 6;
+    z-index: 30;
     width: 1.55rem;
     height: 1.55rem;
     border-radius: 9999px;
@@ -17030,7 +17030,7 @@
     position: absolute;
     top: -0.15rem;
     right: -0.15rem;
-    z-index: 7;
+    z-index: 31;
     min-width: 1.4rem;
     height: 1.4rem;
     padding: 0 0.34rem;

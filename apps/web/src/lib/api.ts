@@ -5428,6 +5428,10 @@ export interface ChatAdminOverview {
   transport: string;
 }
 
+export function getStaffChatUnreadCount(): Promise<{ count: number }> {
+  return authRequest<{ count: number }>("/chat/unread-customer-count");
+}
+
 export function listChatRooms(
   page = 1,
   limit = 50,

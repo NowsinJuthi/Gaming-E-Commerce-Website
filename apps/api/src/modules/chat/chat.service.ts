@@ -921,6 +921,24 @@ export class ChatService {
     });
   }
 
+  /** Rooms on the staff inbox that still have a customer message nobody on staff has read. */
+  async countUnreadCustomerRooms(): Promise<number> {
+    const rooms = await this.roomModel
+      .find({
+        type: ChatRoomType.Support,
+        status: ChatRoomStatus.Open,
+      })
+      .sort({ lastMessageAt: -1, updatedAt: -1 })
+      .limit(300)
+      .select('_id')
+      .lean()
+      .exec();
+    const unread = await this.findRoomsWithUnreadCustomerMessages(
+      rooms.map((room) => room._id as Types.ObjectId),
+    );
+    return unread.size;
+  }
+
   async adminOverview(): Promise<{
     openRooms: number;
     closedRooms: number;

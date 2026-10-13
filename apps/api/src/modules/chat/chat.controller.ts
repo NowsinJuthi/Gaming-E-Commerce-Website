@@ -242,6 +242,14 @@ export class ChatController {
 
   @UseGuards(RolesGuard)
   @Roles(...CHAT_STAFF_ROLES)
+  @Get('unread-customer-count')
+  async unreadCustomerCount() {
+    const count = await this.chat.countUnreadCustomerRooms();
+    return { count };
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(...CHAT_STAFF_ROLES)
   @Get('online')
   online() {
     return this.presence.listOnline();

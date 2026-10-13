@@ -14,6 +14,7 @@ import { SupportTeamAvatar } from "@/components/chat/ChatRoomAvatar";
 import { useLiveChatIconAlerts } from "@/hooks/useStaffChatAlerts";
 import {
   notifyUnreadCountChanged,
+  useStaffChatUnreadCount,
   useUnreadNotifications,
 } from "@/hooks/useUnreadNotifications";
 import {
@@ -82,11 +83,21 @@ export function LiveChatLauncher({
   useEffect(() => {
     setMounted(true);
     syncRole();
+    let cancelled = false;
+    if (hasAuthSession() && !isChatStaffFromRoles(getSessionRoles())) {
+      getMe()
+        .then((me) => {
+          if (cancelled) return;
+          if (isChatStaffFromRoles(me.roles ?? [])) setRole("staff");
+        })
+        .catch(() => undefined);
+    }
     // Lets other pages (e.g. /contact) open the chat overlay programmatically.
     const openFromEvent = () => setOpen(true);
     window.addEventListener("auth-change", syncRole);
     window.addEventListener("live-chat:open", openFromEvent);
     return () => {
+      cancelled = true;
       window.removeEventListener("auth-change", syncRole);
       window.removeEventListener("live-chat:open", openFromEvent);
     };
@@ -94,11 +105,13 @@ export function LiveChatLauncher({
 
   const chatAllowed = canAccessLiveChat(allowGuestChat);
 
-  const unread = useUnreadNotifications(
-    chatAllowed && role !== "guest",
-    role === "staff" ? "staff" : "customer",
+  const staffUnread = useStaffChatUnreadCount(chatAllowed && role === "staff");
+  const customerUnread = useUnreadNotifications(
+    chatAllowed && role === "customer",
+    "customer",
     true,
   );
+  const unread = role === "staff" ? staffUnread : customerUnread;
 
   const hidden = isLauncherHidden(pathname);
 
@@ -107,6 +120,7 @@ export function LiveChatLauncher({
     alertOn: role === "staff" ? "customer" : "staff",
     chatOpen: open,
     playSound: true,
+    bumpUnread: role === "staff",
   });
 
   useEffect(() => {

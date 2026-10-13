@@ -6,7 +6,10 @@ import { usePathname } from "next/navigation";
 import { acquireChatSocket, releaseChatSocket } from "@/lib/chat-socket";
 import { isChatStaffRole } from "@/lib/chat-roles";
 import { playChatNotificationSound } from "@/lib/chat-notification-sound";
-import { notifyUnreadCountChanged } from "@/hooks/useUnreadNotifications";
+import {
+  bumpStaffChatUnread,
+  notifyUnreadCountChanged,
+} from "@/hooks/useUnreadNotifications";
 
 type ChatIconAlertSide = "customer" | "staff";
 
@@ -19,15 +22,25 @@ export function useLiveChatIconAlerts(options: {
   alertOn: ChatIconAlertSide;
   chatOpen?: boolean;
   playSound?: boolean;
+  bumpUnread?: boolean;
 }) {
-  const { enabled = true, alertOn, chatOpen = false, playSound = false } = options;
+  const {
+    enabled = true,
+    alertOn,
+    chatOpen = false,
+    playSound = false,
+    bumpUnread = false,
+  } = options;
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   const chatOpenRef = useRef(chatOpen);
   const playSoundRef = useRef(playSound);
+  const bumpUnreadRef = useRef(bumpUnread);
+  const seenMessageIdsRef = useRef(new Set<string>());
   pathnameRef.current = pathname;
   chatOpenRef.current = chatOpen;
   playSoundRef.current = playSound;
+  bumpUnreadRef.current = bumpUnread;
 
   useEffect(() => {
     if (!enabled || !hasAuthSession()) return;
@@ -46,12 +59,24 @@ export function useLiveChatIconAlerts(options: {
       }
     };
 
-    const onMessage = (msg: { senderRole?: string }) => {
+    const onMessage = (msg: { id?: string; senderRole?: string }) => {
+      const messageId = msg.id?.trim();
+      if (messageId) {
+        if (seenMessageIdsRef.current.has(messageId)) return;
+        seenMessageIdsRef.current.add(messageId);
+        if (seenMessageIdsRef.current.size > 200) {
+          const first = seenMessageIdsRef.current.values().next().value;
+          if (first) seenMessageIdsRef.current.delete(first);
+        }
+      }
       const fromStaff = isChatStaffRole(msg.senderRole);
       if (alertOn === "customer" && fromStaff) return;
       if (alertOn === "staff" && !fromStaff) return;
       const path = pathnameRef.current;
       if (path?.startsWith("/admin/chat") || path === "/chat") return;
+      if (bumpUnreadRef.current && !fromStaff) {
+        bumpStaffChatUnread();
+      }
       if (playSoundRef.current && !chatOpenRef.current) {
         playChatNotificationSound();
       }
