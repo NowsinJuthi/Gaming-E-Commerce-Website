@@ -1,7 +1,8 @@
 import { ChildProcess, spawn } from 'child_process';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { join, resolve, sep } from 'path';
 import {
   Injectable,
@@ -17,7 +18,7 @@ import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media
 import { SmbServer, SmbServerDocument } from '../../database/schemas/smb-server.schema';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { resolveUploadsRoot } from '../../shared/uploads/uploads-root';
-import { SmbAuth, SmbClientService, SmbListedEntry } from './smb-client.service';
+import { SmbAuth, SmbClientService, SmbListedEntry, type SmbPlayback } from './smb-client.service';
 
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
@@ -71,6 +72,7 @@ type Session = {
   complete: boolean;
   dir: string;
   cacheName: string | null;
+  remote: SmbPlayback | null;
   ffmpeg: ChildProcess | null;
   touchedAt: number;
 };
@@ -79,8 +81,9 @@ type Session = {
 export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MediaPlaybackService.name);
   private readonly sessions = new Map<string, Session>();
-  private readonly downloads = new Map<string, Promise<string>>();
   private sweepTimer: NodeJS.Timeout | null = null;
+  private mediaServer: Server | null = null;
+  private mediaPort = 0;
 
   constructor(
     @InjectModel(CatalogTitle.name)
@@ -94,13 +97,21 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
+    this.mediaServer = createServer((req, res) => {
+      void this.serveRemote(req, res);
+    });
+    this.mediaServer.listen(0, '127.0.0.1');
     this.sweepTimer = setInterval(() => void this.sweep(), 10 * 60 * 1000);
     this.sweepTimer.unref?.();
   }
 
   onModuleDestroy() {
     if (this.sweepTimer) clearInterval(this.sweepTimer);
-    for (const session of this.sessions.values()) this.stopFfmpeg(session);
+    for (const session of this.sessions.values()) {
+      this.stopFfmpeg(session);
+      session.remote?.close();
+    }
+    this.mediaServer?.close();
   }
 
   async start(titleId: string, request: PlaybackRequest) {
@@ -240,6 +251,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       complete: false,
       dir,
       cacheName: null,
+      remote: null,
       ffmpeg: null,
       touchedAt: Date.now(),
     };
@@ -275,56 +287,117 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     }
     if (!session.auth) throw new Error('This library is not connected to storage.');
     const cacheDir = join(resolveUploadsRoot(), 'playback-cache');
-    await mkdir(cacheDir, { recursive: true });
     const cacheName = `${createHash('sha1').update(`${session.auth.host}|${session.auth.share}|${episode.remotePath}`).digest('hex')}.bin`;
     const finalPath = join(cacheDir, cacheName);
-    const partPath = `${finalPath}.part`;
-    session.cacheName = cacheName;
     const ready = await this.cachedSize(finalPath, episode.sizeBytes);
     if (ready) {
+      session.remote?.close();
+      session.remote = null;
+      session.cacheName = cacheName;
       session.downloaded = ready;
       return finalPath;
     }
-    session.message = 'Copying the video from storage…';
-    const job = this.downloads.get(finalPath) ?? this.startDownload(session.auth, episode.remotePath, partPath, finalPath);
-    this.downloads.set(finalPath, job);
-    const timer = setInterval(() => {
-      if (session.token !== token) return;
-      void stat(partPath)
-        .then((info) => {
-          session.downloaded = info.size;
-          const total = session.fileSize ?? 0;
-          const percent = total > 0 ? Math.min(99, Math.round((info.size / total) * 100)) : null;
-          session.message = percent == null
-            ? 'Copying the video from storage…'
-            : `Copying the video from storage… ${percent}%`;
-        })
-        .catch(() => undefined);
-    }, 700);
-    try {
-      await job;
-    } finally {
-      clearInterval(timer);
-      if (this.downloads.get(finalPath) === job) this.downloads.delete(finalPath);
+    if (session.remote && session.cacheName === cacheName) {
+      const port = await this.readyPort();
+      return `http://127.0.0.1:${port}/${session.id}`;
     }
-    if (session.token !== token) return finalPath;
-    const size = await this.cachedSize(finalPath, null);
-    session.downloaded = size ?? session.fileSize ?? 0;
-    void this.pruneCache(cacheDir);
-    return finalPath;
+    await rm(`${finalPath}.part`, { force: true }).catch(() => undefined);
+    session.message = 'Starting playback…';
+    session.cacheName = cacheName;
+    session.remote?.close();
+    const playback = await this.smb.openPlayback(session.auth, episode.remotePath);
+    if (session.token !== token) {
+      playback.close();
+      return finalPath;
+    }
+    session.remote = playback;
+    session.fileSize = playback.size;
+    const port = await this.readyPort();
+    return `http://127.0.0.1:${port}/${session.id}`;
   }
 
-  private startDownload(auth: SmbAuth, remotePath: string, partPath: string, finalPath: string): Promise<string> {
-    const job = (async () => {
-      await rm(partPath, { force: true }).catch(() => undefined);
-      await this.smb.downloadFile(auth, remotePath, partPath);
-      await rename(partPath, finalPath);
-      return finalPath;
-    })().catch(async (error) => {
-      await rm(partPath, { force: true }).catch(() => undefined);
-      throw error;
+  private async serveRemote(req: IncomingMessage, res: ServerResponse) {
+    const id = (req.url ?? '').split('?')[0]?.replace(/^\//, '') ?? '';
+    const remote = id ? this.sessions.get(id)?.remote : null;
+    if (!remote) {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    const size = remote.size;
+    const range = req.headers.range;
+    let start = 0;
+    let end = Math.max(0, size - 1);
+    if (range?.startsWith('bytes=')) {
+      const piece = range.slice('bytes='.length).split(',')[0] ?? '';
+      const [rawStart, rawEnd] = piece.split('-');
+      if (!rawStart) {
+        const suffix = Number(rawEnd);
+        if (Number.isFinite(suffix)) start = Math.max(0, size - suffix);
+      } else {
+        start = Number(rawStart);
+        if (rawEnd) end = Number(rawEnd);
+      }
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= size || end < start) {
+      res.statusCode = 416;
+      res.setHeader('Content-Range', `bytes */${size}`);
+      res.end();
+      return;
+    }
+    end = Math.min(end, size - 1);
+    res.statusCode = range ? 206 : 200;
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', String(end - start + 1));
+    if (range) res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+    try {
+      const stream = await remote.read(start, end);
+      req.on('close', () => {
+        if (!res.writableEnded) stream.destroy();
+      });
+      stream.on('error', () => {
+        stream.destroy();
+        if (!res.headersSent) res.statusCode = 500;
+        res.end();
+      });
+      stream.pipe(res);
+    } catch (error) {
+      this.logger.warn(`Storage read failed: ${error instanceof Error ? error.message : error}`);
+      if (!res.headersSent) res.statusCode = 500;
+      res.end();
+    }
+  }
+
+  private readyPort(): Promise<number> {
+    if (this.mediaPort > 0) return Promise.resolve(this.mediaPort);
+    const server = this.mediaServer;
+    if (!server) return Promise.reject(new Error('Playback server is not running.'));
+    if (server.listening) {
+      const current = server.address();
+      if (current && typeof current === 'object' && current.port) {
+        this.mediaPort = current.port;
+        return Promise.resolve(current.port);
+      }
+    }
+    return new Promise((resolvePort, reject) => {
+      const timer = setTimeout(() => reject(new Error('Playback server did not start.')), 5000);
+      server.once('listening', () => {
+        clearTimeout(timer);
+        const address = server.address();
+        const port = address && typeof address === 'object' ? address.port : 0;
+        if (!port) {
+          reject(new Error('Playback server did not start.'));
+          return;
+        }
+        this.mediaPort = port;
+        resolvePort(port);
+      });
     });
-    return job;
   }
 
   private async cachedSize(file: string, expected: number | null): Promise<number | null> {
@@ -394,6 +467,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       ...(session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
+      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
       '-i', file,
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
@@ -668,6 +742,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     for (const [id, session] of this.sessions) {
       if (now - session.touchedAt < 3 * 60 * 60 * 1000) continue;
       this.stopFfmpeg(session);
+      session.remote?.close();
+      session.remote = null;
       this.sessions.delete(id);
       await rm(session.dir, { recursive: true, force: true }).catch(() => undefined);
     }

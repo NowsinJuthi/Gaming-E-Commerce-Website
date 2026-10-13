@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'child_process';
 import { unlink } from 'fs/promises';
+import type { Readable } from 'stream';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -19,6 +20,21 @@ export type SmbListedEntry = {
   path: string;
   isDirectory: boolean;
   sizeBytes: number | null;
+};
+
+export type SmbPlayback = {
+  size: number;
+  read: (start: number, end: number) => Promise<Readable>;
+  close: () => void;
+};
+
+type SmbStreamClient = {
+  getSize: (path: string) => Promise<number>;
+  createReadStream: (
+    path: string,
+    options?: { start?: number; end?: number },
+  ) => Promise<Readable & { fileSize?: number }>;
+  disconnect: () => void;
 };
 
 type Smb2Client = {
@@ -102,6 +118,34 @@ export class SmbClientService {
     const message = this.formatLinuxSmbError(lastError);
     const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
     throw new Error(`${message}${shareHint}`);
+  }
+
+  /** Open a file on the share for ranged reads. Does not copy the file onto this server. */
+  async openPlayback(auth: SmbAuth, remoteFile: string): Promise<SmbPlayback> {
+    const remote = remoteFile.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\//g, '\\');
+    if (!remote || remote.split('\\').some((part) => !part || part === '.' || part === '..')) {
+      throw new Error('That file path is not allowed.');
+    }
+    const attempts = this.authAttempts(auth);
+    let lastError: unknown;
+    for (const attempt of attempts) {
+      try {
+        return await this.openOnShare(attempt, remote);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    const shares = await this.listDiskShares(attempts[0] ?? auth).catch(() => [] as string[]);
+    const known = auth.share.trim().toLowerCase();
+    for (const share of shares) {
+      if (share.toLowerCase() === known) continue;
+      try {
+        return await this.openOnShare({ ...(attempts[0] ?? auth), share }, remote);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw new Error(this.formatLinuxSmbError(lastError));
   }
 
   async list(auth: SmbAuth, remotePath = ''): Promise<SmbListedEntry[]> {
@@ -406,6 +450,84 @@ export class SmbClientService {
     return value
       .replace(/--password=\S+/gi, '--password=***')
       .replace(/password=[^\s]+/gi, 'password=***');
+  }
+
+  private async openOnShare(auth: SmbAuth, remoteFile: string): Promise<SmbPlayback> {
+    const client = await this.createStreamClient(auth);
+    try {
+      const size = await client.getSize(remoteFile);
+      if (!Number.isFinite(size) || size <= 0) {
+        client.disconnect();
+        throw new Error('The video file is empty.');
+      }
+      return {
+        size,
+        read: (start, end) => {
+          const from = Math.max(0, Math.floor(start));
+          const to = Math.max(from, Math.floor(end));
+          return client.createReadStream(remoteFile, { start: from, end: to });
+        },
+        close: () => {
+          try {
+            client.disconnect();
+          } catch {
+            /* already closed */
+          }
+        },
+      };
+    } catch (error) {
+      try {
+        client.disconnect();
+      } catch {
+        /* already closed */
+      }
+      throw error;
+    }
+  }
+
+  private async createStreamClient(auth: SmbAuth): Promise<SmbStreamClient> {
+    const SMB2 = await this.loadSmb2();
+    const domain = auth.domain?.trim() ? auth.domain.trim() : 'WORKGROUP';
+    return new SMB2({
+      share: `\\\\${auth.host}\\${auth.share.trim()}`,
+      domain: domain || '.',
+      username: auth.username,
+      password: auth.password,
+      port: auth.port ?? 445,
+      autoCloseTimeout: 0,
+      packetConcurrency: 8,
+    }) as unknown as SmbStreamClient;
+  }
+
+  private async loadSmb2(): Promise<
+    new (options: {
+      share: string;
+      domain: string;
+      username: string;
+      password: string;
+      port?: number;
+      autoCloseTimeout?: number;
+      packetConcurrency?: number;
+    }) => SmbStreamClient
+  > {
+    try {
+      const mod = (await import('@marsaud/smb2')) as unknown as {
+        default?: new (options: {
+          share: string;
+          domain: string;
+          username: string;
+          password: string;
+          port?: number;
+          autoCloseTimeout?: number;
+          packetConcurrency?: number;
+        }) => SmbStreamClient;
+      };
+      if (!mod.default) throw new Error('Samba client module did not export a constructor.');
+      return mod.default;
+    } catch (error) {
+      if (error instanceof Error && /did not export/.test(error.message)) throw error;
+      throw new Error('Samba client is not installed. Run pnpm --filter @uniqbd/api add @marsaud/smb2');
+    }
   }
 
   private async createClient(auth: SmbAuth): Promise<Smb2Client> {
