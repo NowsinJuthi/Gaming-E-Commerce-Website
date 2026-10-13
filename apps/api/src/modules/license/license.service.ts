@@ -638,8 +638,6 @@ export class LicenseService implements OnModuleInit {
 
       installationId: doc.installationId.trim(),
 
-      websiteId: this.resolveWebsiteId(doc) || undefined,
-
       siteSecret,
 
       cachePath: this.cachePath(),
@@ -744,7 +742,7 @@ export class LicenseService implements OnModuleInit {
 
         apiUrl: 'https://license.amarpin.com/api',
 
-        productId: 'amarpin-pro',
+        productId: '',
 
         websiteId: '',
 
@@ -899,38 +897,6 @@ export class LicenseService implements OnModuleInit {
     }
 
     return this.normalizeApiUrl('https://license.amarpin.com/api');
-
-  }
-
-
-
-  private resolveProductId(doc?: LicenseSettingsDocument): string {
-
-    return (
-
-      getLicenseVendorConfig().productId?.trim() ||
-
-      doc?.productId?.trim() ||
-
-      'amarpin-pro'
-
-    );
-
-  }
-
-
-
-  private resolveWebsiteId(doc?: LicenseSettingsDocument): string {
-
-    return (
-
-      getLicenseVendorConfig().websiteId?.trim() ||
-
-      doc?.websiteId?.trim() ||
-
-      ''
-
-    );
 
   }
 

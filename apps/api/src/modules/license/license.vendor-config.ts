@@ -1,7 +1,9 @@
+import { createDecipheriv, createHash } from 'node:crypto';
+
 /**
- * Server-only vendor credentials (never exposed in admin UI or API responses).
- * Set LICENSE_* in apps/api/.env on production. Legacy MongoDB siteSecret
- * is read only when env is unset.
+ * Server-only vendor credentials. The API address and website secret are
+ * stored sealed in this file. Activation uses the admin license key plus
+ * these two values. Product id is not part of the check.
  */
 export type LicenseVendorConfig = {
   apiUrl: string;
@@ -10,18 +12,43 @@ export type LicenseVendorConfig = {
   siteSecret: string;
 };
 
+const SEALED_API_URL =
+  'gm1JVxVoKa3sVKCE1BTGNwz2uLtt1tk8cRGISMGwSag3JuxDI4FTaXU2LvdN67T15XBERgSqTfJ0k1M=';
+const SEALED_SITE_SECRET =
+  'W8sqJcG5YxZfEmCXF6Bgr3sBUX/FIfaf4kblielpkwK630/bvkoeTGZBONw6ZDA7gGG7A+8Ze01MvvpJ4C4SJ2Yl77nwI32b';
+
 export function getLicenseVendorConfig(): LicenseVendorConfig {
   return {
     apiUrl:
-      process.env.LICENSE_API_URL?.trim() || 'https://license.amarpin.com/api',
-    productId: process.env.LICENSE_PRODUCT_ID?.trim() || 'amarpin-pro',
-    websiteId: process.env.LICENSE_WEBSITE_ID?.trim() || '',
-    siteSecret: process.env.LICENSE_SITE_SECRET?.trim() || '',
+      process.env.LICENSE_API_URL?.trim() ||
+      openSeal(SEALED_API_URL) ||
+      'https://license.amarpin.com/api',
+    productId: '',
+    websiteId: '',
+    siteSecret:
+      process.env.LICENSE_SITE_SECRET?.trim() || openSeal(SEALED_SITE_SECRET),
   };
 }
 
 export function isLicenseVendorReady(
   config: LicenseVendorConfig = getLicenseVendorConfig(),
 ): boolean {
-  return Boolean(config.siteSecret?.trim());
+  return Boolean(config.apiUrl?.trim() && config.siteSecret?.trim());
+}
+
+function openSeal(packed: string): string {
+  try {
+    const key = createHash('sha256').update('uniqbd-license-vendor-v1').digest();
+    const bytes = Buffer.from(packed, 'base64');
+    const iv = bytes.subarray(0, 12);
+    const tag = bytes.subarray(12, 28);
+    const ciphertext = bytes.subarray(28);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+      .toString('utf8')
+      .trim();
+  } catch {
+    return '';
+  }
 }
