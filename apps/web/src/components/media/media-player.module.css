@@ -302,12 +302,49 @@
   align-items: center;
 }
 
-.seek input {
+.seekTrack {
+  --seek: 0%;
+  position: relative;
   width: 100%;
   height: 1.15rem;
-  accent-color: #fff;
   cursor: pointer;
   touch-action: none;
+  user-select: none;
+}
+
+.seekTrackBar {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.28);
+}
+
+.seekTrackFill {
+  width: var(--seek);
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+}
+
+.seekTrackThumb {
+  position: absolute;
+  top: 50%;
+  left: var(--seek);
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+
+.seekTrackTeal .seekTrackFill,
+.seekTrackTeal .seekTrackThumb {
+  background: #26bfb0;
 }
 
 .qualityTag {
@@ -1007,12 +1044,9 @@
   text-align: right;
 }
 
-.mSeekRow input {
+.mSeekRow .seekTrack {
   min-width: 0;
   flex: 1;
-  height: 1.15rem;
-  accent-color: #26bfb0;
-  touch-action: none;
 }
 
 @media (min-width: 769px) {

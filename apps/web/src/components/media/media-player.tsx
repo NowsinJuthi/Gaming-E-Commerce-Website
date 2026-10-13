@@ -116,6 +116,131 @@ function volumeReadOnly(): boolean {
   return probe.volume === before;
 }
 
+/** 0 at the start of the bar, 1 at the end, including a CSS-rotated phone player. */
+function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number): number {
+  let angle = 0;
+  if (typeof DOMMatrixReadOnly === "function") {
+    for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+      const transform = window.getComputedStyle(node).transform;
+      if (!transform || transform === "none") continue;
+      try {
+        const matrix = new DOMMatrixReadOnly(transform);
+        angle += Math.atan2(matrix.b, matrix.a);
+      } catch {
+        /* ignore a transform the browser cannot parse */
+      }
+    }
+  }
+  const rect = el.getBoundingClientRect();
+  const dx = clientX - (rect.left + rect.width / 2);
+  const dy = clientY - (rect.top + rect.height / 2);
+  const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
+  const width = el.offsetWidth || rect.width || 1;
+  return Math.min(1, Math.max(0, localX / width + 0.5));
+}
+
+function localTimeBuffered(video: HTMLVideoElement, local: number): boolean {
+  const ranges = video.buffered;
+  for (let i = 0; i < ranges.length; i += 1) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (local >= start - 0.35 && local <= end + 1.5) return true;
+  }
+  return false;
+}
+
+function SeekTrack({
+  value,
+  max,
+  teal = false,
+  onScrub,
+  onCommit,
+}: {
+  value: number;
+  max: number;
+  teal?: boolean;
+  onScrub: (seconds: number) => void;
+  onCommit: (seconds: number) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragId = useRef<number | null>(null);
+  const limit = Math.max(max, 1);
+  const ratio = Math.min(1, Math.max(0, value / limit));
+
+  function secondsFrom(clientX: number, clientY: number) {
+    const el = trackRef.current;
+    if (!el) return 0;
+    return Math.round(sliderRatioFromClient(el, clientX, clientY) * limit);
+  }
+
+  function finish(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragId.current !== event.pointerId) return;
+    dragId.current = null;
+    onCommit(secondsFrom(event.clientX, event.clientY));
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      className={`${styles.seekTrack} ${teal ? styles.seekTrackTeal : ""}`}
+      role="slider"
+      tabIndex={0}
+      aria-label="Seek"
+      aria-valuemin={0}
+      aria-valuemax={Math.floor(limit)}
+      aria-valuenow={Math.min(Math.floor(value), Math.floor(limit))}
+      dir="ltr"
+      style={{ "--seek": `${ratio * 100}%` } as React.CSSProperties}
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragId.current = event.pointerId;
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          /* the bar still tracks the pointer while it stays over the track */
+        }
+        onScrub(secondsFrom(event.clientX, event.clientY));
+      }}
+      onPointerMove={(event) => {
+        if (dragId.current !== event.pointerId) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onScrub(secondsFrom(event.clientX, event.clientY));
+      }}
+      onPointerUp={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event);
+      }}
+      onPointerCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event);
+      }}
+      onKeyDown={(event) => {
+        const step = event.shiftKey ? 30 : 5;
+        if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+          event.preventDefault();
+          event.stopPropagation();
+          onCommit(Math.min(limit, value + step));
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+          event.preventDefault();
+          event.stopPropagation();
+          onCommit(Math.max(0, value - step));
+        }
+      }}
+    >
+      <div className={styles.seekTrackBar}>
+        <div className={styles.seekTrackFill} />
+      </div>
+      <div className={styles.seekTrackThumb} />
+    </div>
+  );
+}
+
 function Icon({ d, filled = false }: { d: string; filled?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={filled ? styles.filled : undefined}>
@@ -266,6 +391,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const lastTap = useRef<{ zone: string; at: number } | null>(null);
   const zoneTimer = useRef<number | null>(null);
   const skipAt = useRef<number | null>(null);
+  const seekHold = useRef<number | null>(null);
+  const seekHoldTimer = useRef<number | null>(null);
   const [session, setSession] = useState<PlaybackSession | null>(null);
   const [bootId, setBootId] = useState(0);
   const [error, setError] = useState("");
@@ -506,6 +633,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const onTime = () => {
       const start = sessionRef.current?.startSeconds ?? 0;
       const mediaTime = start + video.currentTime;
+      if (seekHold.current != null) {
+        if (Math.abs(mediaTime - seekHold.current) > 2) return;
+        seekHold.current = null;
+      }
       setCurrent(mediaTime);
       const known = sessionRef.current?.durationSeconds ?? 0;
       setDuration(known > 0 ? known : start + (Number.isFinite(video.duration) ? video.duration : 0));
@@ -564,6 +695,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   useEffect(() => () => {
     if (startTimer.current) window.clearTimeout(startTimer.current);
     if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+    if (seekHoldTimer.current) window.clearTimeout(seekHoldTimer.current);
   }, []);
 
   useEffect(() => {
@@ -597,7 +729,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.closest("[role='slider']"))) return;
       if (event.key === " " || event.key.toLowerCase() === "k") {
         event.preventDefault();
         togglePlay();
@@ -687,21 +819,41 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     reveal();
   }
 
+  function holdSeek(absolute: number) {
+    seekHold.current = absolute;
+    if (seekHoldTimer.current) window.clearTimeout(seekHoldTimer.current);
+    seekHoldTimer.current = window.setTimeout(() => {
+      if (seekHold.current === absolute) seekHold.current = null;
+    }, 8000);
+  }
+
   async function seekTo(target: number) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
+    const movie = currentSession.durationSeconds;
+    let absolute = Math.max(0, target);
+    if (movie > 0) absolute = Math.min(absolute, movie);
     const start = currentSession.startSeconds;
-    const end = video.seekable.length > 0 ? video.seekable.end(video.seekable.length - 1) : video.currentTime;
-    if (target >= start && target <= start + end + 1.5) {
-      video.currentTime = Math.max(0, target - start);
-      setCurrent(target);
-      return;
+    const local = Math.max(0, absolute - start);
+    holdSeek(absolute);
+    setCurrent(absolute);
+    // A live HLS event playlist reports a seekable range that is not the movie.
+    // Setting currentTime outside the buffer snaps to the live edge, so a forward
+    // drag jumps backward and a backward drag jumps forward. Restart from that time.
+    if (absolute + 0.4 >= start && localTimeBuffered(video, local)) {
+      try {
+        video.currentTime = local;
+        return;
+      } catch {
+        /* restart the transcode at the requested time */
+      }
     }
-    remember(target);
+    remember(absolute);
     try {
-      await retarget({ startSeconds: target });
+      await retarget({ startSeconds: absolute });
     } catch (reason) {
+      seekHold.current = null;
       setError(reason instanceof Error ? reason.message : "Could not seek.");
     }
   }
@@ -811,32 +963,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   const shown = scrub ?? current;
 
-  function timeFromSeekPointer(event: React.PointerEvent<HTMLInputElement>): number {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const max = Math.max(duration, 1);
-    const rotated = immersive && portrait;
-    const span = Math.max(1, rotated ? rect.height : rect.width);
-    const ratio = rotated ? (event.clientY - rect.top) / span : (event.clientX - rect.left) / span;
-    return Math.round(Math.min(1, Math.max(0, ratio)) * max);
-  }
-
-  function onSeekPointerDown(event: React.PointerEvent<HTMLInputElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setScrub(timeFromSeekPointer(event));
-  }
-
-  function onSeekPointerMove(event: React.PointerEvent<HTMLInputElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    setScrub(timeFromSeekPointer(event));
-  }
-
-  function onSeekPointerUp(event: React.PointerEvent<HTMLInputElement>) {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    const target = timeFromSeekPointer(event);
+  function commitSeek(target: number) {
     setScrub(null);
     skipAt.current = null;
     void seekTo(target);
@@ -1042,18 +1169,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               </div>
             </div>
             <div className={styles.seek}>
-              <input
-                aria-label="Seek"
-                type="range"
-                min={0}
-                max={Math.max(duration, 1)}
-                step={1}
-                value={Math.min(shown, Math.max(duration, 1))}
-                onChange={() => undefined}
-                onPointerDown={onSeekPointerDown}
-                onPointerMove={onSeekPointerMove}
-                onPointerUp={onSeekPointerUp}
-                onPointerCancel={onSeekPointerUp}
+              <SeekTrack
+                value={shown}
+                max={duration}
+                onScrub={setScrub}
+                onCommit={commitSeek}
               />
             </div>
             <div className={styles.transport}>
@@ -1140,18 +1260,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
             </div>
             <div className={styles.mSeekRow}>
               <span>{formatTime(shown)}</span>
-              <input
-                aria-label="Seek"
-                type="range"
-                min={0}
-                max={Math.max(duration, 1)}
-                step={1}
-                value={Math.min(shown, Math.max(duration, 1))}
-                onChange={() => undefined}
-                onPointerDown={onSeekPointerDown}
-                onPointerMove={onSeekPointerMove}
-                onPointerUp={onSeekPointerUp}
-                onPointerCancel={onSeekPointerUp}
+              <SeekTrack
+                teal
+                value={shown}
+                max={duration}
+                onScrub={setScrub}
+                onCommit={commitSeek}
               />
               <span className={styles.mDuration}>{duration > 0 ? formatTime(duration) : "--:--"}</span>
             </div>
