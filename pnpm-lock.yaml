@@ -207,6 +207,9 @@ importers:
       '@uniqbd/types':
         specifier: workspace:*
         version: link:../../packages/types
+      hls.js:
+        specifier: ^1.7.3
+        version: 1.7.3
       next:
         specifier: ^15.5.27
         version: 15.5.27(@babel/core@7.29.7)(@types/node@22.19.20)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -2558,6 +2561,9 @@ packages:
 
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
+
+  hls.js@1.7.3:
+    resolution: {integrity: sha512-MsPlx6yVW4Qv4C7mEVou4/gk/5cN2dVxOTnrNjPSmyH2f0Ln+/UkG10Ax1PE6OvrmTVPKgQYozTtBaPOuCzq7A==}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -6895,6 +6901,8 @@ snapshots:
   hermes-parser@0.25.1:
     dependencies:
       hermes-estree: 0.25.1
+
+  hls.js@1.7.3: {}
 
   html-escaper@2.0.2: {}
 

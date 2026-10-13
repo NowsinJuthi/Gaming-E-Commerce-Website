@@ -80,7 +80,7 @@ export function buildContentSecurityPolicy(nonce?: string): string {
       "https://www.gstatic.com",
       "https://www.recaptcha.net",
     ].join(" "),
-    "media-src 'self' blob: data:",
+    `media-src 'self' blob: data: ${apiOrigins.join(" ")}`.trim(),
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",

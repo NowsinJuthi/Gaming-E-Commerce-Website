@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -53,6 +53,36 @@ export class SmbClientService {
     } finally {
       client.close?.();
     }
+  }
+
+  /** Copy one share file onto the website server. The local path must already have a parent directory. */
+  async downloadFile(auth: SmbAuth, remoteFile: string, localFile: string): Promise<void> {
+    const remote = this.normalizeRemotePath(remoteFile);
+    if (!remote || remote.includes('"') || localFile.includes('"')) {
+      throw new Error('That file path is not allowed.');
+    }
+    const attempts = this.authAttempts(auth);
+    let lastError: unknown;
+    for (const attempt of attempts) {
+      try {
+        await this.spawnGet(attempt, remote, localFile, 'SMB3');
+        return;
+      } catch (error) {
+        lastError = error;
+        const raw = this.execText(error);
+        if (this.isUnreachable(raw)) break;
+        if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
+          try {
+            await this.spawnGet(attempt, remote, localFile, 'SMB2');
+            return;
+          } catch (smb2Error) {
+            lastError = smb2Error;
+          }
+        }
+        if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
+      }
+    }
+    throw new Error(this.formatLinuxSmbError(lastError));
   }
 
   async list(auth: SmbAuth, remotePath = ''): Promise<SmbListedEntry[]> {
@@ -197,6 +227,47 @@ export class SmbClientService {
       maxBuffer: 4_000_000,
     });
     return stdout;
+  }
+
+  private spawnGet(
+    auth: SmbAuth,
+    remoteFile: string,
+    localFile: string,
+    protocol: 'SMB2' | 'SMB3',
+  ): Promise<void> {
+    const share = auth.share.trim().replace(/^[\\/]+|[\\/]+$/g, '');
+    const args = [
+      `//${auth.host}/${share}`,
+      '-U',
+      this.linuxUser(auth),
+      `--password=${auth.password}`,
+      '-p',
+      String(auth.port ?? 445),
+      '-m',
+      protocol,
+    ];
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      args.push('-W', domain);
+    }
+    args.push('-c', `get "${remoteFile}" "${localFile}"`);
+    return new Promise((resolve, reject) => {
+      const child = spawn('smbclient', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let output = '';
+      const collect = (chunk: Buffer) => {
+        output = `${output}${chunk.toString('utf8')}`.slice(-4000);
+      };
+      child.stdout?.on('data', collect);
+      child.stderr?.on('data', collect);
+      child.on('error', (error) => reject(error));
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(output || `smbclient exited ${code ?? 'unknown'}`));
+      });
+    });
   }
 
   private linuxUser(auth: SmbAuth): string {

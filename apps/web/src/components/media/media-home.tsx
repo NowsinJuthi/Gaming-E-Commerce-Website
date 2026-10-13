@@ -1,5 +1,7 @@
 "use client";
 
+import type { Route } from "next";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
@@ -228,7 +230,9 @@ function MovieInfo({
         <div className={styles.body}>
           {details?.overview ? <p className={styles.overview}>{details.overview}</p> : <p className={styles.overview}>Loading movie info…</p>}
           <div className={styles.actions}>
-            <span className={styles.play}>▶ Play</span>
+            <Link className={styles.play} href={`/media/watch/${card.id}` as Route}>
+              ▶ Play
+            </Link>
             <span className={styles.ghost}>+ My List</span>
             <span className={styles.ghost}>Mark watched</span>
           </div>

@@ -15,6 +15,8 @@ import { CatalogService } from './catalog.service';
 import { MediaOpsController } from './media-ops.controller';
 import { MediaOpsService } from './media-ops.service';
 import { LibraryIndexService } from './library-index.service';
+import { MediaPlaybackController } from './media-playback.controller';
+import { MediaPlaybackService } from './media-playback.service';
 import { SmbClientService } from './smb-client.service';
 import { TmdbMetadataService } from './tmdb-metadata.service';
 
@@ -27,7 +29,7 @@ import { TmdbMetadataService } from './tmdb-metadata.service';
     ]),
     CryptoModule,
   ],
-  controllers: [MediaOpsController, CatalogController],
-  providers: [MediaOpsService, SmbClientService, CatalogService, LibraryIndexService, TmdbMetadataService],
+  controllers: [MediaOpsController, CatalogController, MediaPlaybackController],
+  providers: [MediaOpsService, SmbClientService, CatalogService, LibraryIndexService, TmdbMetadataService, MediaPlaybackService],
 })
 export class MediaOpsModule {}

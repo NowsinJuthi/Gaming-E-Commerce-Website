@@ -15,6 +15,7 @@
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-devtools": "^5.101.0",
     "@uniqbd/types": "workspace:*",
+    "hls.js": "^1.7.3",
     "next": "^15.5.27",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

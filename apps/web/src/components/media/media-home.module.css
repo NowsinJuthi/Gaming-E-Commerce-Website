@@ -415,6 +415,7 @@
 .play {
   background: #26bfb0;
   color: #04211d;
+  text-decoration: none;
 }
 
 .ghost {
