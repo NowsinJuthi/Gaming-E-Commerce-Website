@@ -77,6 +77,9 @@ export class CatalogTitle {
   /** Stable id for a file or folder imported from a media library. */
   @Prop({ type: String })
   sourceKey?: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export type CatalogTitleDocument = HydratedDocument<CatalogTitle>;
