@@ -184,7 +184,7 @@ export class LibraryIndexService {
       kind,
       title: meta?.title || parsed.title,
       year: meta?.year || parsed.year || new Date().getFullYear(),
-      videoFileName: null,
+      videoFileName: folder.name,
       videoFileSizeBytes: null,
       posterUrl: meta?.posterUrl ?? null,
       seasonCount: null,

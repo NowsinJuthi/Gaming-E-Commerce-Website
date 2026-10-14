@@ -230,6 +230,11 @@
   color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
 }
 
+.titleFileLabel {
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
 .titleFileMuted {
   display: block;
   margin-top: 0.15rem;

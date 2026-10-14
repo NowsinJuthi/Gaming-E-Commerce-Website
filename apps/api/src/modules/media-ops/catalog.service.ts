@@ -21,6 +21,24 @@ function libraryIdFromSource(sourceKey?: string | null): string | null {
   return Types.ObjectId.isValid(id) ? id : null;
 }
 
+function seriesFolderNameFromSource(sourceKey?: string | null): string | null {
+  if (!sourceKey?.includes(':')) return null;
+  const path = sourceKey.split(':').slice(1).join(':').replace(/\\/g, '/');
+  const segment = path.split('/').filter(Boolean).pop()?.trim();
+  return segment || null;
+}
+
+function resolveOriginalFileName(doc: {
+  kind?: CatalogKind;
+  videoFileName?: string | null;
+  sourceKey?: string | null;
+}): string | null {
+  const stored = doc.videoFileName?.trim();
+  if (stored) return stored;
+  if (doc.kind === 'series') return seriesFolderNameFromSource(doc.sourceKey);
+  return null;
+}
+
 function serialize(doc: CatalogTitleDocument) {
   return {
     id: String(doc._id),
@@ -32,7 +50,7 @@ function serialize(doc: CatalogTitleDocument) {
     featured: doc.featured,
     trending: doc.trending,
     posterUrl: doc.posterUrl ?? null,
-    videoFileName: doc.videoFileName ?? null,
+    videoFileName: resolveOriginalFileName(doc),
     videoFileSizeBytes: doc.videoFileSizeBytes ?? null,
     seasonCount: doc.seasonCount ?? null,
   };

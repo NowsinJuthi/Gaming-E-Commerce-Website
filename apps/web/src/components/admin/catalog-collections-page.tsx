@@ -208,13 +208,22 @@ export function CatalogCollectionsPage({
                           <span className={styles.titleName}>{item.title}</span>
                           {item.videoFileName || item.videoFileSizeBytes != null ? (
                             <span className={styles.titleFile}>
-                              {item.videoFileName ?? "Video file"}
-                              {item.videoFileSizeBytes != null
+                              {showSeasons ? (
+                                <>
+                                  <span className={styles.titleFileLabel}>Original folder: </span>
+                                  {item.videoFileName ?? "—"}
+                                </>
+                              ) : (
+                                item.videoFileName ?? "Video file"
+                              )}
+                              {!showSeasons && item.videoFileSizeBytes != null
                                 ? ` · ${formatBytes(item.videoFileSizeBytes)}`
                                 : ""}
                             </span>
                           ) : (
-                            <span className={styles.titleFileMuted}>No linked video file</span>
+                            <span className={styles.titleFileMuted}>
+                              {showSeasons ? "No original folder name" : "No linked video file"}
+                            </span>
                           )}
                           <span className={styles.titleMeta}>
                             {item.featured ? "Featured" : "Catalog"}
