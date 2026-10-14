@@ -36386,6 +36386,17 @@ a:has(> .site-logo-img),
   min-width: 0;
 }
 
+/* Google reCAPTCHA v3 badge (loads after login/register/contact). Keep off media/shop UI. */
+.grecaptcha-badge {
+  z-index: 30 !important;
+  pointer-events: none !important;
+}
+
+body:not(.recaptcha-badge-visible) .grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 @media (max-width: 767px) {
   .admin-panel,
   .customer-panel {

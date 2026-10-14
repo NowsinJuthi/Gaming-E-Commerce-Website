@@ -19,6 +19,7 @@ import { LiveChatLauncher } from "@/components/chat/LiveChatLauncher";
 import { StoreEventsProvider } from "@/components/StoreEventsProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { SitePresenceTracker } from "@/components/analytics/SitePresenceTracker";
+import { RecaptchaBadgeVisibility } from "@/components/RecaptchaBadgeVisibility";
 
 export function ChromeShell({
   children,
@@ -54,6 +55,7 @@ export function ChromeShell({
             <DocumentFaviconHead />
             <StoreEventsProvider />
             <SitePresenceTracker />
+            <RecaptchaBadgeVisibility />
             <a href="#main-content" className="skip-link">
               Skip to content
             </a>
@@ -77,6 +79,7 @@ export function ChromeShell({
           </a>
           <div className="chrome-shell flex min-h-screen min-w-0 flex-col">
             <SitePresenceTracker />
+            <RecaptchaBadgeVisibility />
             <ReferralTracker />
             <SiteMenusProvider initialMenus={initialSiteMenus}>
               <ContactSocialProvider
