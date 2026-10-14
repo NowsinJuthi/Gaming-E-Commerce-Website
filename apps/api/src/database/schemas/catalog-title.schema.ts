@@ -82,6 +82,10 @@ export class CatalogTitle {
   @Prop({ type: Date, default: null, index: true })
   listedAt?: Date | null;
 
+  /** Last seen modification time of the file/folder on Samba (detect manual PC uploads). */
+  @Prop({ type: Date, default: null })
+  diskModifiedAt?: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

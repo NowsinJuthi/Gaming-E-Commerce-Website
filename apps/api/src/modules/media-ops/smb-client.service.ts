@@ -22,6 +22,8 @@ export type SmbListedEntry = {
   path: string;
   isDirectory: boolean;
   sizeBytes: number | null;
+  /** File/folder mtime from storage when available (ms since epoch). */
+  modifiedAtMs?: number | null;
 };
 
 export type SmbIncoming = {
@@ -416,6 +418,7 @@ export class SmbClientService {
         path: rel.replace(/\\/g, '/'),
         isDirectory,
         sizeBytes: parsed.sizeBytes,
+        modifiedAtMs: parsed.modifiedAtMs,
       });
     }
     if (entries.length === 0 && /NT_STATUS_/.test(output)) {
@@ -732,19 +735,29 @@ export class SmbClientService {
   /** smbclient `ls` lines are not grepable; `-g` does not apply to directory listings. */
   private parseSmbclientLsLine(
     line: string,
-  ): { name: string; isDirectory: boolean; sizeBytes: number } | null {
+  ): { name: string; isDirectory: boolean; sizeBytes: number; modifiedAtMs: number | null } | null {
     if (/blocks of size|blocks available|^Domain=\[/i.test(line)) return null;
     const human = line.match(
-      /^\s{2}(.+?)\s+([ADHSRN]+)\s+(\d+)\s+\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\s*$/,
+      /^\s{2}(.+?)\s+([ADHSRN]+)\s+(\d+)\s+\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{2}:\d{2}:\d{2})\s+(\d{4})\s*$/,
     );
     const name = human?.[1]?.trim();
     const modes = human?.[2];
     const size = Number(human?.[3]);
+    const month = human?.[4];
+    const day = human?.[5];
+    const time = human?.[6];
+    const year = human?.[7];
     if (!name || !modes) return null;
+    let modifiedAtMs: number | null = null;
+    if (month && day && time && year) {
+      const parsed = Date.parse(`${month} ${day}, ${year} ${time} UTC`);
+      if (Number.isFinite(parsed)) modifiedAtMs = parsed;
+    }
     return {
       name,
       isDirectory: modes.includes('D'),
       sizeBytes: Number.isFinite(size) ? size : 0,
+      modifiedAtMs,
     };
   }
 

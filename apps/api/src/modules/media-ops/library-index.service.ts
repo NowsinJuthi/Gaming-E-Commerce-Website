@@ -308,6 +308,40 @@ export class LibraryIndexService {
     return { indexed, matched, unmatched, removed, logs };
   }
 
+  /** Pick up manual Samba copies and refresh listedAt from file mtime (runs during background prune). */
+  private async syncDiskEntriesFromList(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    videos: SmbListedEntry[],
+    folders: SmbListedEntry[],
+  ): Promise<void> {
+    const noLookup = () => false;
+    if (kind === 'movie' && videos.length > 0 && videos.length >= folders.length) {
+      for (const file of videos.slice(0, MAX_TITLES)) {
+        try {
+          await this.upsertFromFile(library, kind, file, noLookup, false);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Disk sync failed.';
+          this.logger.warn(`Disk sync ${file.name}: ${message}`);
+        }
+      }
+      return;
+    }
+    const source = kind === 'series' ? folders : folders.length > 0 ? folders : videos;
+    for (const entry of source.slice(0, MAX_TITLES)) {
+      try {
+        if (entry.isDirectory) {
+          await this.upsertFromFolder(library, kind, entry, noLookup, false);
+        } else {
+          await this.upsertFromFile(library, kind, entry, noLookup, false);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Disk sync failed.';
+        this.logger.warn(`Disk sync ${entry.name}: ${message}`);
+      }
+    }
+  }
+
   async pruneLibraryFromDisk(library: MediaLibraryDocument, kind: CatalogKind): Promise<number> {
     let entries: SmbListedEntry[];
     try {
@@ -319,6 +353,7 @@ export class LibraryIndexService {
     }
     const videos = entries.filter((entry) => !entry.isDirectory && this.isVideo(entry.name));
     const folders = entries.filter((entry) => entry.isDirectory);
+    await this.syncDiskEntriesFromList(library, kind, videos, folders);
     const onDiskKeys = await this.buildOnDiskKeys(library, kind, videos, folders);
     const removed = await this.removeStaleTitles(library, kind, onDiskKeys);
     if (removed > 0) {
@@ -426,6 +461,7 @@ export class LibraryIndexService {
         seasonCount: null,
       },
       bumpListedAt,
+      file.modifiedAtMs ?? null,
     );
     return Boolean(meta?.posterUrl);
   }
@@ -454,6 +490,7 @@ export class LibraryIndexService {
         seasonCount: null,
       },
       bumpListedAt,
+      folder.modifiedAtMs ?? null,
     );
     return Boolean(meta?.posterUrl);
   }
@@ -476,6 +513,28 @@ export class LibraryIndexService {
     return kind === 'series' ? this.tmdb.searchSeries(title, year) : this.tmdb.searchMovie(title, year);
   }
 
+  private listedAtFromDisk(
+    existing: { listedAt?: Date | null; diskModifiedAt?: Date | null } | null,
+    diskModifiedAtMs: number,
+  ): { listedAt?: Date; diskModifiedAt?: Date } {
+    const diskAt = new Date(diskModifiedAtMs);
+    if (!existing) {
+      return { listedAt: diskAt, diskModifiedAt: diskAt };
+    }
+    const prevMs = existing.diskModifiedAt ? new Date(existing.diskModifiedAt).getTime() : 0;
+    const listedMs = existing.listedAt ? new Date(existing.listedAt).getTime() : 0;
+    if (prevMs > 0 && Math.abs(diskModifiedAtMs - prevMs) <= 2000) {
+      return {};
+    }
+    if (prevMs === 0) {
+      if (listedMs === 0) {
+        return { listedAt: diskAt, diskModifiedAt: diskAt };
+      }
+      return { diskModifiedAt: diskAt };
+    }
+    return { listedAt: diskAt, diskModifiedAt: diskAt };
+  }
+
   private async upsert(
     library: MediaLibraryDocument,
     relativePath: string,
@@ -489,7 +548,9 @@ export class LibraryIndexService {
       seasonCount: number | null;
     },
     bumpListedAt = false,
+    diskModifiedAtMs: number | null = null,
   ) {
+    const sourceKey = this.sourceKey(library, relativePath);
     const set: Record<string, unknown> = {
       kind: fields.kind,
       videoFileName: fields.videoFileName,
@@ -497,6 +558,18 @@ export class LibraryIndexService {
     };
     if (bumpListedAt) {
       set.listedAt = new Date();
+      if (diskModifiedAtMs && diskModifiedAtMs > 0) {
+        set.diskModifiedAt = new Date(diskModifiedAtMs);
+      }
+    } else if (diskModifiedAtMs && diskModifiedAtMs > 0) {
+      const existing = await this.titles
+        .findOne({ sourceKey })
+        .select('listedAt diskModifiedAt')
+        .lean()
+        .exec();
+      const patch = this.listedAtFromDisk(existing, diskModifiedAtMs);
+      if (patch.listedAt) set.listedAt = patch.listedAt;
+      if (patch.diskModifiedAt) set.diskModifiedAt = patch.diskModifiedAt;
     }
     const onInsert: Record<string, unknown> = {
       published: true,
@@ -514,11 +587,7 @@ export class LibraryIndexService {
       onInsert.year = fields.year;
       onInsert.posterUrl = null;
     }
-    await this.titles.updateOne(
-      { sourceKey: this.sourceKey(library, relativePath) },
-      { $setOnInsert: onInsert, $set: set },
-      { upsert: true },
-    );
+    await this.titles.updateOne({ sourceKey }, { $setOnInsert: onInsert, $set: set }, { upsert: true });
   }
 
   private sourceKey(library: MediaLibraryDocument, relativePath: string): string {
@@ -652,15 +721,18 @@ export class LibraryIndexService {
       if (!dirent.name || dirent.name.startsWith('.')) continue;
       const rel = remotePath ? `${remotePath}/${dirent.name}` : dirent.name;
       let sizeBytes: number | null = null;
+      let modifiedAtMs: number | null = null;
+      const info = await stat(`${full.replace(/[\\/]+$/, '')}/${dirent.name}`).catch(() => null);
       if (dirent.isFile()) {
-        const info = await stat(`${full.replace(/[\\/]+$/, '')}/${dirent.name}`).catch(() => null);
         sizeBytes = info?.size ?? null;
       }
+      if (info?.mtimeMs) modifiedAtMs = info.mtimeMs;
       entries.push({
         name: dirent.name,
         path: rel.replace(/\\/g, '/'),
         isDirectory: dirent.isDirectory(),
         sizeBytes,
+        modifiedAtMs,
       });
     }
     return entries;
