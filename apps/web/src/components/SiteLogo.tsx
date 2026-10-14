@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { useInitialSiteBrand } from "@/components/site-brand-initial-context";
 import { resolveLogoSrc } from "@/lib/site-appearance";
@@ -24,6 +25,7 @@ type SiteLogoProps = {
   size?: LogoSize;
   showWave?: boolean;
   title?: string;
+  onLinkClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   /** Admin preview — bypasses global store */
   override?: SiteLogoOverride;
 };
@@ -100,6 +102,7 @@ export function SiteLogo({
   size = "default",
   showWave = true,
   title,
+  onLinkClick,
   override,
 }: SiteLogoProps) {
   const storeLogoUrlLight = useSiteBrandStore((s) => s.logoUrlLight);
@@ -155,7 +158,12 @@ export function SiteLogo({
     );
     if (href) {
       return (
-        <Link href={href as "/"} className={wrapperClass} title={title}>
+        <Link
+          href={href as "/"}
+          className={wrapperClass}
+          title={title}
+          onClick={onLinkClick}
+        >
           {content}
         </Link>
       );
@@ -202,7 +210,12 @@ export function SiteLogo({
 
   if (href) {
     return (
-      <Link href={href as "/"} className={wrapperClass} title={title}>
+      <Link
+        href={href as "/"}
+        className={wrapperClass}
+        title={title}
+        onClick={onLinkClick}
+      >
         {content}
       </Link>
     );

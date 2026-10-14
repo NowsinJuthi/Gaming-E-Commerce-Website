@@ -78,6 +78,13 @@ export const ADMIN_NAV: NavSection[] = [
     icon: GridIcon,
     items: [
       { href: "/admin", label: "Dashboard", icon: GridIcon, accent: "brand" },
+      {
+        href: "/admin/live-analytics",
+        label: "Live visitors",
+        icon: PulseIcon,
+        accent: "success",
+        keywords: ["realtime", "visitors", "counter", "media", "watching", "analytics"],
+      },
     ],
   },
   {
@@ -260,17 +267,17 @@ export const ADMIN_NAV: NavSection[] = [
     title: "Movie Server",
     items: [
       {
-        href: "/admin/libraries",
+        href: "/admin/movie-server",
         label: "Movie Server",
         icon: LayersIcon,
         accent: "accent",
-        keywords: ["media", "library", "samba", "folder", "movies", "tv"],
+        keywords: ["media", "library", "samba", "folder", "movies", "tv", "dashboard"],
         children: [
           {
-            href: "/admin/libraries",
-            label: "Media library",
-            icon: LayersIcon,
-            keywords: ["folder", "scan", "movies", "tv"],
+            href: "/admin/movie-server",
+            label: "Dashboard",
+            icon: ChartIcon,
+            keywords: ["overview", "stats", "count", "libraries"],
           },
           {
             href: "/admin/collections",
@@ -283,6 +290,12 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Series collections",
             icon: LayersIcon,
             keywords: ["series", "tv", "seasons", "catalog"],
+          },
+          {
+            href: "/admin/libraries",
+            label: "Media library",
+            icon: LayersIcon,
+            keywords: ["folder", "scan", "movies", "tv"],
           },
           {
             href: "/admin/file-manager",

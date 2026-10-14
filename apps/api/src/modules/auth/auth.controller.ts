@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -69,6 +70,31 @@ export class AuthController {
   ) {
     const result = await this.auth.login(dto, this.meta(req));
     return this.respondWithSession(result, req, res);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('browser-session/resync')
+  async resyncBrowserSession(@Req() req: Request) {
+    const cookieToken = this.readCookie(req, this.refreshCookieName);
+    if (!cookieToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    if (
+      !isBrowserAuthRequest({
+        origin: req.headers.origin,
+        cookie: req.headers.cookie,
+      })
+    ) {
+      throw new UnauthorizedException('Browser session required');
+    }
+    const result = await this.auth.resyncBrowserSession(cookieToken);
+    const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    return omitSecretsFromBrowserSession({
+      csrfToken: result.csrfToken,
+      user: result.user,
+      expiresIn: accessMaxAge,
+    });
   }
 
   @Public()
@@ -226,12 +252,13 @@ export class AuthController {
       'user' in result && result.user.isGuest === true;
     const refreshMaxAge = isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86_400)
-      : (this.config.get<number>('jwt.refreshTtl') ?? 2_592_000);
+      : (this.config.get<number>('jwt.refreshTtl') ?? LONG_SESSION_TTL_SECONDS);
     const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    const domain = this.authCookieDomain();
     res.cookie(
       ACCESS_COOKIE_NAME,
       result.accessToken,
-      accessCookieOptions({ production, maxAgeSeconds: accessMaxAge }),
+      accessCookieOptions({ production, maxAgeSeconds: accessMaxAge, domain }),
     );
     res.cookie(
       this.refreshCookieName,
@@ -240,6 +267,7 @@ export class AuthController {
         production,
         path: this.authCookiePath(),
         maxAgeSeconds: refreshMaxAge,
+        domain,
       }),
     );
     return omitSecretsFromBrowserSession({ ...result, csrfToken });
@@ -247,18 +275,25 @@ export class AuthController {
 
   private clearRefreshCookie(res: Response): void {
     const production = this.config.get<string>('app.env') === 'production';
+    const domain = this.authCookieDomain();
     res.clearCookie(this.refreshCookieName, {
       httpOnly: true,
       secure: production,
       sameSite: 'lax',
       path: this.authCookiePath(),
+      ...(domain ? { domain } : {}),
     });
     res.clearCookie(ACCESS_COOKIE_NAME, {
       httpOnly: true,
       secure: production,
       sameSite: 'lax',
       path: '/',
+      ...(domain ? { domain } : {}),
     });
+  }
+
+  private authCookieDomain(): string | null {
+    return this.config.get<string | null>('app.authCookieDomain') ?? null;
   }
 
   private authCookiePath(): string {

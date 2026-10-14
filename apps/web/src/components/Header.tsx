@@ -3,7 +3,14 @@ import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { getCart, getMe, logoutUser } from "@/lib/api";
 import { useCanAccessAdminPanel } from "@/hooks/useAdminPermissions";
 import { getPrimaryRoleLabel } from "@/lib/admin-order-view";
@@ -38,6 +45,7 @@ import {
   splitStorefrontHeaderNav,
   type SiteMenuLink,
 } from "@/lib/site-menus";
+import { hardNavigateFromMediaCatalog } from "@/lib/storefront-nav";
 
 const iconBtn = "shell-icon-btn";
 
@@ -124,7 +132,10 @@ function NavOthersDropdown({
                 href={item.href as "/"}
                 role="menuitem"
                 className={`site-nav-dropdown__item${itemActive ? " site-nav-dropdown__item--active" : ""}`}
-                onClick={() => setOpen(false)}
+                onClick={(event) => {
+                  setOpen(false);
+                  hardNavigateFromMediaCatalog(pathname, item.href, event);
+                }}
               >
                 {item.label}
               </Link>
@@ -180,7 +191,10 @@ function MobileNavOthers({
               <li key={item.href}>
                 <Link
                   href={item.href as "/"}
-                  onClick={onClose}
+                  onClick={(event) => {
+                    onClose();
+                    hardNavigateFromMediaCatalog(pathname, item.href, event);
+                  }}
                   className={`admin-nav-link ${itemActive ? "admin-nav-link-active" : ""}`}
                 >
                   {itemActive ? <span className="admin-nav-indicator" aria-hidden /> : null}
@@ -225,6 +239,9 @@ function NavLinks({
             key={item.href}
             href={item.href as "/"}
             className={active ? "site-nav-link site-nav-link--active" : "site-nav-link"}
+            onClick={(event) => {
+              hardNavigateFromMediaCatalog(pathname, item.href, event);
+            }}
           >
             {item.label}
           </Link>
@@ -241,11 +258,19 @@ function NavLinksFallback({
   navItems: SiteMenuLink[];
   headerOthers: SiteMenuLink[];
 }) {
+  const pathname = usePathname() ?? "";
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
       {primary.map((item) => (
-        <Link key={item.href} href={item.href as "/"} className="site-nav-link">
+        <Link
+          key={item.href}
+          href={item.href as "/"}
+          className="site-nav-link"
+          onClick={(event) => {
+            hardNavigateFromMediaCatalog(pathname, item.href, event);
+          }}
+        >
           {item.label}
         </Link>
       ))}
@@ -276,7 +301,10 @@ function MobileNavItems({
           <li key={item.href} className="shrink-0">
             <Link
               href={item.href as "/"}
-              onClick={onClose}
+              onClick={(event) => {
+                onClose();
+                hardNavigateFromMediaCatalog(pathname, item.href, event);
+              }}
               className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}
             >
               {active ? <span className="admin-nav-indicator" aria-hidden /> : null}
@@ -301,6 +329,7 @@ function MobileNavItemsFallback({
   headerOthers: SiteMenuLink[];
   onClose: () => void;
 }) {
+  const pathname = usePathname() ?? "";
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
@@ -308,7 +337,14 @@ function MobileNavItemsFallback({
         const Icon = siteMenuIcon(item.href);
         return (
           <li key={item.href} className="shrink-0">
-            <Link href={item.href as "/"} onClick={onClose} className="admin-nav-link">
+            <Link
+              href={item.href as "/"}
+              onClick={(event) => {
+                onClose();
+                hardNavigateFromMediaCatalog(pathname, item.href, event);
+              }}
+              className="admin-nav-link"
+            >
               <span className="admin-nav-icon-box">
                 <Icon className="h-4 w-4" />
               </span>
@@ -349,6 +385,7 @@ export function Header({
   const [term, setTerm] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [headerPortaled, setHeaderPortaled] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const { refreshing: adminRefreshing, refresh: refreshAdminPage } =
     useAdminHeaderRefresh();
@@ -440,6 +477,16 @@ export function Header({
     };
   }, [menuOpen]);
 
+  useIsomorphicLayoutEffect(() => {
+    setMenuOpen(false);
+    setSearchOpen(false);
+    setUserOpen(false);
+  }, [pathname]);
+
+  useLayoutEffect(() => {
+    setHeaderPortaled(true);
+  }, []);
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -486,15 +533,15 @@ export function Header({
     </span>
   );
 
-  return (
+  const headerChrome = (
     <>
-      <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
+      <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b">
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
-            {/* Hamburger — mobile only */}
+            {/* Mobile nav (+ storefront search) — admin: menu, refresh; no search */}
             <button
               type="button"
               onClick={() => {
@@ -512,7 +559,6 @@ export function Header({
               <MenuIcon />
             </button>
 
-            {/* Theme toggle or refresh — mobile only */}
             {isAdminRoute ? (
               <button
                 type="button"
@@ -526,33 +572,16 @@ export function Header({
                   aria-hidden
                 />
               </button>
-            ) : (
+            ) : null}
+            {!isAdminRoute ? (
               <button
                 type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={() => setSearchOpen((o) => !o)}
                 className={`${iconBtn} lg:hidden`}
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label="Search"
               >
-                {themeToggleIcon}
+                <SearchIcon />
               </button>
-            )}
-
-            {/* Notification bell — mobile only, sits left of the centered logo */}
-            {loggedIn ? (
-              <Link
-                href={notifHref}
-                className={`${iconBtn} relative lg:hidden`}
-                aria-label={
-                  unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
-                }
-              >
-                <BellIcon className="h-5 w-5 text-[#f5b737]" />
-                {unread > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                ) : null}
-              </Link>
             ) : null}
 
             {/* Logo — desktop only */}
@@ -560,7 +589,12 @@ export function Header({
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
-                <SiteLogo href="/" />
+                <SiteLogo
+                  href="/"
+                  onLinkClick={(event) => {
+                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+                  }}
+                />
               )}
             </div>
           </div>
@@ -572,7 +606,12 @@ export function Header({
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
-                <SiteLogo href="/" />
+                <SiteLogo
+                  href="/"
+                  onLinkClick={(event) => {
+                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+                  }}
+                />
               )}
             </div>
 
@@ -630,11 +669,11 @@ export function Header({
               </button>
             )}
 
-            {/* Search */}
+            {/* Search — desktop only (mobile search is on the left) */}
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
-              className={iconBtn}
+              className={`${iconBtn} hidden lg:grid`}
               aria-label="Search"
             >
               <SearchIcon />
@@ -656,7 +695,7 @@ export function Header({
               </Link>
             )}
 
-            {/* Bell — desktop only (mobile bell is in left column) */}
+            {/* Bell — desktop only */}
             {loggedIn ? (
               <Link
                 href={notifHref}
@@ -753,8 +792,8 @@ export function Header({
           </div>
         </div>
 
-        {/* Search bar */}
-        {searchOpen && (
+        {/* Search bar — storefront only (admin mobile has no search in header) */}
+        {searchOpen && !isAdminRoute && (
           <form
             onSubmit={onSearch}
             className={`relative border-t border-border py-3 ${HOME_CONTAINER_CLS}`}
@@ -783,7 +822,7 @@ export function Header({
       {/* Mobile nav drawer — only shown when no external sidebar handler */}
       {menuOpen && !onOpenMobileMenu && (
         <div
-          className="fixed inset-x-0 bottom-0 top-14 z-40 sm:top-16 lg:hidden"
+          className="pointer-events-auto fixed inset-x-0 bottom-0 top-14 z-[990] sm:top-16 lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"
@@ -829,6 +868,12 @@ export function Header({
       )}
     </>
   );
+
+  if (headerPortaled && typeof document !== "undefined") {
+    return createPortal(headerChrome, document.body);
+  }
+
+  return headerChrome;
 }
 
 function MenuIcon() {

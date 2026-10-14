@@ -12,12 +12,34 @@ import {
   listSmbServers,
   saveSmbPassword,
   testSmbServer,
+  updateSmbServer,
+  uploadSmbMedia,
   type AdminSmbServer,
   type MediaLibraryKind,
   type SmbBrowseEntry,
 } from "@/lib/media-ops-api";
+import { CLOUDFLARE_PROXY_UPLOAD_BYTES } from "@/lib/api";
 
 const VIDEO_ACCEPT = ".mkv,.mp4,.avi,.mov,.wmv,.m4v,.ts,.m2ts,.webm,.mpg,.mpeg,video/*";
+const LARGE_UPLOAD_HOST = Boolean(process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim());
+/** Network upload 0–70%; Samba write animates 70–98%; done = 100%. */
+const UPLOAD_PHASE_MAX = 70;
+const SAVING_PHASE_CAP = 98;
+
+function totalPickBytes(files: File[]) {
+  return files.reduce((sum, file) => sum + file.size, 0);
+}
+
+function mapNetworkProgress(loaded: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.min(UPLOAD_PHASE_MAX, Math.round((loaded / total) * UPLOAD_PHASE_MAX));
+}
+
+function savingTick(fileSize: number): { intervalMs: number; step: number } {
+  if (fileSize > 2 * 1024 * 1024 * 1024) return { intervalMs: 450, step: 0.35 };
+  if (fileSize > 500 * 1024 * 1024) return { intervalMs: 320, step: 0.55 };
+  return { intervalMs: 220, step: 0.85 };
+}
 
 export default function AdminFileManagerPage() {
   const [servers, setServers] = useState<AdminSmbServer[]>([]);
@@ -26,6 +48,7 @@ export default function AdminFileManagerPage() {
   const [browsePath, setBrowsePath] = useState("");
   const [entries, setEntries] = useState<SmbBrowseEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [browsing, setBrowsing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -37,16 +60,55 @@ export default function AdminFileManagerPage() {
   const [password, setPassword] = useState("");
   const [domain, setDomain] = useState("");
   const [updatePassword, setUpdatePassword] = useState("");
+  const [shareEdit, setShareEdit] = useState("");
   const [libraryName, setLibraryName] = useState("");
   const [libraryKind, setLibraryKind] = useState<MediaLibraryKind>("movies");
   const [pendingDir, setPendingDir] = useState<SmbBrowseEntry | null>(null);
   const [pickLabel, setPickLabel] = useState<string | null>(null);
+  const [pickedFiles, setPickedFiles] = useState<File[]>([]);
+  const [uploadKind, setUploadKind] = useState<MediaLibraryKind>("movies");
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<"idle" | "upload" | "samba">("idle");
+  const uploadPctRef = useRef(0);
+  const savingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
     () => servers.find((server) => server.id === selectedId) ?? null,
     [servers, selectedId],
+  );
+
+  const clearSavingTimer = useCallback(() => {
+    if (savingTimerRef.current) {
+      clearInterval(savingTimerRef.current);
+      savingTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearSavingTimer(), [clearSavingTimer]);
+
+  useEffect(() => {
+    setShareEdit(selected?.share ?? "");
+  }, [selected?.share]);
+
+  const setDisplayProgress = useCallback((next: number) => {
+    uploadPctRef.current = next;
+    setUploadPct(next);
+  }, []);
+
+  const startSavingProgress = useCallback(
+    (fileSize: number) => {
+      clearSavingTimer();
+      const { intervalMs, step } = savingTick(fileSize);
+      savingTimerRef.current = setInterval(() => {
+        const prev = uploadPctRef.current;
+        if (prev >= SAVING_PHASE_CAP) return;
+        setDisplayProgress(Math.min(SAVING_PHASE_CAP, prev + step));
+      }, intervalMs);
+    },
+    [clearSavingTimer, setDisplayProgress],
   );
 
   const reload = useCallback(async () => {
@@ -92,12 +154,69 @@ export default function AdminFileManagerPage() {
   const uncPath = selected
     ? `\\\\${selected.host}\\${selected.share}${browsePath ? `\\${browsePath.replace(/\//g, "\\")}` : ""}`
     : "";
-  const showCredentials = Boolean(selected && (selected.lastError || error));
+  const showCredentials = Boolean(selected && (selected.lastError || (error && !uploadError)));
 
   function openLibrary(entry: { name: string; path: string }) {
     setPendingDir({ name: entry.name, path: entry.path, isDirectory: true });
     setLibraryName(entry.name);
     setLibraryKind(pathLooksLikeTv(`${entry.path} ${entry.name}`) ? "tv" : "movies");
+  }
+
+  function resetPickers() {
+    setPickedFiles([]);
+    setPickLabel(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  }
+
+  async function startUpload() {
+    if (!selected || pickedFiles.length === 0) return;
+    const bytes = totalPickBytes(pickedFiles);
+    if (!LARGE_UPLOAD_HOST && bytes > CLOUDFLARE_PROXY_UPLOAD_BYTES * 0.95) {
+      setUploadError(
+        "Total size is over Cloudflare’s ~100MB limit while the site is proxied. Copy the file onto the Samba share from your LAN, or set up upload.uniqbd.com (grey cloud) with NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN and rebuild web.",
+      );
+      return;
+    }
+    setBusy(true);
+    setUploadError(null);
+    clearSavingTimer();
+    setDisplayProgress(0);
+    setUploadPhase("upload");
+    setUploadNote(null);
+    try {
+      const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles, {
+        onProgress: ({ loaded, total, phase }) => {
+          if (phase === "processing") {
+            setUploadPhase("samba");
+            setDisplayProgress(UPLOAD_PHASE_MAX);
+            startSavingProgress(bytes);
+            return;
+          }
+          if (total > 0) {
+            setDisplayProgress(mapNetworkProgress(loaded, total));
+          }
+        },
+      });
+      clearSavingTimer();
+      setDisplayProgress(100);
+      setUploadNote(
+        result.logs?.[1] ??
+          `Uploaded ${result.uploaded} file(s). TMDB runs for those files only — check Movie/Series collections shortly.`,
+      );
+      resetPickers();
+      const data = await loadBrowse(selected.id, browsePath);
+      setEntries(data.entries);
+      await reload();
+    } catch (err) {
+      clearSavingTimer();
+      setUploadNote(null);
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+      setUploadPhase("idle");
+      setDisplayProgress(0);
+    }
   }
 
   async function onCreate(event: React.FormEvent) {
@@ -158,7 +277,14 @@ export default function AdminFileManagerPage() {
                 <Field label="Display name" value={name} onChange={setName} placeholder="Data-Storage" />
                 <Field label="Server IP / host" value={host} onChange={setHost} placeholder="192.168.0.10" required />
                 <Field label="Port" value={port} onChange={setPort} />
-                <Field label="Share name" value={share} onChange={setShare} placeholder="Data-Storage" required />
+                <Field
+                  label="Share name"
+                  value={share}
+                  onChange={setShare}
+                  placeholder="Data-Storage"
+                  hint="Samba share from smbclient -L //host -U user — not a Windows drive label (e.g. 12TB-Storage)."
+                  required
+                />
                 <Field label="Username" value={username} onChange={setUsername} placeholder="samba-user" required />
                 <Field label="Password" value={password} onChange={setPassword} type="password" required />
                 <Field label="Domain (optional)" value={domain} onChange={setDomain} placeholder="WORKGROUP" />
@@ -189,7 +315,8 @@ export default function AdminFileManagerPage() {
                       setSelectedId(server.id);
                       setBrowsePath("");
                       setPendingDir(null);
-                      setPickLabel(null);
+                      resetPickers();
+                      setUploadNote(null);
                       setError(null);
                     }}
                   >
@@ -274,6 +401,48 @@ export default function AdminFileManagerPage() {
                     </button>
                   </div>
                 </header>
+
+                <div className={styles.credPanel}>
+                  <p className="mb-2 text-xs text-zinc-400">
+                    Share name from{" "}
+                    <code className="text-[0.68rem]">smbclient -L //host -U user</code> (e.g.{" "}
+                    <strong>Data-Storage</strong>), not a Windows label like 12TB-Storage.
+                  </p>
+                  <form
+                    className="flex flex-wrap items-end gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!selected || !shareEdit.trim()) return;
+                      setBusy(true);
+                      setUploadError(null);
+                      setError(null);
+                      void updateSmbServer(selected.id, { share: shareEdit.trim() })
+                        .then(async () => {
+                          await reload();
+                          const data = await loadBrowse(selected.id, browsePath);
+                          setEntries(data.entries);
+                        })
+                        .catch((err: unknown) =>
+                          setError(err instanceof Error ? err.message : "Could not update share name."),
+                        )
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    <label className="min-w-[12rem] flex-1 text-xs">
+                      Samba share name
+                      <input
+                        className={styles.inputLike}
+                        value={shareEdit}
+                        onChange={(event) => setShareEdit(event.target.value)}
+                        placeholder="Data-Storage"
+                        required
+                      />
+                    </label>
+                    <button type="submit" className={styles.toolBtn} disabled={busy || !shareEdit.trim()}>
+                      {busy ? "Saving…" : "Save share name"}
+                    </button>
+                  </form>
+                </div>
 
                 {showCredentials ? (
                   <div className={styles.credPanel}>
@@ -382,6 +551,19 @@ export default function AdminFileManagerPage() {
                   </button>
                 </div>
 
+                {uploadError ? (
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                    <p className="m-0">{uploadError}</p>
+                    {uploadError.includes("Share name was not found") && selected ? (
+                      <p className="mb-0 mt-2 text-xs text-rose-200/90">
+                        Fix: delete this server, reconnect with the correct share (sidebar shows{" "}
+                        <strong>{selected.share}</strong>). On the storage box:{" "}
+                        <code className="text-[0.7rem]">smbclient -L //{selected.host} -U {selected.username}</code>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <section className={styles.uploadPanel} aria-label="Upload video">
                   <div className={styles.uploadHead}>
                     <div className="min-w-0 flex-1">
@@ -389,9 +571,35 @@ export default function AdminFileManagerPage() {
                       <p className={styles.uploadPath} title={uncPath}>
                         {uncPath}
                       </p>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {LARGE_UPLOAD_HOST
+                          ? "Large uploads use the dedicated upload host (bypasses Cloudflare size cap)."
+                          : "Through Cloudflare (orange cloud), browser uploads above ~100MB fail — use Samba on the storage LAN or configure upload.uniqbd.com (grey cloud)."}
+                      </p>
                     </div>
-                    <button type="button" className={styles.uploadStart} disabled={!pickLabel}>
-                      ↑ Start upload
+                    <label className={styles.field}>
+                      <span className="sr-only">Content type</span>
+                      <select
+                        className={styles.select}
+                        value={uploadKind}
+                        onChange={(event) => setUploadKind(event.target.value as MediaLibraryKind)}
+                        disabled={busy}
+                      >
+                        <option value="movies">Movie upload</option>
+                        <option value="tv">Series upload</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className={styles.uploadStart}
+                      disabled={busy || pickedFiles.length === 0}
+                      onClick={() => void startUpload()}
+                    >
+                      {busy
+                        ? uploadPhase === "samba"
+                          ? `Writing ${Math.round(uploadPct)}%`
+                          : `Uploading ${Math.round(uploadPct)}%`
+                        : "↑ Start upload"}
                     </button>
                   </div>
                   <div className={styles.dropZone}>
@@ -404,7 +612,14 @@ export default function AdminFileManagerPage() {
                       aria-hidden
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        setPickLabel(file ? file.name : null);
+                        if (folderInputRef.current) folderInputRef.current.value = "";
+                        if (file) {
+                          setPickedFiles([file]);
+                          setPickLabel(file.name);
+                          if (pathLooksLikeTv(file.name)) setUploadKind("tv");
+                        } else {
+                          resetPickers();
+                        }
                       }}
                     />
                     <input
@@ -416,23 +631,66 @@ export default function AdminFileManagerPage() {
                       aria-hidden
                       multiple
                       onChange={(event) => {
-                        const files = event.target.files;
-                        setPickLabel(files?.length ? `${files.length} video files` : null);
+                        const list = event.target.files;
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (!list?.length) {
+                          resetPickers();
+                          return;
+                        }
+                        const files = Array.from(list).filter((file) => isVideoFileName(file.name));
+                        if (!files.length) {
+                          setError("No video files found in that folder.");
+                          resetPickers();
+                          return;
+                        }
+                        setPickedFiles(files);
+                        const root =
+                          (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath?.split("/")[0] ??
+                          "folder";
+                        setPickLabel(`${files.length} video file(s) · ${root}`);
+                        if (pathLooksLikeTv(root)) setUploadKind("tv");
                       }}
-                      {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+                      {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
                     />
                     <div className={styles.pickActions}>
-                      <button type="button" className={styles.pickButton} onClick={() => fileInputRef.current?.click()}>
+                      <button
+                        type="button"
+                        className={styles.pickButton}
+                        disabled={busy}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
                         Choose file
                       </button>
-                      <button type="button" className={styles.pickButton} onClick={() => folderInputRef.current?.click()}>
+                      <button
+                        type="button"
+                        className={styles.pickButton}
+                        disabled={busy}
+                        onClick={() => folderInputRef.current?.click()}
+                      >
                         Choose folder
                       </button>
                     </div>
                     <p className={styles.fileMeta}>
-                      {pickLabel ??
-                        "Single video or a whole folder (subfolders kept). MKV, MP4, AVI, MOV, and other video formats."}
+                      {pickLabel
+                        ? `Selected: ${pickLabel}`
+                        : "Upload adds files here, links or creates a media library, then scans TMDB for posters."}
                     </p>
+                    {uploadNote ? <p className={styles.fileMeta}>{uploadNote}</p> : null}
+                    {uploadPhase !== "idle" ? (
+                      <div className={styles.uploadProgressWrap} aria-live="polite">
+                        <div className={styles.uploadProgressTrack}>
+                          <div
+                            className={styles.uploadProgressBar}
+                            style={{ width: `${Math.min(100, Math.max(2, uploadPct))}%` }}
+                          />
+                        </div>
+                        <p className={styles.uploadProgressLabel}>
+                          {uploadPhase === "upload"
+                            ? `Sending to server… ${Math.round(uploadPct)}% · ${formatBytes(totalPickBytes(pickedFiles))}`
+                            : `Writing to Samba… ${Math.round(uploadPct)}% (large files can take several minutes)`}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </section>
 
@@ -461,7 +719,7 @@ export default function AdminFileManagerPage() {
                                   if (!entry.isDirectory) return;
                                   setBrowsePath(entry.path);
                                   setPendingDir(null);
-                                  setPickLabel(null);
+                                  resetPickers();
                                 }}
                               >
                                 <FolderIcon />
@@ -591,6 +849,17 @@ function pathLooksLikeTv(value: string): boolean {
   return /\b(tv|series|season|episode|anime)\b/i.test(value);
 }
 
+function isVideoFileName(name: string): boolean {
+  return /\.(mkv|mp4|avi|mov|wmv|m4v|ts|m2ts|webm|mpg|mpeg)$/i.test(name);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function browseErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not browse this share.";
   if (/failed to fetch/i.test(message)) {
@@ -604,6 +873,7 @@ function Field({
   value,
   onChange,
   placeholder,
+  hint,
   required,
   type = "text",
 }: {
@@ -611,6 +881,7 @@ function Field({
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
   required?: boolean;
   type?: string;
 }) {
@@ -625,6 +896,7 @@ function Field({
         required={required}
         onChange={(event) => onChange(event.target.value)}
       />
+      {hint ? <p className={styles.fieldHint}>{hint}</p> : null}
     </div>
   );
 }
