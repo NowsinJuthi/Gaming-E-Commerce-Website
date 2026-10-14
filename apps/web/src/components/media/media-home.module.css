@@ -57,6 +57,24 @@
   scroll-snap-align: start;
 }
 
+.recentProgressTrack {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  height: 0.22rem;
+  background: rgb(1 19 26 / 0.88);
+}
+
+.recentProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: 0 0 0.12rem 0.12rem;
+  background: linear-gradient(90deg, rgb(38 191 176), rgb(56 214 198));
+  box-shadow: 0 0 8px rgb(38 191 176 / 0.55);
+}
+
 @media (min-width: 640px) {
   .recentTrack {
     grid-auto-columns: calc((100% - 1.5rem) / 3);

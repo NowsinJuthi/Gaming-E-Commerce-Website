@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
-import { readRecentWatched, syncRecentFromLegacyWatchKeys } from "@/lib/media-recent-watched";
+import {
+  readRecentWatched,
+  syncRecentFromLegacyWatchKeys,
+  watchProgressPercent,
+} from "@/lib/media-recent-watched";
 import type { MediaCard, MediaHome } from "@/lib/media-home-api";
 
 type MediaDetails = {
@@ -24,6 +28,10 @@ type MediaDetails = {
 };
 
 const ALL_LIBRARIES = "all";
+
+type RecentWatchCard = MediaCard & {
+  runtimeMinutes?: number | null;
+};
 
 function matchesSearch(title: string, query: string): boolean {
   const trimmed = query.trim().toLowerCase();
@@ -49,7 +57,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [recentRevision, setRecentRevision] = useState(0);
-  const [recentCards, setRecentCards] = useState<MediaCard[]>([]);
+  const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const catalogById = useMemo(() => new Map(source.map((item) => [item.id, item])), [source]);
   const libraryItems = useMemo(
@@ -104,11 +112,11 @@ export function MediaHome({ home }: { home: MediaHome }) {
     }
 
     void (async () => {
-      const cards: MediaCard[] = [];
+      const cards: RecentWatchCard[] = [];
       for (const entry of entries) {
         const cached = catalogById.get(entry.id);
         if (cached) {
-          cards.push(cached);
+          cards.push({ ...cached, runtimeMinutes: null });
           continue;
         }
         try {
@@ -124,6 +132,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
             featured: false,
             trending: false,
             seasonCount: null,
+            runtimeMinutes: data.runtimeMinutes,
           });
         } catch {
           /* skip unavailable titles */
@@ -265,7 +274,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
       </div>
 
       {!searchActive && recentCards.length > 0 ? (
-        <RecentlyWatchedSlider items={recentCards} onSelect={setInfo} />
+        <RecentlyWatchedSlider items={recentCards} progressRevision={recentRevision} onSelect={setInfo} />
       ) : null}
 
       {!searchActive && visible.length === 0 ? (
@@ -309,39 +318,56 @@ export function MediaHome({ home }: { home: MediaHome }) {
 
 function RecentlyWatchedSlider({
   items,
+  progressRevision,
   onSelect,
 }: {
-  items: MediaCard[];
+  items: RecentWatchCard[];
+  progressRevision: number;
   onSelect: (item: MediaCard) => void;
 }) {
+  void progressRevision;
+
   return (
     <section className={styles.recentSection} aria-label="Recently Watched">
       <h2 className={styles.recentHeading}>Recently Watched</h2>
       <div className={styles.recentTrack}>
-        {items.map((item) => (
-          <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
-            <Link
-              className={styles.posterLink}
-              href={`/media/watch/${item.id}` as Route}
-              aria-label={`Play ${item.title}`}
-            >
-              <span className={styles.posterFrame}>
-                {item.posterUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
-                )}
-                <span className={styles.playOverlay} aria-hidden>
-                  <span className={styles.playButton} />
+        {items.map((item) => {
+          const progress = watchProgressPercent(item.id, item.runtimeMinutes);
+          return (
+            <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
+              <Link
+                className={styles.posterLink}
+                href={`/media/watch/${item.id}` as Route}
+                aria-label={`Play ${item.title}`}
+              >
+                <span className={styles.posterFrame}>
+                  {item.posterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+                  )}
+                  <span className={styles.playOverlay} aria-hidden>
+                    <span className={styles.playButton} />
+                  </span>
+                  {progress > 0 ? (
+                    <span className={styles.recentProgressTrack} aria-hidden>
+                      <span className={styles.recentProgressFill} style={{ width: `${progress}%` }} />
+                    </span>
+                  ) : null}
                 </span>
-              </span>
-            </Link>
-            <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
-              {item.title}
-            </button>
-          </article>
-        ))}
+              </Link>
+              <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
+                {item.title}
+              </button>
+              {item.year ? (
+                <button type="button" className={styles.cardMeta} onClick={() => onSelect(item)}>
+                  {item.year}
+                </button>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

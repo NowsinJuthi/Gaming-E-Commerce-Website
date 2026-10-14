@@ -1,7 +1,34 @@
 const STORAGE_KEY = "uniqbd-media-recent";
 const LEGACY_PREFIX = "uniqbd-watch:";
+const DURATION_PREFIX = "uniqbd-watch-dur:";
 const MAX_ENTRIES = 32;
 const MIN_RESUME_SECONDS = 8;
+
+export function readWatchPositionSeconds(titleId: string): number {
+  if (typeof window === "undefined" || !titleId) return 0;
+  const seconds = Number(localStorage.getItem(`${LEGACY_PREFIX}${titleId}`) || 0);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+export function persistWatchProgress(titleId: string, seconds: number, durationSeconds: number): void {
+  if (typeof window === "undefined" || !titleId || seconds < MIN_RESUME_SECONDS) return;
+  localStorage.setItem(`${LEGACY_PREFIX}${titleId}`, String(Math.floor(seconds)));
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    localStorage.setItem(`${DURATION_PREFIX}${titleId}`, String(Math.floor(durationSeconds)));
+  }
+}
+
+/** Progress 0–100 for Recently Watched bar; optional runtime fallback when duration was not saved yet. */
+export function watchProgressPercent(titleId: string, runtimeMinutes?: number | null): number {
+  const seconds = readWatchPositionSeconds(titleId);
+  if (seconds < MIN_RESUME_SECONDS) return 0;
+  let duration = Number(localStorage.getItem(`${DURATION_PREFIX}${titleId}`) || 0);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    duration = runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes * 60 : 0;
+  }
+  if (duration <= 0) return 6;
+  return Math.min(100, Math.max(2, (seconds / duration) * 100));
+}
 
 export type RecentWatchEntry = {
   id: string;
