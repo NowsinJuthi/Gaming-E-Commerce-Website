@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { MediaHome } from "@/components/media/media-home";
 import { HOME_CONTAINER_CLS, HOME_PAGE_BG } from "@/components/home/home-container";
-import { getMediaHome } from "@/lib/media-home-api";
+import {
+  getMediaBrowse,
+  getMediaHome,
+  MEDIA_PAGE_SIZE_MOBILE,
+} from "@/lib/media-home-api";
 
 export const metadata: Metadata = {
   title: "Media",
@@ -11,11 +15,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MediaPage() {
-  const home = await getMediaHome();
+  const [home, initialBrowse] = await Promise.all([
+    getMediaHome(),
+    getMediaBrowse({ offset: 0, limit: MEDIA_PAGE_SIZE_MOBILE }),
+  ]);
   return (
     <main className={`pb-8 pt-2 sm:pb-12 sm:pt-4 ${HOME_PAGE_BG}`}>
       <div className={HOME_CONTAINER_CLS}>
-        <MediaHome home={home} />
+        <MediaHome home={home} initialBrowse={initialBrowse} />
       </div>
     </main>
   );

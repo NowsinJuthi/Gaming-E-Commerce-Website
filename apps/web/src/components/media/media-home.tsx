@@ -10,7 +10,17 @@ import {
   syncRecentFromLegacyWatchKeys,
   watchProgressPercent,
 } from "@/lib/media-recent-watched";
-import { parseMediaHome, type MediaCard, type MediaHome } from "@/lib/media-home-api";
+import { useLgScreen } from "@/hooks/useLgScreen";
+import {
+  getMediaBrowse,
+  getMediaYears,
+  MEDIA_PAGE_SIZE_DESKTOP,
+  MEDIA_PAGE_SIZE_MOBILE,
+  MEDIA_SEARCH_LIMIT,
+  type MediaBrowseResult,
+  type MediaCard,
+  type MediaHome,
+} from "@/lib/media-home-api";
 
 type MediaDetails = {
   title: string;
@@ -29,109 +39,205 @@ type MediaDetails = {
 
 const ALL_LIBRARIES = "all";
 
-/** Samba uploads (listedAt) always before catalog imports; then newest sortAt. */
-function sortUploadFirst(items: MediaCard[]): MediaCard[] {
-  return [...items].sort((a, b) => {
-    const aListed = a.listedAt ?? 0;
-    const bListed = b.listedAt ?? 0;
-    if (aListed > 0 || bListed > 0) {
-      if (aListed !== bListed) return bListed - aListed;
-      if (aListed > 0) return -1;
-      if (bListed > 0) return 1;
-    }
-    return (b.sortAt ?? 0) - (a.sortAt ?? 0);
-  });
-}
-
-/** Within a library menu: recent uploads first, then A–Z (not whole-library createdAt shuffle). */
-function sortLibraryBrowse(items: MediaCard[]): MediaCard[] {
-  const uploaded = items.filter((item) => (item.listedAt ?? 0) > 0);
-  const rest = items.filter((item) => !(item.listedAt ?? 0));
-  return [
-    ...sortUploadFirst(uploaded),
-    ...[...rest].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" })),
-  ];
-}
-
 type RecentWatchCard = MediaCard & {
   runtimeMinutes?: number | null;
 };
 
-function matchesSearch(title: string, query: string): boolean {
-  const trimmed = query.trim().toLowerCase();
-  if (!trimmed) return true;
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  const hay = title.toLowerCase();
-  return words.every((word) => hay.includes(word));
-}
+export function MediaHome({
+  home,
+  initialBrowse,
+}: {
+  home: MediaHome;
+  initialBrowse?: MediaBrowseResult;
+}) {
+  const isLgScreen = useLgScreen();
+  const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const loadingMoreRef = useRef(false);
 
-export function MediaHome({ home: initialHome }: { home: MediaHome }) {
-  const [home, setHome] = useState(initialHome);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${API_BASE}/media/home`, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && data) setHome(parseMediaHome(data));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const source = useMemo(() => {
-    const raw = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
-    const seen = new Set<string>();
-    const unique = raw.filter((item) => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-    return sortUploadFirst(unique);
-  }, [home.items, home.rows]);
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [year, setYear] = useState("");
+  const [years, setYears] = useState<number[]>(home.years ?? []);
+  const [catalogItems, setCatalogItems] = useState<MediaCard[]>(initialBrowse?.items ?? []);
+  const [catalogTotal, setCatalogTotal] = useState(initialBrowse?.total ?? 0);
+  const [hasMore, setHasMore] = useState(initialBrowse?.hasMore ?? false);
+  const [browseLoading, setBrowseLoading] = useState(!initialBrowse);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchItems, setSearchItems] = useState<MediaCard[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [recentRevision, setRecentRevision] = useState(0);
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
-  const catalogById = useMemo(() => new Map(source.map((item) => [item.id, item])), [source]);
-  const libraryItems = useMemo(() => {
-    const scoped =
-      libraryId === ALL_LIBRARIES
-        ? source
-        : source.filter((item) => item.libraryId === libraryId);
-    return libraryId === ALL_LIBRARIES ? sortUploadFirst(scoped) : sortLibraryBrowse(scoped);
-  }, [source, libraryId]);
-
-  const years = useMemo(
-    () => [...new Set(libraryItems.map((item) => item.year).filter((value) => value > 0))].sort((a, b) => b - a),
-    [libraryItems],
-  );
-
-  const visible = useMemo(
-    () =>
-      libraryItems.filter(
-        (item) => (!year || String(item.year) === year) && matchesSearch(item.title, searchQuery),
-      ),
-    [libraryItems, year, searchQuery],
-  );
-
-  const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
-  const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
-  const catalogItems = useMemo(() => visible, [visible]);
+  const catalogById = useMemo(() => {
+    const map = new Map<string, MediaCard>();
+    for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
+      map.set(item.id, item);
+    }
+    return map;
+  }, [catalogItems, searchItems, recentCards]);
 
   const libraryHeading = useMemo(() => {
     if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
     return home.libraries.find((library) => library.id === libraryId)?.name ?? "All Movies & Series";
   }, [home.libraries, libraryId]);
 
-  const searchActive = searchQuery.trim().length > 0;
+  const searchActive = debouncedSearch.trim().length > 0;
   const showSearchHints = searchActive;
+  const movies = useMemo(
+    () => searchItems.filter((item) => item.kind === "movie"),
+    [searchItems],
+  );
+  const series = useMemo(
+    () => searchItems.filter((item) => item.kind === "series"),
+    [searchItems],
+  );
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 280);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getMediaYears(libraryId).then((values) => {
+      if (!cancelled) setYears(values);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryId]);
+
+  useEffect(() => {
+    if (searchActive) return;
+    let cancelled = false;
+    setBrowseLoading(true);
+    setCatalogItems([]);
+    setHasMore(false);
+    void getMediaBrowse({
+      libraryId,
+      year,
+      offset: 0,
+      limit: pageSize,
+    }).then((result) => {
+      if (cancelled) return;
+      setCatalogItems(result.items);
+      setCatalogTotal(result.total);
+      setHasMore(result.hasMore);
+      setBrowseLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryId, year, pageSize, searchActive]);
+
+  useEffect(() => {
+    if (!searchActive) {
+      setSearchItems([]);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    void getMediaBrowse({
+      libraryId,
+      year,
+      q: debouncedSearch,
+      offset: 0,
+      limit: MEDIA_SEARCH_LIMIT,
+    }).then((result) => {
+      if (cancelled) return;
+      setSearchItems(result.items);
+      setSearchLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryId, year, debouncedSearch, searchActive]);
+
+  useEffect(() => {
+    if (searchActive || browseLoading || loadingMore || !hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        if (loadingMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        const offset = catalogItems.length;
+        void getMediaBrowse({
+          libraryId,
+          year,
+          offset,
+          limit: pageSize,
+        })
+          .then((result) => {
+            setCatalogItems((prev) => {
+              const seen = new Set(prev.map((item) => item.id));
+              const merged = [...prev];
+              for (const item of result.items) {
+                if (seen.has(item.id)) continue;
+                seen.add(item.id);
+                merged.push(item);
+              }
+              return merged;
+            });
+            setCatalogTotal(result.total);
+            setHasMore(result.hasMore);
+          })
+          .finally(() => {
+            loadingMoreRef.current = false;
+            setLoadingMore(false);
+          });
+      },
+      { rootMargin: "320px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    browseLoading,
+    catalogItems.length,
+    hasMore,
+    libraryId,
+    loadingMore,
+    pageSize,
+    searchActive,
+    year,
+  ]);
+
+  useEffect(() => {
+    if (searchActive || !isLgScreen || browseLoading) return;
+    if (catalogItems.length >= MEDIA_PAGE_SIZE_DESKTOP || !hasMore) return;
+    if (catalogItems.length >= pageSize) return;
+    let cancelled = false;
+    void getMediaBrowse({
+      libraryId,
+      year,
+      offset: catalogItems.length,
+      limit: MEDIA_PAGE_SIZE_DESKTOP - catalogItems.length,
+    }).then((result) => {
+      if (cancelled || result.items.length === 0) return;
+      setCatalogItems((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        const merged = [...prev];
+        for (const item of result.items) {
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          merged.push(item);
+        }
+        return merged;
+      });
+      setCatalogTotal(result.total);
+      setHasMore(result.hasMore);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [browseLoading, catalogItems.length, hasMore, isLgScreen, libraryId, pageSize, searchActive, year]);
 
   useEffect(() => {
     const refresh = () => setRecentRevision((value) => value + 1);
@@ -323,7 +429,10 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
         <RecentlyWatchedSlider items={recentCards} progressRevision={recentRevision} onSelect={setInfo} />
       ) : null}
 
-      {!searchActive && visible.length === 0 ? (
+      {!searchActive && browseLoading && catalogItems.length === 0 ? (
+        <p className={styles.empty}>Loading titles…</p>
+      ) : null}
+      {!searchActive && !browseLoading && catalogTotal === 0 ? (
         <p className={styles.empty}>
           {home.libraries.length === 0
             ? "No media libraries yet."
@@ -332,15 +441,23 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
               : "No titles in this library yet."}
         </p>
       ) : null}
-      {!searchActive && visible.length > 0 ? (
+      {!searchActive && catalogItems.length > 0 ? (
         <div className={styles.catalog}>
           <h2 className={styles.recentHeading}>{libraryHeading}</h2>
           <section className={styles.catalogSection} aria-label={libraryHeading}>
             <TitleGrid items={catalogItems} onSelect={setInfo} />
+            {hasMore ? (
+              <div ref={loadMoreRef} className={styles.loadMoreSentinel} aria-hidden>
+                {loadingMore ? "Loading more…" : null}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
-      {searchActive && visible.length === 0 ? (
+      {searchActive && searchLoading ? (
+        <p className={styles.empty}>Searching…</p>
+      ) : null}
+      {searchActive && !searchLoading && searchItems.length === 0 ? (
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
@@ -536,7 +653,14 @@ function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: M
             <span className={styles.posterFrame}>
               {item.posterUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                <img
+                  className={styles.posterImage}
+                  src={item.posterUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                />
               ) : (
                 <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
               )}

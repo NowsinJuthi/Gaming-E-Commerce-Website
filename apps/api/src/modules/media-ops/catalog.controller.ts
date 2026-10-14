@@ -139,6 +139,35 @@ export class CatalogController {
 
   @Public()
   @Roles()
+  @Get('media/browse')
+  browse(
+    @Query('libraryId') libraryId?: string,
+    @Query('year') year?: string,
+    @Query('q') q?: string,
+    @Query('offset') offset?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedYear = year?.trim() ? Number(year) : undefined;
+    const parsedOffset = offset?.trim() ? Number(offset) : 0;
+    const parsedLimit = limit?.trim() ? Number(limit) : 24;
+    return this.catalog.publicBrowse({
+      libraryId,
+      year: parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
+      q,
+      offset: Number.isFinite(parsedOffset) ? parsedOffset : 0,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : 24,
+    });
+  }
+
+  @Public()
+  @Roles()
+  @Get('media/years')
+  years(@Query('libraryId') libraryId?: string) {
+    return this.catalog.publicYears(libraryId);
+  }
+
+  @Public()
+  @Roles()
   @Get('media/titles/:id')
   title(@Param('id') id: string) {
     return this.catalog.publicTitle(id);

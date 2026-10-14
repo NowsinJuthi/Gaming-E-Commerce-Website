@@ -36,6 +36,67 @@ function libraryIdFromSource(sourceKey?: string | null): string | null {
   return Types.ObjectId.isValid(id) ? id : null;
 }
 
+const PUBLIC_CATALOG_FIELDS =
+  'title year kind posterUrl featured trending seasonCount sourceKey listedAt createdAt updatedAt';
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function publicCatalogFilter(options: {
+  libraryId?: string;
+  year?: number;
+  q?: string;
+}): Record<string, unknown> {
+  const filter: Record<string, unknown> = {
+    published: true,
+    availability: 'available',
+  };
+  const libraryId = options.libraryId?.trim();
+  if (libraryId && libraryId !== 'all' && Types.ObjectId.isValid(libraryId)) {
+    filter.sourceKey = new RegExp(`^${escapeRegex(libraryId)}:`);
+  }
+  if (options.year && options.year > 0) {
+    filter.year = options.year;
+  }
+  const words = options.q?.trim().toLowerCase().split(/\s+/).filter(Boolean) ?? [];
+  if (words.length > 0) {
+    filter.$and = words.map((word) => ({
+      title: new RegExp(escapeRegex(word), 'i'),
+    }));
+  }
+  return filter;
+}
+
+function mapPublicCard(doc: {
+  _id: Types.ObjectId | string;
+  title: string;
+  year: number;
+  kind: CatalogKind;
+  posterUrl?: string | null;
+  featured?: boolean;
+  trending?: boolean;
+  seasonCount?: number | null;
+  sourceKey?: string | null;
+  listedAt?: Date | string | null;
+  updatedAt?: Date | string;
+  createdAt?: Date | string;
+}) {
+  return {
+    id: String(doc._id),
+    title: doc.title,
+    year: doc.year,
+    kind: doc.kind,
+    posterUrl: doc.posterUrl ?? null,
+    featured: doc.featured ?? false,
+    trending: doc.trending ?? false,
+    seasonCount: doc.seasonCount ?? null,
+    libraryId: libraryIdFromSource(doc.sourceKey),
+    listedAt: doc.listedAt ? new Date(doc.listedAt).getTime() : null,
+    sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
+  };
+}
+
 function seriesFolderNameFromSource(sourceKey?: string | null): string | null {
   if (!sourceKey?.includes(':')) return null;
   const path = sourceKey.split(':').slice(1).join(':').replace(/\\/g, '/');
@@ -170,73 +231,56 @@ export class CatalogService {
 
   async publicHome() {
     this.libraryIndex.maybePruneAllLibraries();
-    const rows = await this.titles
-      .find({ published: true, availability: 'available' })
-      .sort({ featured: -1, trending: -1, updatedAt: -1 })
-      .limit(80)
-      .exec();
-    const items = rows.map((doc) => ({
-      id: String(doc._id),
-      title: doc.title,
-      year: doc.year,
-      kind: doc.kind,
-      posterUrl: doc.posterUrl ?? null,
-      featured: doc.featured,
-      trending: doc.trending,
-      seasonCount: doc.seasonCount ?? null,
-    }));
-    const featured = items.filter((item) => item.featured);
-    const movies = items.filter((item) => item.kind === 'movie');
-    const series = items.filter((item) => item.kind === 'series');
-    const trending = items.filter((item) => item.trending);
-    const shelves = [
-      { id: 'featured', title: 'Featured', items: featured },
-      { id: 'movies', title: 'Movies', items: movies },
-      { id: 'series', title: 'Series', items: series },
-      { id: 'trending', title: 'Trending', items: trending },
-    ].filter((row) => row.items.length > 0);
     const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
-    const catalogFields =
-      'title year kind posterUrl featured trending seasonCount sourceKey listedAt createdAt updatedAt';
-    const catalog = await this.titles
-      .find({ published: true, availability: 'available' })
-      .sort({ listedAt: -1, createdAt: -1, updatedAt: -1 })
-      .select(catalogFields)
-      .lean()
-      .exec();
-    const recentRows = await this.titles
-      .find({
-        published: true,
-        availability: 'available',
-        listedAt: { $ne: null },
-      })
-      .sort({ listedAt: -1 })
-      .limit(48)
-      .select(catalogFields)
-      .lean()
-      .exec();
-    const mapCard = (doc: (typeof catalog)[number]) => ({
-      id: String(doc._id),
-      title: doc.title,
-      year: doc.year,
-      kind: doc.kind,
-      posterUrl: doc.posterUrl ?? null,
-      featured: doc.featured,
-      trending: doc.trending,
-      seasonCount: doc.seasonCount ?? null,
-      libraryId: libraryIdFromSource(doc.sourceKey),
-      listedAt: doc.listedAt ? new Date(doc.listedAt).getTime() : null,
-      sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
-    });
+    const years = await this.publicYears('all');
     return {
-      hero: (featured.length > 0 ? featured : items).slice(0, 6),
-      rows: shelves,
+      hero: [],
+      rows: [],
+      items: [],
+      recentUploads: [],
       libraries: libraries.map((library) => ({
         id: String(library._id),
         name: library.name,
       })),
-      recentUploads: recentRows.map((doc) => mapCard(doc)),
-      items: catalog.map((doc) => mapCard(doc)),
+      years,
+    };
+  }
+
+  async publicYears(libraryId?: string) {
+    const filter = publicCatalogFilter({ libraryId: libraryId?.trim() || 'all' });
+    const values = await this.titles.distinct('year', filter).exec();
+    return values
+      .filter((value): value is number => typeof value === 'number' && value > 0)
+      .sort((a, b) => b - a);
+  }
+
+  async publicBrowse(options: {
+    libraryId?: string;
+    year?: number;
+    q?: string;
+    offset?: number;
+    limit?: number;
+  }) {
+    const filter = publicCatalogFilter(options);
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const limit = Math.min(48, Math.max(1, Math.floor(options.limit ?? 24)));
+    const [total, rows] = await Promise.all([
+      this.titles.countDocuments(filter).exec(),
+      this.titles
+        .find(filter)
+        .sort({ listedAt: -1, createdAt: -1, updatedAt: -1, title: 1 })
+        .skip(offset)
+        .limit(limit)
+        .select(PUBLIC_CATALOG_FIELDS)
+        .lean()
+        .exec(),
+    ]);
+    return {
+      items: rows.map((doc) => mapPublicCard(doc)),
+      total,
+      offset,
+      limit,
+      hasMore: offset + rows.length < total,
     };
   }
 

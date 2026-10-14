@@ -894,6 +894,15 @@
   color: rgb(var(--fg-muted));
 }
 
+.loadMoreSentinel {
+  grid-column: 1 / -1;
+  min-height: 2.5rem;
+  padding: 0.75rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: rgb(var(--fg-muted));
+}
+
 .empty {
   margin: 0;
   font-size: 0.9rem;
