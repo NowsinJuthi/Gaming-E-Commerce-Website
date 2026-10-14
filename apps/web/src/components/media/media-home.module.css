@@ -1067,6 +1067,25 @@
   color: rgb(var(--fg) / 0.92);
 }
 
+.overviewMuted {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 0.9rem;
+  color: rgb(var(--fg-muted));
+}
+
+.heroCompact {
+  height: 3.5rem;
+}
+
+.sheetCompactHero .headerBlock {
+  margin-top: -2.5rem;
+}
+
+.sheetCompactHero .headerCopy {
+  padding-top: 3.2rem;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -1164,4 +1183,100 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;
+}
+
+@media (max-width: 639px) {
+  .root {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .sheet {
+    width: 100%;
+    max-height: min(94dvh, 100%);
+    border-radius: 1rem 1rem 0 0;
+    border-bottom: 0;
+  }
+
+  .hero {
+    height: 6.5rem;
+  }
+
+  .heroCompact {
+    height: 2.75rem;
+  }
+
+  .headerBlock {
+    flex-direction: column;
+    align-items: center;
+    margin-top: -2.75rem;
+    padding: 0 1rem 0.85rem;
+    text-align: center;
+  }
+
+  .sheetCompactHero .headerBlock {
+    margin-top: -2rem;
+  }
+
+  .poster {
+    height: 7.5rem;
+    width: 5.15rem;
+  }
+
+  .headerCopy {
+    width: 100%;
+    padding-top: 0.65rem;
+  }
+
+  .sheetCompactHero .headerCopy {
+    padding-top: 0.65rem;
+  }
+
+  .headerCopy h2 {
+    font-size: 1.125rem;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .meta {
+    font-size: 0.8125rem;
+  }
+
+  .genres {
+    justify-content: center;
+  }
+
+  .body {
+    padding: 0.85rem 1rem 1.15rem;
+    padding-bottom: max(1.15rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .play,
+  .ghost {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .closeBtn {
+    top: 0.55rem;
+    right: 0.55rem;
+  }
+
+  .credits {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .person {
+    width: 5.25rem;
+  }
+
+  .person span {
+    height: 5.25rem;
+  }
 }

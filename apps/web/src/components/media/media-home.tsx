@@ -2,7 +2,15 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
@@ -35,6 +43,7 @@ type MediaDetails = {
   directors: string[];
   writers: string[];
   cast: { name: string; profileUrl: string | null }[];
+  detailsLoaded?: boolean;
 };
 
 const ALL_LIBRARIES = "all";
@@ -75,6 +84,8 @@ export function MediaHome({
   const [recentRevision, setRecentRevision] = useState(0);
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
+  const detailsCacheRef = useRef<Map<string, MediaDetails>>(new Map());
+  const [portalReady, setPortalReady] = useState(false);
   const catalogById = useMemo(() => {
     const map = new Map<string, MediaCard>();
     for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
@@ -318,22 +329,64 @@ export function MediaHome({
   }, [catalogById, recentRevision]);
 
   useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!info) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setInfo(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [info]);
+
+  useEffect(() => {
     if (!info) {
       setDetails(null);
       return;
     }
+    const cached = detailsCacheRef.current.get(info.id);
+    if (cached) {
+      setDetails(cached);
+    } else {
+      setDetails(null);
+    }
+
     let cancelled = false;
-    setDetails(null);
-    fetch(`${API_BASE}/media/titles/${info.id}`)
-      .then((response) => (response.ok ? (response.json() as Promise<MediaDetails>) : null))
-      .then((data) => {
-        if (!cancelled) setDetails(data);
-      })
-      .catch(() => {
-        if (!cancelled) setDetails(null);
-      });
+    let retryTimer: number | null = null;
+
+    const load = (allowRetry: boolean) => {
+      fetch(`${API_BASE}/media/titles/${info.id}`)
+        .then((response) => (response.ok ? (response.json() as Promise<MediaDetails>) : null))
+        .then((data) => {
+          if (cancelled || !data) return;
+          detailsCacheRef.current.set(info.id, data);
+          setDetails(data);
+          if (
+            allowRetry &&
+            !data.detailsLoaded &&
+            !data.overview?.trim() &&
+            (data.cast?.length ?? 0) === 0
+          ) {
+            retryTimer = window.setTimeout(() => load(false), 2800);
+          }
+        })
+        .catch(() => {
+          if (!cancelled && !cached) setDetails(null);
+        });
+    };
+
+    load(true);
+
     return () => {
       cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [info]);
 
@@ -480,14 +533,17 @@ export function MediaHome({
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
-      {info ? (
-        <MovieInfo
-          card={info}
-          details={details}
-          castRow={castRow}
-          onClose={() => setInfo(null)}
-        />
-      ) : null}
+      {info && portalReady
+        ? createPortal(
+            <MovieInfo
+              card={info}
+              details={details}
+              castRow={castRow}
+              onClose={() => setInfo(null)}
+            />,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -716,8 +772,13 @@ function MovieInfo({
   const title = details?.title || card.title;
   const year = details?.year || card.year;
   const poster = details?.posterUrl || card.posterUrl;
-  const backdrop = details?.backdropUrl || poster;
+  const backdrop = details?.backdropUrl || null;
   const kind = details?.kind || card.kind;
+  const detailsPending =
+    !details ||
+    (!details.detailsLoaded &&
+      !details.overview?.trim() &&
+      (details.cast?.length ?? 0) === 0);
   const meta = [
     year ? String(year) : null,
     details?.runtimeMinutes ? `${details.runtimeMinutes} min` : null,
@@ -727,11 +788,11 @@ function MovieInfo({
   return (
     <div className={styles.root} role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className={styles.backdrop} aria-label="Close" onClick={onClose} />
-      <div className={styles.sheet}>
-        <div className={styles.hero}>
+      <div className={`${styles.sheet}${backdrop ? "" : ` ${styles.sheetCompactHero}`}`}>
+        <div className={`${styles.hero}${backdrop ? "" : ` ${styles.heroCompact}`}`}>
           {backdrop ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={backdrop} alt="" referrerPolicy="no-referrer" />
+            <img src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
           ) : null}
           <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
             ×
@@ -741,7 +802,7 @@ function MovieInfo({
           <div className={styles.poster}>
             {poster ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={poster} alt="" referrerPolicy="no-referrer" />
+              <img src={poster} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async" />
             ) : null}
           </div>
           <div className={styles.headerCopy}>
@@ -758,7 +819,13 @@ function MovieInfo({
           </div>
         </div>
         <div className={styles.body}>
-          {details?.overview ? <p className={styles.overview}>{details.overview}</p> : <p className={styles.overview}>Loading movie info…</p>}
+          {details?.overview ? (
+            <p className={styles.overview}>{details.overview}</p>
+          ) : detailsPending ? (
+            <p className={styles.overviewMuted}>Loading description…</p>
+          ) : (
+            <p className={styles.overviewMuted}>No description available.</p>
+          )}
           <div className={styles.actions}>
             <Link className={styles.play} href={`/media/watch/${card.id}` as Route}>
               ▶ Play

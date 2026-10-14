@@ -146,6 +146,8 @@ function serializeAdmin(doc: CatalogTitleDocument) {
 
 @Injectable()
 export class CatalogService {
+  private readonly hydratingTitleIds = new Set<string>();
+
   constructor(
     @InjectModel(CatalogTitle.name)
     private readonly titles: Model<CatalogTitleDocument>,
@@ -182,32 +184,7 @@ export class CatalogService {
     };
   }
 
-  async publicTitle(id: string) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
-    const doc = await this.titles.findById(id).exec();
-    if (!doc || !doc.published || doc.availability !== 'available') {
-      throw new NotFoundException('Title not found.');
-    }
-    if (!doc.detailsLoaded) {
-      const details =
-        doc.kind === 'series'
-          ? await this.tmdb.detailsSeries(doc.title, doc.year)
-          : await this.tmdb.detailsMovie(doc.title, doc.year);
-      doc.detailsLoaded = true;
-      if (details) {
-        if (details.title) doc.title = details.title.slice(0, 200);
-        if (details.year) doc.year = details.year;
-        doc.overview = details.overview || null;
-        doc.runtimeMinutes = details.runtimeMinutes;
-        doc.rating = details.rating;
-        doc.genres = details.genres;
-        doc.backdropUrl = details.backdropUrl;
-        doc.directors = details.directors;
-        doc.writers = details.writers;
-        doc.cast = details.cast;
-      }
-      await doc.save();
-    }
+  private serializePublicTitle(doc: CatalogTitleDocument) {
     return {
       id: String(doc._id),
       title: doc.title,
@@ -226,7 +203,47 @@ export class CatalogService {
         profileUrl: person.profileUrl ?? null,
       })),
       seasonCount: doc.seasonCount ?? null,
+      detailsLoaded: Boolean(doc.detailsLoaded),
     };
+  }
+
+  private async hydrateTitleDetails(id: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id)) return;
+    const doc = await this.titles.findById(id).exec();
+    if (!doc || doc.detailsLoaded) return;
+    const details =
+      doc.kind === 'series'
+        ? await this.tmdb.detailsSeries(doc.title, doc.year)
+        : await this.tmdb.detailsMovie(doc.title, doc.year);
+    doc.detailsLoaded = true;
+    if (details) {
+      if (details.title) doc.title = details.title.slice(0, 200);
+      if (details.year) doc.year = details.year;
+      doc.overview = details.overview || null;
+      doc.runtimeMinutes = details.runtimeMinutes;
+      doc.rating = details.rating;
+      doc.genres = details.genres;
+      doc.backdropUrl = details.backdropUrl;
+      doc.directors = details.directors;
+      doc.writers = details.writers;
+      doc.cast = details.cast;
+    }
+    await doc.save();
+  }
+
+  async publicTitle(id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
+    const doc = await this.titles.findById(id).exec();
+    if (!doc || !doc.published || doc.availability !== 'available') {
+      throw new NotFoundException('Title not found.');
+    }
+    if (!doc.detailsLoaded && !this.hydratingTitleIds.has(id)) {
+      this.hydratingTitleIds.add(id);
+      void this.hydrateTitleDetails(id).finally(() => {
+        this.hydratingTitleIds.delete(id);
+      });
+    }
+    return this.serializePublicTitle(doc);
   }
 
   async publicHome() {
