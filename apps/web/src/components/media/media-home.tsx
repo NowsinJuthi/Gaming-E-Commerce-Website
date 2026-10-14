@@ -2,6 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -59,6 +60,7 @@ export function MediaHome({
   home: MediaHome;
   initialBrowse?: MediaBrowseResult;
 }) {
+  const pathname = usePathname();
   const isLgScreen = useLgScreen();
   const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -333,6 +335,16 @@ export function MediaHome({
   }, []);
 
   useEffect(() => {
+    setInfo(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  useEffect(() => {
     if (!info) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -536,6 +548,7 @@ export function MediaHome({
       {info && portalReady
         ? createPortal(
             <MovieInfo
+              key={info.id}
               card={info}
               details={details}
               castRow={castRow}
@@ -786,9 +799,9 @@ function MovieInfo({
   ].filter(Boolean);
 
   return (
-    <div className={styles.root} role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" className={styles.backdrop} aria-label="Close" onClick={onClose} />
-      <div className={`${styles.sheet}${backdrop ? "" : ` ${styles.sheetCompactHero}`}`}>
+    <div className={styles.infoOverlay} role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" className={styles.infoBackdrop} aria-label="Close" onClick={onClose} />
+      <div className={`${styles.infoSheet}${backdrop ? "" : ` ${styles.infoSheetCompactHero}`}`}>
         <div className={`${styles.hero}${backdrop ? "" : ` ${styles.heroCompact}`}`}>
           {backdrop ? (
             // eslint-disable-next-line @next/next/no-img-element

@@ -15,6 +15,12 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 10px 28px -18px rgb(0 0 0 / 0.55);
+  /* Let taps reach posters/grid under the sticky band (iOS backdrop-filter quirk). */
+  pointer-events: none;
+}
+
+.toolbarSticky .panel {
+  pointer-events: auto;
 }
 
 @media (min-width: 640px) {
@@ -550,6 +556,8 @@
 }
 
 .catalog {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
 }
@@ -788,6 +796,8 @@
 }
 
 .card {
+  position: relative;
+  z-index: 0;
   min-width: 0;
 }
 
@@ -915,7 +925,7 @@
   color: rgb(var(--fg-muted));
 }
 
-.root {
+.infoOverlay {
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -923,18 +933,22 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  pointer-events: auto;
 }
 
-.backdrop {
+.infoBackdrop {
   position: absolute;
   inset: 0;
+  z-index: 0;
   border: 0;
   background: rgb(0 0 0 / 0.72);
+  cursor: pointer;
 }
 
-.sheet {
+.infoSheet {
   position: relative;
   z-index: 1;
+  pointer-events: auto;
   display: flex;
   width: min(64rem, 100%);
   max-height: min(92dvh, 880px);
@@ -1078,11 +1092,11 @@
   height: 3.5rem;
 }
 
-.sheetCompactHero .headerBlock {
+.infoSheetCompactHero .headerBlock {
   margin-top: -2.5rem;
 }
 
-.sheetCompactHero .headerCopy {
+.infoSheetCompactHero .headerCopy {
   padding-top: 3.2rem;
 }
 
@@ -1186,12 +1200,12 @@
 }
 
 @media (max-width: 639px) {
-  .root {
+  .infoOverlay {
     align-items: flex-end;
     padding: 0;
   }
 
-  .sheet {
+  .infoSheet {
     width: 100%;
     max-height: min(94dvh, 100%);
     border-radius: 1rem 1rem 0 0;
@@ -1214,7 +1228,7 @@
     text-align: center;
   }
 
-  .sheetCompactHero .headerBlock {
+  .infoSheetCompactHero .headerBlock {
     margin-top: -2rem;
   }
 
@@ -1228,7 +1242,7 @@
     padding-top: 0.65rem;
   }
 
-  .sheetCompactHero .headerCopy {
+  .infoSheetCompactHero .headerCopy {
     padding-top: 0.65rem;
   }
 
