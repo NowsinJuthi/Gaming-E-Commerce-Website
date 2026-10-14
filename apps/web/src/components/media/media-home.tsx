@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -710,12 +710,13 @@ function SearchHintSection({
   );
 }
 
-function watchHref(id: string): Route {
-  return `/media/watch/${id}` as Route;
+function mediaWatchPath(id: string): string {
+  return `/media/watch/${encodeURIComponent(id)}`;
 }
 
-function goToWatch(id: string, router: ReturnType<typeof useRouter>) {
-  router.push(watchHref(id));
+/** Full navigation — reliable on mobile/WebKit when client router or Link taps fail. */
+function navigateToWatch(id: string) {
+  window.location.assign(mediaWatchPath(id));
 }
 
 function PosterPlayLink({
@@ -729,24 +730,17 @@ function PosterPlayLink({
   children: ReactNode;
   className?: string;
 }) {
-  const router = useRouter();
-  const href = watchHref(id);
   const linkClass = className ? `${styles.posterLink} ${className}` : styles.posterLink;
 
   return (
-    <Link
+    <button
+      type="button"
       className={linkClass}
-      href={href}
-      prefetch={false}
       aria-label={`Play ${title}`}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        goToWatch(id, router);
-      }}
+      onClick={() => navigateToWatch(id)}
     >
       {children}
-    </Link>
+    </button>
   );
 }
 
@@ -761,14 +755,13 @@ function WatchPlayButton({
   children: ReactNode;
   onBeforeNavigate?: () => void;
 }) {
-  const router = useRouter();
   return (
     <button
       type="button"
       className={className}
       onClick={() => {
         onBeforeNavigate?.();
-        goToWatch(id, router);
+        navigateToWatch(id);
       }}
     >
       {children}
