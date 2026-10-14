@@ -30,8 +30,28 @@ type MediaDetails = {
 const ALL_LIBRARIES = "all";
 const RECENTLY_ADDED_LIMIT = 24;
 
-function sortByNewestFirst(items: MediaCard[]): MediaCard[] {
-  return [...items].sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
+/** Samba uploads (listedAt) always before catalog imports; then newest sortAt. */
+function sortUploadFirst(items: MediaCard[]): MediaCard[] {
+  return [...items].sort((a, b) => {
+    const aListed = a.listedAt ?? 0;
+    const bListed = b.listedAt ?? 0;
+    if (aListed > 0 || bListed > 0) {
+      if (aListed !== bListed) return bListed - aListed;
+      if (aListed > 0) return -1;
+      if (bListed > 0) return 1;
+    }
+    return (b.sortAt ?? 0) - (a.sortAt ?? 0);
+  });
+}
+
+/** Within a library menu: recent uploads first, then A–Z (not whole-library createdAt shuffle). */
+function sortLibraryBrowse(items: MediaCard[]): MediaCard[] {
+  const uploaded = items.filter((item) => (item.listedAt ?? 0) > 0);
+  const rest = items.filter((item) => !(item.listedAt ?? 0));
+  return [
+    ...sortUploadFirst(uploaded),
+    ...[...rest].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" })),
+  ];
 }
 
 type RecentWatchCard = MediaCard & {
@@ -70,7 +90,7 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
       seen.add(item.id);
       return true;
     });
-    return sortByNewestFirst(unique);
+    return sortUploadFirst(unique);
   }, [home.items, home.rows]);
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +106,7 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
       libraryId === ALL_LIBRARIES
         ? source
         : source.filter((item) => item.libraryId === libraryId);
-    return sortByNewestFirst(scoped);
+    return libraryId === ALL_LIBRARIES ? sortUploadFirst(scoped) : sortLibraryBrowse(scoped);
   }, [source, libraryId]);
 
   const years = useMemo(
@@ -104,24 +124,19 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
 
   const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
   const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
+  const catalogItems = useMemo(() => visible, [visible]);
 
+  /** Always global — Bangla/Hindi/Tamil/English uploads together, not tied to Media Menu filter. */
   const recentlyAdded = useMemo(() => {
-    const scopedRecent = (home.recentUploads ?? []).filter((item) =>
-      libraryId === ALL_LIBRARIES ? true : item.libraryId === libraryId,
-    );
-    if (scopedRecent.length > 0) {
-      return scopedRecent.slice(0, RECENTLY_ADDED_LIMIT);
+    const global = home.recentUploads ?? [];
+    if (global.length > 0) {
+      return global.slice(0, RECENTLY_ADDED_LIMIT);
     }
-    const withUploadStamp = libraryItems.filter(
-      (item) => typeof item.listedAt === "number" && item.listedAt > 0,
+    return sortUploadFirst(source.filter((item) => (item.listedAt ?? 0) > 0)).slice(
+      0,
+      RECENTLY_ADDED_LIMIT,
     );
-    if (withUploadStamp.length > 0) {
-      return [...withUploadStamp]
-        .sort((a, b) => (b.listedAt ?? 0) - (a.listedAt ?? 0))
-        .slice(0, RECENTLY_ADDED_LIMIT);
-    }
-    return libraryItems.slice(0, RECENTLY_ADDED_LIMIT);
-  }, [home.recentUploads, libraryItems, libraryId]);
+  }, [home.recentUploads, source]);
 
   const libraryHeading = useMemo(() => {
     if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
@@ -337,16 +352,9 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
       {!searchActive && visible.length > 0 ? (
         <div className={styles.catalog}>
           <h2 className={styles.recentHeading}>{libraryHeading}</h2>
-          {movies.length > 0 ? (
-            <section className={styles.catalogSection} aria-label="Movies">
-              <TitleGrid items={movies} onSelect={setInfo} />
-            </section>
-          ) : null}
-          {series.length > 0 ? (
-            <section className={styles.catalogSection} aria-label="Series">
-              <TitleGrid items={series} onSelect={setInfo} />
-            </section>
-          ) : null}
+          <section className={styles.catalogSection} aria-label={libraryHeading}>
+            <TitleGrid items={catalogItems} onSelect={setInfo} />
+          </section>
         </div>
       ) : null}
       {searchActive && visible.length === 0 ? (
@@ -408,8 +416,8 @@ function RecentlyAddedSlider({
   };
 
   return (
-    <section className={styles.recentSection} aria-label="Recently added">
-      <h2 className={styles.recentHeading}>Recently added</h2>
+    <section className={styles.recentSection} aria-label="Recently uploaded">
+      <h2 className={styles.recentHeading}>Recently uploaded</h2>
       <div className={styles.recentCarousel}>
         {canScrollBack ? (
           <button

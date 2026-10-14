@@ -211,7 +211,7 @@ export class CatalogService {
         listedAt: { $ne: null },
       })
       .sort({ listedAt: -1 })
-      .limit(24)
+      .limit(48)
       .select(catalogFields)
       .lean()
       .exec();
