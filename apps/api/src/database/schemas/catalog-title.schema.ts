@@ -94,3 +94,5 @@ export type CatalogTitleDocument = HydratedDocument<CatalogTitle>;
 export const CatalogTitleSchema = SchemaFactory.createForClass(CatalogTitle);
 CatalogTitleSchema.index({ kind: 1, title: 1 });
 CatalogTitleSchema.index({ sourceKey: 1 }, { unique: true, sparse: true });
+CatalogTitleSchema.index({ published: 1, availability: 1, listedAt: -1, createdAt: -1 });
+CatalogTitleSchema.index({ published: 1, availability: 1, year: -1 });

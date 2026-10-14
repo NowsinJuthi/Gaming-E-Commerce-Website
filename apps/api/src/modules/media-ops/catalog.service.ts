@@ -230,7 +230,6 @@ export class CatalogService {
   }
 
   async publicHome() {
-    this.libraryIndex.maybePruneAllLibraries();
     const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
     const years = await this.publicYears('all');
     return {
@@ -243,6 +242,28 @@ export class CatalogService {
         name: library.name,
       })),
       years,
+    };
+  }
+
+  /** One round-trip for SSR: libraries, years, and first catalog page. */
+  async publicBootstrap(limit = 12) {
+    this.libraryIndex.maybePruneAllLibraries();
+    const [libraries, years, browse] = await Promise.all([
+      this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').lean().exec(),
+      this.publicYears('all'),
+      this.publicBrowse({ offset: 0, limit, libraryId: 'all' }),
+    ]);
+    return {
+      libraries: libraries.map((library) => ({
+        id: String(library._id),
+        name: library.name,
+      })),
+      years,
+      items: browse.items,
+      total: browse.total,
+      offset: browse.offset,
+      limit: browse.limit,
+      hasMore: browse.hasMore,
     };
   }
 
@@ -264,23 +285,24 @@ export class CatalogService {
     const filter = publicCatalogFilter(options);
     const offset = Math.max(0, Math.floor(options.offset ?? 0));
     const limit = Math.min(48, Math.max(1, Math.floor(options.limit ?? 24)));
-    const [total, rows] = await Promise.all([
-      this.titles.countDocuments(filter).exec(),
-      this.titles
-        .find(filter)
-        .sort({ listedAt: -1, createdAt: -1, updatedAt: -1, title: 1 })
-        .skip(offset)
-        .limit(limit)
-        .select(PUBLIC_CATALOG_FIELDS)
-        .lean()
-        .exec(),
-    ]);
+    const rows = await this.titles
+      .find(filter)
+      .sort({ listedAt: -1, createdAt: -1, updatedAt: -1, title: 1 })
+      .skip(offset)
+      .limit(limit + 1)
+      .select(PUBLIC_CATALOG_FIELDS)
+      .lean()
+      .exec();
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const items = page.map((doc) => mapPublicCard(doc));
+    const total = hasMore ? offset + limit + 1 : offset + items.length;
     return {
-      items: rows.map((doc) => mapPublicCard(doc)),
+      items,
       total,
       offset,
       limit,
-      hasMore: offset + rows.length < total,
+      hasMore,
     };
   }
 

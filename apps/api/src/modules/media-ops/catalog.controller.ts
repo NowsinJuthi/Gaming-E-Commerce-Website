@@ -139,6 +139,17 @@ export class CatalogController {
 
   @Public()
   @Roles()
+  @Get('media/bootstrap')
+  bootstrap(@Query('limit') limit?: string) {
+    const parsedLimit = limit?.trim() ? Number(limit) : 12;
+    const safeLimit = Number.isFinite(parsedLimit)
+      ? Math.min(48, Math.max(1, Math.floor(parsedLimit)))
+      : 12;
+    return this.catalog.publicBootstrap(safeLimit);
+  }
+
+  @Public()
+  @Roles()
   @Get('media/browse')
   browse(
     @Query('libraryId') libraryId?: string,

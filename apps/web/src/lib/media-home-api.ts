@@ -1,5 +1,20 @@
 import { API_BASE } from "@/lib/api";
 
+function resolveMediaApiBase(): string {
+  if (typeof window === "undefined") {
+    const internal = process.env.INTERNAL_API_URL?.trim();
+    if (internal) return internal.replace(/\/$/, "");
+  }
+  return API_BASE.replace(/\/$/, "");
+}
+
+function mediaFetchInit(): RequestInit {
+  if (typeof window === "undefined") {
+    return { next: { revalidate: 30 } };
+  }
+  return { cache: "no-store" };
+}
+
 export type MediaCard = {
   id: string;
   title: string;
@@ -106,9 +121,10 @@ function browseQuery(params: MediaBrowseParams): string {
 
 export async function getMediaBrowse(params: MediaBrowseParams = {}): Promise<MediaBrowseResult> {
   try {
-    const res = await fetch(`${API_BASE}/media/browse?${browseQuery(params)}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(
+      `${resolveMediaApiBase()}/media/browse?${browseQuery(params)}`,
+      mediaFetchInit(),
+    );
     if (!res.ok) return parseMediaBrowse(null);
     return parseMediaBrowse(await res.json());
   } catch {
@@ -122,7 +138,7 @@ export async function getMediaYears(libraryId: string): Promise<number[]> {
       libraryId && libraryId !== "all"
         ? `?libraryId=${encodeURIComponent(libraryId)}`
         : "";
-    const res = await fetch(`${API_BASE}/media/years${q}`, { cache: "no-store" });
+    const res = await fetch(`${resolveMediaApiBase()}/media/years${q}`, mediaFetchInit());
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data.filter((y) => typeof y === "number" && y > 0) : [];
@@ -133,12 +149,53 @@ export async function getMediaYears(libraryId: string): Promise<number[]> {
 
 export async function getMediaHome(): Promise<MediaHome> {
   try {
-    const res = await fetch(`${API_BASE}/media/home`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`${resolveMediaApiBase()}/media/home`, mediaFetchInit());
     if (!res.ok) return EMPTY_MEDIA_HOME;
     return parseMediaHome(await res.json());
   } catch {
     return EMPTY_MEDIA_HOME;
+  }
+}
+
+export type MediaBootstrap = {
+  home: MediaHome;
+  browse: MediaBrowseResult;
+};
+
+export async function getMediaBootstrap(limit = MEDIA_PAGE_SIZE_MOBILE): Promise<MediaBootstrap> {
+  try {
+    const res = await fetch(
+      `${resolveMediaApiBase()}/media/bootstrap?limit=${limit}`,
+      mediaFetchInit(),
+    );
+    if (!res.ok) {
+      return { home: EMPTY_MEDIA_HOME, browse: parseMediaBrowse(null) };
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    const libraries = Array.isArray(data.libraries)
+      ? (data.libraries as MediaLibraryMenu[])
+      : [];
+    const years = Array.isArray(data.years)
+      ? (data.years as number[]).filter((y) => typeof y === "number" && y > 0)
+      : [];
+    const browse = parseMediaBrowse({
+      items: data.items,
+      total: data.total,
+      offset: data.offset,
+      limit: data.limit,
+      hasMore: data.hasMore,
+    });
+    return {
+      home: {
+        hero: [],
+        rows: [],
+        items: [],
+        libraries,
+        years,
+      },
+      browse,
+    };
+  } catch {
+    return { home: EMPTY_MEDIA_HOME, browse: parseMediaBrowse(null) };
   }
 }

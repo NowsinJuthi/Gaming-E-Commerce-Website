@@ -54,6 +54,7 @@ export function MediaHome({
   const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
+  const skipInitialBrowseRef = useRef(Boolean(initialBrowse?.items?.length));
 
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,6 +103,10 @@ export function MediaHome({
   }, [searchQuery]);
 
   useEffect(() => {
+    if (libraryId === ALL_LIBRARIES && (home.years?.length ?? 0) > 0) {
+      setYears(home.years ?? []);
+      return;
+    }
     let cancelled = false;
     void getMediaYears(libraryId).then((values) => {
       if (!cancelled) setYears(values);
@@ -109,10 +114,18 @@ export function MediaHome({
     return () => {
       cancelled = true;
     };
-  }, [libraryId]);
+  }, [home.years, libraryId]);
 
   useEffect(() => {
     if (searchActive) return;
+    if (
+      skipInitialBrowseRef.current &&
+      libraryId === ALL_LIBRARIES &&
+      !year
+    ) {
+      skipInitialBrowseRef.current = false;
+      return;
+    }
     let cancelled = false;
     setBrowseLoading(true);
     setCatalogItems([]);
@@ -132,7 +145,9 @@ export function MediaHome({
     return () => {
       cancelled = true;
     };
-  }, [libraryId, year, pageSize, searchActive]);
+    // pageSize intentionally omitted — desktop growth uses append effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryId, year, searchActive]);
 
   useEffect(() => {
     if (!searchActive) {
@@ -210,15 +225,14 @@ export function MediaHome({
   ]);
 
   useEffect(() => {
-    if (searchActive || !isLgScreen || browseLoading) return;
-    if (catalogItems.length >= MEDIA_PAGE_SIZE_DESKTOP || !hasMore) return;
-    if (catalogItems.length >= pageSize) return;
+    if (searchActive || browseLoading) return;
+    if (catalogItems.length >= pageSize || !hasMore) return;
     let cancelled = false;
     void getMediaBrowse({
       libraryId,
       year,
       offset: catalogItems.length,
-      limit: MEDIA_PAGE_SIZE_DESKTOP - catalogItems.length,
+      limit: pageSize - catalogItems.length,
     }).then((result) => {
       if (cancelled || result.items.length === 0) return;
       setCatalogItems((prev) => {
@@ -237,7 +251,15 @@ export function MediaHome({
     return () => {
       cancelled = true;
     };
-  }, [browseLoading, catalogItems.length, hasMore, isLgScreen, libraryId, pageSize, searchActive, year]);
+  }, [
+    browseLoading,
+    catalogItems.length,
+    hasMore,
+    libraryId,
+    pageSize,
+    searchActive,
+    year,
+  ]);
 
   useEffect(() => {
     const refresh = () => setRecentRevision((value) => value + 1);
