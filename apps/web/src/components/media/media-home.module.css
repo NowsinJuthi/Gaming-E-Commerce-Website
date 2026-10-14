@@ -134,6 +134,7 @@
   bottom: 0;
   left: 0;
   z-index: 2;
+  pointer-events: none;
   height: 0.22rem;
   background: rgb(1 19 26 / 0.88);
 }
@@ -791,6 +792,8 @@
 }
 
 .posterLink {
+  position: relative;
+  z-index: 0;
   display: block;
   width: 100%;
   border: 0;
@@ -799,6 +802,7 @@
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .posterFrame {
@@ -839,6 +843,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
   background: linear-gradient(180deg, rgb(1 19 26 / 0.08), rgb(1 19 26 / 0.42));
   opacity: 0;
   transition: opacity 0.28s ease;
@@ -852,6 +857,7 @@
 .playButton {
   height: 3rem;
   width: 3rem;
+  pointer-events: none;
   border-radius: 999px;
   border: 2px solid rgb(38 191 176 / 0.8);
   background: rgb(1 19 26 / 0.45);

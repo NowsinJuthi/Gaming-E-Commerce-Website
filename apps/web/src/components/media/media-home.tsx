@@ -54,7 +54,9 @@ export function MediaHome({
   const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
-  const skipInitialBrowseRef = useRef(Boolean(initialBrowse?.items?.length));
+  const lastBrowseFilterKeyRef = useRef<string | null>(
+    initialBrowse?.items?.length ? `${ALL_LIBRARIES}|` : null,
+  );
 
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState("");
@@ -118,14 +120,9 @@ export function MediaHome({
 
   useEffect(() => {
     if (searchActive) return;
-    if (
-      skipInitialBrowseRef.current &&
-      libraryId === ALL_LIBRARIES &&
-      !year
-    ) {
-      skipInitialBrowseRef.current = false;
-      return;
-    }
+    const filterKey = `${libraryId}|${year}`;
+    if (lastBrowseFilterKeyRef.current === filterKey) return;
+    lastBrowseFilterKeyRef.current = filterKey;
     let cancelled = false;
     setBrowseLoading(true);
     setCatalogItems([]);
