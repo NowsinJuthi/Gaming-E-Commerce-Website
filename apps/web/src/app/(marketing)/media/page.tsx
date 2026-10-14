@@ -13,7 +13,10 @@ export const revalidate = 30;
 export default async function MediaPage() {
   const { home, browse: initialBrowse } = await getMediaBootstrap(MEDIA_PAGE_SIZE_MOBILE);
   return (
-    <main className={`pb-8 pt-2 sm:pb-12 sm:pt-4 ${HOME_PAGE_BG}`}>
+    <main
+      className={`media-page-root pb-8 pt-2 sm:pb-12 sm:pt-4 ${HOME_PAGE_BG}`}
+      data-media-page=""
+    >
       <div className={HOME_CONTAINER_CLS}>
         <MediaHome home={home} initialBrowse={initialBrowse} />
       </div>

@@ -36382,6 +36382,11 @@ a:has(> .site-logo-img),
   min-width: 0;
 }
 
+/* Let fixed header receive taps above scroll/composited media layers (WebKit). */
+.chrome-shell .site-footer {
+  pointer-events: auto;
+}
+
 @media (max-width: 767px) {
   .admin-panel,
   .customer-panel {

@@ -15,6 +15,10 @@
   padding: 0.15rem 0 0.35rem;
   background: rgb(var(--bg) / 0.92);
   box-shadow: 0 10px 28px -18px rgb(0 0 0 / 0.55);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
+  touch-action: manipulation;
 }
 
 .recentSection {
@@ -179,7 +183,7 @@
 }
 
 .panel {
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0.9rem;
   border: 1px solid rgb(var(--border) / 0.72);
   background: linear-gradient(180deg, rgb(var(--bg-elevated)) 0%, rgb(var(--bg)) 100%);
@@ -190,6 +194,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .librarySection {
@@ -919,12 +925,14 @@
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 20;
+  z-index: 500;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
   pointer-events: auto;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @media (min-width: 640px) {

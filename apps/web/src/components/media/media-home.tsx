@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
@@ -86,6 +88,11 @@ export function MediaHome({
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const detailsCacheRef = useRef<Map<string, MediaDetails>>(new Map());
+  const [infoPortalReady, setInfoPortalReady] = useState(false);
+
+  useLayoutEffect(() => {
+    setInfoPortalReady(true);
+  }, []);
   const catalogById = useMemo(() => {
     const map = new Map<string, MediaCard>();
     for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
@@ -341,14 +348,11 @@ export function MediaHome({
 
   useEffect(() => {
     if (!info) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setInfo(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [info]);
@@ -540,15 +544,18 @@ export function MediaHome({
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
-      {info ? (
-        <MovieInfo
-          key={info.id}
-          card={info}
-          details={details}
-          castRow={castRow}
-          onClose={() => setInfo(null)}
-        />
-      ) : null}
+      {info && infoPortalReady
+        ? createPortal(
+            <MovieInfo
+              key={info.id}
+              card={info}
+              details={details}
+              castRow={castRow}
+              onClose={() => setInfo(null)}
+            />,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
