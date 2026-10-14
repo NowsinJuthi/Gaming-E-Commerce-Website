@@ -25,6 +25,7 @@
 
 .recentSection {
   min-width: 0;
+  margin-bottom: 0.85rem;
 }
 
 .recentHeading {
@@ -550,7 +551,14 @@
 .catalog {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+}
+
+.catalog > .recentHeading {
+  margin-bottom: 0.45rem;
+}
+
+.catalogSection + .catalogSection {
+  margin-top: 1.75rem;
 }
 
 .catalogSection {

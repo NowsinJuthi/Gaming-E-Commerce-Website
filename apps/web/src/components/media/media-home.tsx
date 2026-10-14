@@ -84,6 +84,11 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
   const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
 
+  const libraryHeading = useMemo(() => {
+    if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
+    return home.libraries.find((library) => library.id === libraryId)?.name ?? "All Movies & Series";
+  }, [home.libraries, libraryId]);
+
   const searchActive = searchQuery.trim().length > 0;
   const showSearchHints = searchActive;
 
@@ -288,6 +293,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
       ) : null}
       {!searchActive && visible.length > 0 ? (
         <div className={styles.catalog}>
+          <h2 className={styles.recentHeading}>{libraryHeading}</h2>
           {movies.length > 0 ? (
             <section className={styles.catalogSection} aria-label="Movies">
               <TitleGrid items={movies} onSelect={setInfo} />
