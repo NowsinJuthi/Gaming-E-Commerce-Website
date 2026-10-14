@@ -793,7 +793,6 @@
 
 .card {
   position: relative;
-  z-index: 1;
   min-width: 0;
 }
 
@@ -941,7 +940,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 500;
+  z-index: 900;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1122,6 +1121,8 @@
 }
 
 .actions {
+  position: relative;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
@@ -1139,6 +1140,9 @@
 }
 
 .play {
+  border: 0;
+  cursor: pointer;
+  pointer-events: auto;
   background: #26bfb0;
   color: #04211d;
   text-decoration: none;

@@ -6,14 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
@@ -89,11 +87,6 @@ export function MediaHome({
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const detailsCacheRef = useRef<Map<string, MediaDetails>>(new Map());
-  const [infoPortalReady, setInfoPortalReady] = useState(false);
-
-  useLayoutEffect(() => {
-    setInfoPortalReady(true);
-  }, []);
   const catalogById = useMemo(() => {
     const map = new Map<string, MediaCard>();
     for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
@@ -545,18 +538,15 @@ export function MediaHome({
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
-      {info && infoPortalReady
-        ? createPortal(
-            <MovieInfo
-              key={info.id}
-              card={info}
-              details={details}
-              castRow={castRow}
-              onClose={() => setInfo(null)}
-            />,
-            document.body,
-          )
-        : null}
+      {info ? (
+        <MovieInfo
+          key={info.id}
+          card={info}
+          details={details}
+          castRow={castRow}
+          onClose={() => setInfo(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -720,6 +710,14 @@ function SearchHintSection({
   );
 }
 
+function watchHref(id: string): Route {
+  return `/media/watch/${id}` as Route;
+}
+
+function goToWatch(id: string, router: ReturnType<typeof useRouter>) {
+  router.push(watchHref(id));
+}
+
 function PosterPlayLink({
   id,
   title,
@@ -732,19 +730,49 @@ function PosterPlayLink({
   className?: string;
 }) {
   const router = useRouter();
-  const href = `/media/watch/${id}` as Route;
+  const href = watchHref(id);
+  const linkClass = className ? `${styles.posterLink} ${className}` : styles.posterLink;
+
   return (
     <Link
-      className={className ? `${styles.posterLink} ${className}` : styles.posterLink}
+      className={linkClass}
       href={href}
+      prefetch={false}
       aria-label={`Play ${title}`}
       onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
-        router.push(href);
+        goToWatch(id, router);
       }}
     >
       {children}
     </Link>
+  );
+}
+
+function WatchPlayButton({
+  id,
+  className,
+  children,
+  onBeforeNavigate,
+}: {
+  id: string;
+  className?: string;
+  children: ReactNode;
+  onBeforeNavigate?: () => void;
+}) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => {
+        onBeforeNavigate?.();
+        goToWatch(id, router);
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -856,9 +884,9 @@ function MovieInfo({
             <p className={styles.overviewMuted}>No description available.</p>
           )}
           <div className={styles.actions}>
-            <Link className={styles.play} href={`/media/watch/${card.id}` as Route}>
+            <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
               ▶ Play
-            </Link>
+            </WatchPlayButton>
             <span className={styles.ghost}>+ My List</span>
             <span className={styles.ghost}>Mark watched</span>
           </div>
