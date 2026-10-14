@@ -133,6 +133,11 @@ export class MediaOpsController {
     return this.media.listLibraries();
   }
 
+  @Get('admin/movie-server/dashboard')
+  movieServerDashboard() {
+    return this.media.movieServerDashboard();
+  }
+
   @Post('admin/libraries')
   createLibrary(@Body() body: LibraryBody) {
     return this.media.createLibrary(body);

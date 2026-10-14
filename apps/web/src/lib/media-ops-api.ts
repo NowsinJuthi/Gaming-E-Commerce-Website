@@ -45,6 +45,22 @@ export function listMediaLibraries() {
   }>("/admin/libraries");
 }
 
+export type MovieServerDashboardLibrary = AdminMediaLibrary & {
+  catalogCount: number;
+};
+
+export function getMovieServerDashboard() {
+  return authRequest<{
+    totals: {
+      libraries: number;
+      movies: number;
+      series: number;
+      catalog: number;
+    };
+    libraries: MovieServerDashboardLibrary[];
+  }>("/admin/movie-server/dashboard");
+}
+
 export function createMediaLibrary(body: {
   name: string;
   kind: MediaLibraryKind;

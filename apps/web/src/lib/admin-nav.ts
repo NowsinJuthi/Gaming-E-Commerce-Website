@@ -260,12 +260,18 @@ export const ADMIN_NAV: NavSection[] = [
     title: "Movie Server",
     items: [
       {
-        href: "/admin/libraries",
+        href: "/admin/movie-server",
         label: "Movie Server",
         icon: LayersIcon,
         accent: "accent",
-        keywords: ["media", "library", "samba", "folder", "movies", "tv"],
+        keywords: ["media", "library", "samba", "folder", "movies", "tv", "dashboard"],
         children: [
+          {
+            href: "/admin/movie-server",
+            label: "Dashboard",
+            icon: ChartIcon,
+            keywords: ["overview", "stats", "count", "libraries"],
+          },
           {
             href: "/admin/libraries",
             label: "Media library",

@@ -98,6 +98,51 @@ export class MediaOpsService {
     };
   }
 
+  async movieServerDashboard() {
+    const rows = await this.libraries.find().sort({ kind: 1, name: 1 }).exec();
+    const agg = await this.catalogTitles
+      .aggregate<{ _id: { libId: string; kind: CatalogKind }; count: number }>([
+        { $match: { sourceKey: { $exists: true, $nin: [null, ''] } } },
+        {
+          $project: {
+            libId: { $arrayElemAt: [{ $split: ['$sourceKey', ':'] }, 0] },
+          },
+        },
+        { $group: { _id: { libId: '$libId' }, count: { $sum: 1 } } },
+      ])
+      .exec();
+
+    const countByLib = new Map<string, number>();
+    for (const row of agg) {
+      const libId = row._id.libId;
+      if (!Types.ObjectId.isValid(libId)) continue;
+      countByLib.set(libId, row.count);
+    }
+
+    let totalMovies = 0;
+    let totalSeries = 0;
+    const libraries = rows.map((doc) => {
+      const base = serializeLibrary(doc);
+      const catalogCount = countByLib.get(String(doc._id)) ?? 0;
+      if (doc.kind === 'tv') totalSeries += catalogCount;
+      else totalMovies += catalogCount;
+      return {
+        ...base,
+        catalogCount,
+      };
+    });
+
+    return {
+      totals: {
+        libraries: libraries.length,
+        movies: totalMovies,
+        series: totalSeries,
+        catalog: totalMovies + totalSeries,
+      },
+      libraries,
+    };
+  }
+
   async createLibrary(input: {
     name: string;
     kind: MediaLibraryKind;
