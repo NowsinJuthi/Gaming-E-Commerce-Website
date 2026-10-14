@@ -510,6 +510,32 @@ export function Header({
               </button>
             ) : null}
 
+            {/* Mobile nav + search — left side */}
+            <button
+              type="button"
+              onClick={() => {
+                setUserOpen(false);
+                if (onOpenMobileMenu) {
+                  onOpenMobileMenu();
+                } else {
+                  setMenuOpen((open) => !open);
+                }
+              }}
+              className={`${iconBtn} lg:hidden`}
+              aria-label="Open menu"
+              aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
+            >
+              <MenuIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen((o) => !o)}
+              className={`${iconBtn} lg:hidden`}
+              aria-label="Search"
+            >
+              <SearchIcon />
+            </button>
+
             {/* Logo — desktop only */}
             <div className="hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
               {isAdminRoute ? (
@@ -585,29 +611,11 @@ export function Header({
               </button>
             )}
 
-            {/* Mobile nav — right side, next to search */}
-            <button
-              type="button"
-              onClick={() => {
-                setUserOpen(false);
-                if (onOpenMobileMenu) {
-                  onOpenMobileMenu();
-                } else {
-                  setMenuOpen((open) => !open);
-                }
-              }}
-              className={`${iconBtn} lg:hidden`}
-              aria-label="Open menu"
-              aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
-            >
-              <MenuIcon />
-            </button>
-
-            {/* Search */}
+            {/* Search — desktop only (mobile search is on the left) */}
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
-              className={iconBtn}
+              className={`${iconBtn} hidden lg:grid`}
               aria-label="Search"
             >
               <SearchIcon />
