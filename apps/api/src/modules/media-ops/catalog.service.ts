@@ -150,7 +150,7 @@ export class CatalogService {
     const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
-      .sort({ title: 1 })
+      .sort({ createdAt: -1, updatedAt: -1 })
       .select('title year kind posterUrl featured trending seasonCount sourceKey')
       .lean()
       .exec();

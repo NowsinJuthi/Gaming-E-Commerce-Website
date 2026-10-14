@@ -9,6 +9,7 @@ import {
   isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
+import { touchRecentWatched } from "@/lib/media-recent-watched";
 import styles from "./media-player.module.css";
 
 /** Bust CDN/browser cache when ffmpeg starts a new pack (Movie Server uses t= + g=). */
@@ -521,7 +522,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   const remember = useCallback(
     (seconds: number) => {
-      if (seconds > 8) localStorage.setItem(`uniqbd-watch:${titleId}`, String(Math.floor(seconds)));
+      if (seconds > 8) {
+        localStorage.setItem(`uniqbd-watch:${titleId}`, String(Math.floor(seconds)));
+        touchRecentWatched(titleId);
+      }
     },
     [titleId],
   );

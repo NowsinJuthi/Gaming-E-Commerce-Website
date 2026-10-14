@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
+import { readRecentWatched } from "@/lib/media-recent-watched";
 import type { MediaCard, MediaHome } from "@/lib/media-home-api";
 
 type MediaDetails = {
@@ -47,7 +48,9 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const [year, setYear] = useState("");
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
+  const [recentRevision, setRecentRevision] = useState(0);
   const castRow = useRef<HTMLDivElement>(null);
+  const catalogById = useMemo(() => new Map(source.map((item) => [item.id, item])), [source]);
   const libraryItems = useMemo(
     () =>
       libraryId === ALL_LIBRARIES
@@ -75,6 +78,24 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const searchActive = searchQuery.trim().length > 0;
   const showSearchHints = searchActive;
 
+  const recentlyWatched = useMemo(() => {
+    void recentRevision;
+    return readRecentWatched()
+      .map((entry) => catalogById.get(entry.id))
+      .filter((item): item is MediaCard => Boolean(item));
+  }, [catalogById, recentRevision]);
+
+  useEffect(() => {
+    const refresh = () => setRecentRevision((value) => value + 1);
+    refresh();
+    window.addEventListener("uniqbd-media-recent-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("uniqbd-media-recent-changed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
   useEffect(() => {
     if (!info) {
       setDetails(null);
@@ -98,6 +119,10 @@ export function MediaHome({ home }: { home: MediaHome }) {
   return (
     <div className={styles.page}>
       <h1 className="sr-only">Media</h1>
+
+      {!searchActive && recentlyWatched.length > 0 ? (
+        <RecentlyWatchedSlider items={recentlyWatched} onSelect={setInfo} />
+      ) : null}
 
       <section className={styles.panel}>
         <div className={styles.filters}>
@@ -236,6 +261,46 @@ export function MediaHome({ home }: { home: MediaHome }) {
         />
       ) : null}
     </div>
+  );
+}
+
+function RecentlyWatchedSlider({
+  items,
+  onSelect,
+}: {
+  items: MediaCard[];
+  onSelect: (item: MediaCard) => void;
+}) {
+  return (
+    <section className={styles.recentSection} aria-label="Recently Watched">
+      <h2 className={styles.recentHeading}>Recently Watched</h2>
+      <div className={styles.recentTrack}>
+        {items.map((item) => (
+          <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
+            <Link
+              className={styles.posterLink}
+              href={`/media/watch/${item.id}` as Route}
+              aria-label={`Play ${item.title}`}
+            >
+              <span className={styles.posterFrame}>
+                {item.posterUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+                )}
+                <span className={styles.playOverlay} aria-hidden>
+                  <span className={styles.playButton} />
+                </span>
+              </span>
+            </Link>
+            <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
+              {item.title}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
