@@ -5,6 +5,24 @@
   padding-bottom: 4rem;
 }
 
+.toolbarSticky {
+  position: sticky;
+  top: 3.5rem;
+  z-index: 40;
+  margin: -0.15rem -0.05rem 0;
+  padding: 0.15rem 0.05rem 0.35rem;
+  background: rgb(var(--bg) / 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px -18px rgb(0 0 0 / 0.55);
+}
+
+@media (min-width: 640px) {
+  .toolbarSticky {
+    top: 4rem;
+  }
+}
+
 .recentSection {
   min-width: 0;
 }

@@ -161,10 +161,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
     <div className={styles.page}>
       <h1 className="sr-only">Media</h1>
 
-      {!searchActive && recentCards.length > 0 ? (
-        <RecentlyWatchedSlider items={recentCards} onSelect={setInfo} />
-      ) : null}
-
+      <div className={styles.toolbarSticky}>
       <section className={styles.panel}>
         <div className={styles.filters}>
           <div className={styles.filterRowMobile1}>
@@ -265,6 +262,11 @@ export function MediaHome({ home }: { home: MediaHome }) {
           </div>
         ) : null}
       </section>
+      </div>
+
+      {!searchActive && recentCards.length > 0 ? (
+        <RecentlyWatchedSlider items={recentCards} onSelect={setInfo} />
+      ) : null}
 
       {!searchActive && visible.length === 0 ? (
         <p className={styles.empty}>
