@@ -16,6 +16,12 @@ export type CatalogBulkAction =
   | 'feature'
   | 'trending';
 
+function catalogSortTimestamp(updatedAt?: Date | string, createdAt?: Date | string): number {
+  const updated = updatedAt ? new Date(updatedAt).getTime() : 0;
+  const created = createdAt ? new Date(createdAt).getTime() : 0;
+  return Math.max(updated, created) || 0;
+}
+
 function libraryIdFromSource(sourceKey?: string | null): string | null {
   const id = sourceKey?.split(':')[0]?.trim() ?? '';
   return Types.ObjectId.isValid(id) ? id : null;
@@ -83,7 +89,8 @@ export class CatalogService {
     const filter: Record<string, unknown> = { kind };
     const term = q?.trim();
     if (term) {
-      filter.title = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ title: regex }, { videoFileName: regex }, { sourceKey: regex }];
     }
     const total = await this.titles.countDocuments(filter).exec();
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -181,7 +188,7 @@ export class CatalogService {
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
       .sort({ createdAt: -1, updatedAt: -1 })
-      .select('title year kind posterUrl featured trending seasonCount sourceKey')
+      .select('title year kind posterUrl featured trending seasonCount sourceKey createdAt updatedAt')
       .lean()
       .exec();
     return {
@@ -201,6 +208,7 @@ export class CatalogService {
         trending: doc.trending,
         seasonCount: doc.seasonCount ?? null,
         libraryId: libraryIdFromSource(doc.sourceKey),
+        sortAt: catalogSortTimestamp(doc.updatedAt, doc.createdAt),
       })),
     };
   }

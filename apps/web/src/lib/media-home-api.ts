@@ -10,6 +10,7 @@ export type MediaCard = {
   trending: boolean;
   seasonCount: number | null;
   libraryId?: string | null;
+  sortAt?: number;
 };
 
 export type MediaLibraryMenu = {

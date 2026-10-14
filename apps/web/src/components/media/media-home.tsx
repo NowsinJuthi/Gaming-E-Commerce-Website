@@ -29,6 +29,10 @@ type MediaDetails = {
 
 const ALL_LIBRARIES = "all";
 
+function sortByNewestFirst(items: MediaCard[]): MediaCard[] {
+  return [...items].sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
+}
+
 type RecentWatchCard = MediaCard & {
   runtimeMinutes?: number | null;
 };
@@ -45,11 +49,12 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const source = useMemo(() => {
     const raw = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
     const seen = new Set<string>();
-    return raw.filter((item) => {
+    const unique = raw.filter((item) => {
       if (seen.has(item.id)) return false;
       seen.add(item.id);
       return true;
     });
+    return sortByNewestFirst(unique);
   }, [home.items, home.rows]);
   const [libraryId, setLibraryId] = useState(ALL_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,13 +65,13 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const catalogById = useMemo(() => new Map(source.map((item) => [item.id, item])), [source]);
-  const libraryItems = useMemo(
-    () =>
+  const libraryItems = useMemo(() => {
+    const scoped =
       libraryId === ALL_LIBRARIES
         ? source
-        : source.filter((item) => item.libraryId === libraryId),
-    [source, libraryId],
-  );
+        : source.filter((item) => item.libraryId === libraryId);
+    return sortByNewestFirst(scoped);
+  }, [source, libraryId]);
 
   const years = useMemo(
     () => [...new Set(libraryItems.map((item) => item.year).filter((value) => value > 0))].sort((a, b) => b - a),
