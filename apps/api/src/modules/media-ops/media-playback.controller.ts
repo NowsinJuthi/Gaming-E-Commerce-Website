@@ -63,6 +63,38 @@ export class MediaPlaybackController {
   ) {
     try {
       const baseFile = decodeURIComponent(file.split('?')[0]?.split('#')[0] ?? file);
+      if (baseFile === 'media.mp4') {
+        const child = this.playback.beginStream(sessionId);
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+        const stdout = child.stdout;
+        if (!stdout) {
+          res.status(404).end();
+          return;
+        }
+        stdout.pipe(res);
+        const stop = () => {
+          if (child.exitCode == null && !child.killed) child.kill('SIGTERM');
+        };
+        res.on('close', stop);
+        child.on('close', () => {
+          if (!res.writableEnded) res.end();
+        });
+        child.on('error', () => {
+          if (!res.headersSent) res.status(500).end();
+          else if (!res.writableEnded) res.end();
+        });
+        return;
+      }
+      const caption = this.playback.captionText(sessionId, baseFile);
+      if (caption != null) {
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(caption);
+        return;
+      }
       if (baseFile === 'index.m3u8') {
         const body = await this.playback.playlistForServe(sessionId);
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');

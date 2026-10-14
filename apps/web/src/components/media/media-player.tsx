@@ -621,7 +621,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         );
       });
 
-    if (nativeHls(video)) {
+    const progressive = /\/media\.mp4(?:\?|$)/i.test(playlist);
+    if (progressive || nativeHls(video)) {
       await waitForAttach((resolve, reject) => {
         const onMeta = () => {
           video.removeEventListener("loadedmetadata", onMeta);

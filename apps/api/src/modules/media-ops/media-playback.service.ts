@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
+import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { join, resolve, sep } from 'path';
 import {
@@ -77,6 +77,8 @@ type Session = {
   message: string;
   complete: boolean;
   dir: string;
+  sourceFile: string | null;
+  captions: Map<string, string>;
   cacheName: string | null;
   remote: SmbPlayback | null;
   incoming: SmbIncoming | null;
@@ -111,6 +113,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     this.mediaServer.listen(0, '127.0.0.1');
     this.sweepTimer = setInterval(() => void this.sweep(), 10 * 60 * 1000);
     this.sweepTimer.unref?.();
+    void this.removePlaybackPacks();
   }
 
   onModuleDestroy() {
@@ -167,6 +170,51 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (!session) throw new NotFoundException('That playback session expired. Play the video again.');
     session.touchedAt = Date.now();
     return this.present(session);
+  }
+
+  captionText(sessionId: string, name: string): string | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    session.touchedAt = Date.now();
+    return session.captions.get(name) ?? null;
+  }
+
+  /** Stream the original file to the browser. Nothing is written under uploads. */
+  beginStream(sessionId: string): ChildProcess {
+    const session = this.sessions.get(sessionId);
+    if (!session?.sourceFile || session.status !== 'ready') throw new NotFoundException();
+    session.touchedAt = Date.now();
+    this.stopFfmpeg(session);
+    const audio = session.audioTracks[session.audioIndex];
+    const args = [
+      '-hide_banner', '-loglevel', 'error', '-nostdin',
+      ...this.ffmpegInputArgs(session.sourceFile, false, session.startSeconds),
+      '-map', '0:v:0',
+      '-map', `0:a:${session.audioIndex}?`,
+      '-sn', '-dn',
+      ...this.progressiveArgs(session, audio?.codec ?? ''),
+      '-f', 'mp4',
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+      'pipe:1',
+    ];
+    const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    session.ffmpeg = child;
+    if (child.pid && process.platform === 'linux') {
+      spawn('renice', ['-n', '10', '-p', String(child.pid)], { stdio: 'ignore' }).on('error', () => undefined);
+    }
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
+    });
+    child.on('close', (code) => {
+      if (session.ffmpeg === child) session.ffmpeg = null;
+      if (code && code !== 0) this.logger.warn(`playback stream ended ${code}: ${stderr.slice(0, 400)}`);
+    });
+    child.on('error', (error) => {
+      if (session.ffmpeg === child) session.ffmpeg = null;
+      this.logger.warn(`playback stream failed: ${error.message}`);
+    });
+    return child;
   }
 
   /** Growing EVENT playlists may list segments before the file exists; drop missing entries and bust segment cache on pack restart. */
@@ -273,8 +321,6 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (episodes.length === 0) throw new NotFoundException('No video file was found for this title.');
     const episodeIndex = Math.min(Math.max(Math.floor(request.episodeIndex ?? 0), 0), episodes.length - 1);
     const id = randomBytes(16).toString('hex');
-    const dir = join(resolveUploadsRoot(), 'hls-pack', id);
-    await mkdir(dir, { recursive: true });
     return {
       id,
       token: 1,
@@ -303,7 +349,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       status: 'preparing',
       message: 'Starting playback…',
       complete: false,
-      dir,
+      dir: '',
+      sourceFile: null,
+      captions: new Map(),
       cacheName: null,
       remote: null,
       incoming: null,
@@ -326,9 +374,11 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
         session.startSeconds = 0;
         if (!session.durationSeconds) session.durationSeconds = session.runtimeSeconds;
       }
-      await this.pack(session, file, token);
-      if (session.token !== token) return;
+      session.sourceFile = file;
       if (!session.incoming) void this.extractCaptions(session, file, token);
+      if (session.token !== token) return;
+      session.status = 'ready';
+      session.message = '';
     } catch (error) {
       if (session.token !== token) return;
       session.status = 'error';
@@ -594,6 +644,18 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.message = '';
   }
 
+  /** In-memory remux. Video is copied. Audio is AAC only when it is not already AAC/MP3. */
+  private progressiveArgs(session: Session, audioCodec: string): string[] {
+    const codec = session.videoCodec.toLowerCase();
+    const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
+    const video = hevc ? ['-c:v', 'copy', '-tag:v', 'hvc1'] : ['-c:v', 'copy'];
+    const audio =
+      audioCodec === 'aac' || audioCodec === 'mp3'
+        ? ['-c:a', 'copy']
+        : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1:first_pts=0'];
+    return [...video, ...audio, '-max_muxing_queue_size', '9999'];
+  }
+
   /** Direct stream: never re-encode video. Audio becomes AAC only when it is not already AAC/MP3. */
   private codecArgs(
     session: Session,
@@ -620,16 +682,16 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     for (const track of session.subtitles) {
       if (session.token !== token) return;
       const name = `captions-${track.index}.vtt`;
-      const output = join(session.dir, name);
       try {
-        await this.runCapture(this.bin('ffmpeg'), [
-          '-hide_banner', '-loglevel', 'error', '-y',
+        const vtt = await this.runCapture(this.bin('ffmpeg'), [
+          '-hide_banner', '-loglevel', 'error',
           '-i', file,
           '-map', `0:s:${track.index}`,
-          '-c:s', 'webvtt',
-          output,
+          '-f', 'webvtt',
+          'pipe:1',
         ], 90_000);
         if (session.token !== token) return;
+        session.captions.set(name, vtt);
         track.url = `/api/media/playback/sessions/${session.id}/${name}`;
       } catch {
         track.url = null;
@@ -754,7 +816,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       sessionId: session.id,
       status: session.status,
       message: session.message,
-      playlistUrl: `/api/media/playback/sessions/${session.id}/index.m3u8`,
+      playlistUrl: `/api/media/playback/sessions/${session.id}/media.mp4`,
       title: session.title,
       year: session.year,
       kind: session.kind,
@@ -775,6 +837,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async clearSegments(session: Session) {
+    if (!session.dir) return;
     const files = await readdir(session.dir).catch(() => [] as string[]);
     await Promise.all(
       files
@@ -784,8 +847,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async clearCaptions(session: Session) {
-    const files = await readdir(session.dir).catch(() => [] as string[]);
-    await Promise.all(files.filter((name) => name.endsWith('.vtt')).map((name) => unlink(join(session.dir, name)).catch(() => undefined)));
+    session.captions.clear();
   }
 
   private feedFfmpeg(session: Session, child: ChildProcess) {
@@ -869,7 +931,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async removePlaybackPacks() {
+    await rm(join(resolveUploadsRoot(), 'hls-pack'), { recursive: true, force: true }).catch(() => undefined);
+  }
+
   private async sweep() {
+    await this.removePlaybackPacks();
     const now = Date.now();
     for (const [id, session] of this.sessions) {
       if (now - session.touchedAt < 3 * 60 * 60 * 1000) continue;
@@ -877,7 +944,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       session.remote?.close();
       session.remote = null;
       this.sessions.delete(id);
-      await rm(session.dir, { recursive: true, force: true }).catch(() => undefined);
+      if (session.dir) await rm(session.dir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
