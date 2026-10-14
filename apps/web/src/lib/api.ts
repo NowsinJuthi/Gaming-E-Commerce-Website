@@ -1012,7 +1012,15 @@ export async function authFormDataRequest<T>(path: string, form: FormData): Prom
       0,
     );
   }
-  if (!res.ok) await throwApiError(res);
+  if (!res.ok) {
+    if (res.status === 413) {
+      throw new ApiError(
+        "File is too large for the current upload limit. Reload nginx on the server (client_max_body_size 25g on uniqbd.com), or if Cloudflare is proxied, use DNS-only (grey cloud) for upload or keep movies under 100MB.",
+        413,
+      );
+    }
+    await throwApiError(res);
+  }
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
