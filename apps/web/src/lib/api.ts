@@ -987,11 +987,13 @@ function largeUploadOrigin(): string | null {
   return raw.replace(/\/$/, "");
 }
 
-/** Movie-Server style: Next.js streams to API (same-origin or grey-cloud upload host). */
+/** Samba upload URL: grey-cloud host → Nest directly; main site → Next stream route (Movie-Server pattern). */
 export function resolveSmbMediaUploadProxyUrl(serverId: string): string {
   const direct = largeUploadOrigin();
-  const origin =
-    direct || (typeof window !== "undefined" ? window.location.origin : "");
+  if (direct) {
+    return `${direct}/api/admin/media-shares/${serverId}/upload`;
+  }
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   return `${origin.replace(/\/$/, "")}/api/smb-media-upload/${serverId}`;
 }
 

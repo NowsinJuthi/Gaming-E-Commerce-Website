@@ -5,9 +5,14 @@ export const dynamic = "force-dynamic";
 /** Large Samba uploads (network + disk copy). */
 export const maxDuration = 3600;
 
-const API =
-  (process.env.INTERNAL_API_URL || "http://127.0.0.1:4000/api").replace(/\/api\/?$/, "") +
-  "/api";
+function internalApiBase(): string {
+  const raw = (process.env.INTERNAL_API_URL || "http://127.0.0.1:4000/api").trim();
+  const normalized = raw.replace(/\/$/, "");
+  if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(normalized)) {
+    return normalized.replace(/\/api\/?$/, "") + "/api";
+  }
+  return "http://127.0.0.1:4000/api";
+}
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ message }, { status });
@@ -31,7 +36,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return jsonError("Empty upload body.", 400);
     }
 
-    const target = `${API}/admin/media-shares/${encodeURIComponent(id)}/upload`;
+    const target = `${internalApiBase()}/admin/media-shares/${encodeURIComponent(id)}/upload`;
 
     const headers = new Headers();
     const contentType = req.headers.get("content-type");
