@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   BellIcon,
   GridIcon,
@@ -33,20 +34,29 @@ function MobileProfileThemeToggle() {
   const theme = useThemeStore((s) => s.theme);
   const hydrated = useThemeStore((s) => s.hydrated);
   const setTheme = useThemeStore((s) => s.setTheme);
+  const [animating, setAnimating] = useState(false);
   const resolved = hydrated ? resolveTheme(theme) : resolveTheme("system");
   const isDark = resolved === "dark" || resolved === "gaming" || resolved === "amoled";
   const display = isDark ? "dark" : "light";
 
+  function toggleTheme() {
+    setAnimating(true);
+    setTheme(isDark ? "light" : "dark");
+    window.setTimeout(() => setAnimating(false), 500);
+  }
+
   return (
     <button
       type="button"
-      className="shell-icon-btn lg:hidden"
+      className={`shell-icon-btn profile-theme-toggle lg:hidden${animating ? " profile-theme-toggle--active" : ""}`}
       aria-label={
         isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
       }
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={toggleTheme}
     >
-      <ThemePreferenceIcon preference={display} className="h-5 w-5 text-brand" />
+      <span key={display} className="profile-theme-toggle__icon" aria-hidden>
+        <ThemePreferenceIcon preference={display} className="h-5 w-5 text-brand" />
+      </span>
     </button>
   );
 }
