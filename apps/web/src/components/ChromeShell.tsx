@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { isMediaCatalogPath } from "@/lib/storefront-nav";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ContactSocialProvider } from "@/components/ContactSocialProvider";
@@ -47,12 +48,12 @@ export function ChromeShell({
   const isAdmin = pathname?.startsWith("/admin");
   const isCustomerPanel = isCustomerPanelRoute(pathname);
   const isCompactStorefrontMain = pathname === "/";
-  const isMediaCatalog = pathname === "/media";
+  const isMediaCatalog = isMediaCatalogPath(pathname);
 
   useEffect(() => {
     document.documentElement.classList.toggle(
       "media-catalog-route",
-      Boolean(isMediaCatalog),
+      isMediaCatalog,
     );
     return () => {
       document.documentElement.classList.remove("media-catalog-route");
@@ -100,9 +101,10 @@ export function ChromeShell({
                 whatsappUrl={initialContactSocial?.whatsappUrl}
               >
                 <Header />
+                <div className="h-14 shrink-0 sm:h-16" aria-hidden />
                 <div
                   id="main-content"
-                  className={`min-w-0 mt-14 sm:mt-16${isCompactStorefrontMain ? "" : " flex-1"}`}
+                  className={`min-w-0${isCompactStorefrontMain ? "" : " flex-1"}`}
                 >
                   {children}
                 </div>

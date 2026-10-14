@@ -45,6 +45,7 @@ import {
   splitStorefrontHeaderNav,
   type SiteMenuLink,
 } from "@/lib/site-menus";
+import { hardNavigateFromMediaCatalog } from "@/lib/storefront-nav";
 
 const iconBtn = "shell-icon-btn";
 
@@ -131,7 +132,10 @@ function NavOthersDropdown({
                 href={item.href as "/"}
                 role="menuitem"
                 className={`site-nav-dropdown__item${itemActive ? " site-nav-dropdown__item--active" : ""}`}
-                onClick={() => setOpen(false)}
+                onClick={(event) => {
+                  setOpen(false);
+                  hardNavigateFromMediaCatalog(pathname, item.href, event);
+                }}
               >
                 {item.label}
               </Link>
@@ -187,7 +191,10 @@ function MobileNavOthers({
               <li key={item.href}>
                 <Link
                   href={item.href as "/"}
-                  onClick={onClose}
+                  onClick={(event) => {
+                    onClose();
+                    hardNavigateFromMediaCatalog(pathname, item.href, event);
+                  }}
                   className={`admin-nav-link ${itemActive ? "admin-nav-link-active" : ""}`}
                 >
                   {itemActive ? <span className="admin-nav-indicator" aria-hidden /> : null}
@@ -232,6 +239,9 @@ function NavLinks({
             key={item.href}
             href={item.href as "/"}
             className={active ? "site-nav-link site-nav-link--active" : "site-nav-link"}
+            onClick={(event) => {
+              hardNavigateFromMediaCatalog(pathname, item.href, event);
+            }}
           >
             {item.label}
           </Link>
@@ -248,11 +258,19 @@ function NavLinksFallback({
   navItems: SiteMenuLink[];
   headerOthers: SiteMenuLink[];
 }) {
+  const pathname = usePathname() ?? "";
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
       {primary.map((item) => (
-        <Link key={item.href} href={item.href as "/"} className="site-nav-link">
+        <Link
+          key={item.href}
+          href={item.href as "/"}
+          className="site-nav-link"
+          onClick={(event) => {
+            hardNavigateFromMediaCatalog(pathname, item.href, event);
+          }}
+        >
           {item.label}
         </Link>
       ))}
@@ -283,7 +301,10 @@ function MobileNavItems({
           <li key={item.href} className="shrink-0">
             <Link
               href={item.href as "/"}
-              onClick={onClose}
+              onClick={(event) => {
+                onClose();
+                hardNavigateFromMediaCatalog(pathname, item.href, event);
+              }}
               className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}
             >
               {active ? <span className="admin-nav-indicator" aria-hidden /> : null}
@@ -308,6 +329,7 @@ function MobileNavItemsFallback({
   headerOthers: SiteMenuLink[];
   onClose: () => void;
 }) {
+  const pathname = usePathname() ?? "";
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
@@ -315,7 +337,14 @@ function MobileNavItemsFallback({
         const Icon = siteMenuIcon(item.href);
         return (
           <li key={item.href} className="shrink-0">
-            <Link href={item.href as "/"} onClick={onClose} className="admin-nav-link">
+            <Link
+              href={item.href as "/"}
+              onClick={(event) => {
+                onClose();
+                hardNavigateFromMediaCatalog(pathname, item.href, event);
+              }}
+              className="admin-nav-link"
+            >
               <span className="admin-nav-icon-box">
                 <Icon className="h-4 w-4" />
               </span>
@@ -506,7 +535,7 @@ export function Header({
 
   const headerChrome = (
     <>
-      <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[1000] border-b">
+      <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b">
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
@@ -560,7 +589,12 @@ export function Header({
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
-                <SiteLogo href="/" />
+                <SiteLogo
+                  href="/"
+                  onLinkClick={(event) => {
+                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+                  }}
+                />
               )}
             </div>
           </div>
@@ -572,7 +606,12 @@ export function Header({
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
-                <SiteLogo href="/" />
+                <SiteLogo
+                  href="/"
+                  onLinkClick={(event) => {
+                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+                  }}
+                />
               )}
             </div>
 

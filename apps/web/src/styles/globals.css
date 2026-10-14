@@ -3040,7 +3040,7 @@
 
   /* Storefront chrome â€” 3D depth (colors unchanged) */
   .site-header {
-    z-index: 1000;
+    z-index: 10000;
     pointer-events: auto;
     border-bottom-color: rgb(var(--border) / 0.65);
     background: linear-gradient(
@@ -36398,14 +36398,24 @@ body:not(.recaptcha-badge-visible) .grecaptcha-badge {
 }
 
 /*
- * WebKit can deliver header-band taps to #main-content on /media (composited catalog).
- * Pass stray hits through; children keep pointer-events: auto for posters/filters.
+ * WebKit: composited /media catalog can steal taps meant for the header.
+ * Only interactive nodes receive hits; empty grid/background passes through.
  */
-html.media-catalog-route #main-content {
+html.media-catalog-route .media-page-root {
   pointer-events: none;
 }
 
-html.media-catalog-route #main-content > * {
+html.media-catalog-route .media-page-root :where(
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  [role="button"],
+  [role="link"],
+  [role="dialog"]
+) {
   pointer-events: auto;
 }
 
