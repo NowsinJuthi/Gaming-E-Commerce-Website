@@ -494,24 +494,6 @@ export function Header({
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
-            {/* Hamburger — mobile only */}
-            <button
-              type="button"
-              onClick={() => {
-                setUserOpen(false);
-                if (onOpenMobileMenu) {
-                  onOpenMobileMenu();
-                } else {
-                  setMenuOpen((open) => !open);
-                }
-              }}
-              className={`${iconBtn} lg:hidden`}
-              aria-label="Open menu"
-              aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
-            >
-              <MenuIcon />
-            </button>
-
             {/* Admin refresh — mobile only (storefront: no theme/bell on mobile) */}
             {isAdminRoute ? (
               <button
@@ -602,6 +584,24 @@ export function Header({
                 {themeToggleIcon}
               </button>
             )}
+
+            {/* Mobile nav — right side, next to search */}
+            <button
+              type="button"
+              onClick={() => {
+                setUserOpen(false);
+                if (onOpenMobileMenu) {
+                  onOpenMobileMenu();
+                } else {
+                  setMenuOpen((open) => !open);
+                }
+              }}
+              className={`${iconBtn} lg:hidden`}
+              aria-label="Open menu"
+              aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
+            >
+              <MenuIcon />
+            </button>
 
             {/* Search */}
             <button
