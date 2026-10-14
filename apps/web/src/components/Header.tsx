@@ -512,7 +512,7 @@ export function Header({
               <MenuIcon />
             </button>
 
-            {/* Theme toggle or refresh — mobile only */}
+            {/* Admin refresh — mobile only (storefront: no theme/bell on mobile) */}
             {isAdminRoute ? (
               <button
                 type="button"
@@ -526,33 +526,6 @@ export function Header({
                   aria-hidden
                 />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className={`${iconBtn} lg:hidden`}
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {themeToggleIcon}
-              </button>
-            )}
-
-            {/* Notification bell — mobile only, sits left of the centered logo */}
-            {loggedIn ? (
-              <Link
-                href={notifHref}
-                className={`${iconBtn} relative lg:hidden`}
-                aria-label={
-                  unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
-                }
-              >
-                <BellIcon className="h-5 w-5 text-[#f5b737]" />
-                {unread > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                ) : null}
-              </Link>
             ) : null}
 
             {/* Logo — desktop only */}
@@ -656,7 +629,7 @@ export function Header({
               </Link>
             )}
 
-            {/* Bell — desktop only (mobile bell is in left column) */}
+            {/* Bell — desktop only */}
             {loggedIn ? (
               <Link
                 href={notifHref}
