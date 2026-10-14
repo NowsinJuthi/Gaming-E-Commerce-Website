@@ -7,6 +7,7 @@ import {
   CatalogTitleDocument,
 } from '../../database/schemas/catalog-title.schema';
 import { MediaLibrary, MediaLibraryDocument } from '../../database/schemas/media-library.schema';
+import { LibraryIndexService } from './library-index.service';
 import { TmdbMetadataService } from './tmdb-metadata.service';
 
 export type CatalogBulkAction =
@@ -81,6 +82,7 @@ export class CatalogService {
     private readonly titles: Model<CatalogTitleDocument>,
     @InjectModel(MediaLibrary.name)
     private readonly libraries: Model<MediaLibraryDocument>,
+    private readonly libraryIndex: LibraryIndexService,
     private readonly tmdb: TmdbMetadataService,
   ) {}
 
@@ -159,6 +161,7 @@ export class CatalogService {
   }
 
   async publicHome() {
+    this.libraryIndex.maybePruneAllLibraries();
     const rows = await this.titles
       .find({ published: true, availability: 'available' })
       .sort({ featured: -1, trending: -1, updatedAt: -1 })

@@ -11,12 +11,15 @@ import { TmdbMetadataService } from './tmdb-metadata.service';
 
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const FRESH_MS = 10 * 60 * 1000;
+const PRUNE_DEBOUNCE_MS = 3 * 60 * 1000;
 const MAX_TITLES = 1000;
 const ENRICH_LIMIT = 16;
 
 @Injectable()
 export class LibraryIndexService {
   private readonly logger = new Logger(LibraryIndexService.name);
+  private lastBackgroundPruneAt = 0;
+  private backgroundPruneRunning = false;
 
   constructor(
     @InjectModel(MediaLibrary.name)
@@ -36,7 +39,15 @@ export class LibraryIndexService {
     const deadline = Date.now() + 22_000;
     for (const library of rows) {
       if (Date.now() > deadline) break;
-      if (library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) continue;
+      if (library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) {
+        try {
+          await this.pruneLibraryFromDisk(library, kind);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Library prune failed.';
+          this.logger.warn(`Could not prune ${library.name}: ${message}`);
+        }
+        continue;
+      }
       try {
         await this.indexLibrary(library, kind, false);
       } catch (error) {
@@ -60,6 +71,36 @@ export class LibraryIndexService {
     const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
     const result = await this.indexLibrary(library, kind, true);
     return result;
+  }
+
+  /** Drop catalog rows whose files were removed from storage (debounced, for /media home). */
+  maybePruneAllLibraries(): void {
+    const now = Date.now();
+    if (this.backgroundPruneRunning || now - this.lastBackgroundPruneAt < PRUNE_DEBOUNCE_MS) {
+      return;
+    }
+    this.backgroundPruneRunning = true;
+    this.lastBackgroundPruneAt = now;
+    void this.pruneAllEnabledLibraries()
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Background media prune failed.';
+        this.logger.warn(message);
+      })
+      .finally(() => {
+        this.backgroundPruneRunning = false;
+      });
+  }
+
+  async pruneAllEnabledLibraries(): Promise<number> {
+    const rows = await this.libraries.find({ enabled: true }).exec();
+    const deadline = Date.now() + 28_000;
+    let removed = 0;
+    for (const library of rows) {
+      if (Date.now() > deadline) break;
+      const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
+      removed += await this.pruneLibraryFromDisk(library, kind);
+    }
+    return removed;
   }
 
   async libraryItems(id: string) {
@@ -87,12 +128,17 @@ export class LibraryIndexService {
     force: boolean,
   ): Promise<{ indexed: number; matched: number; unmatched: number; removed: number; logs: string[] }> {
     if (!force && library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) {
+      const removed = await this.pruneLibraryFromDisk(library, kind);
+      const logs = [`${library.name} was scanned recently.`];
+      if (removed > 0) {
+        logs.push(`Removed ${removed} title${removed === 1 ? '' : 's'} that are no longer on disk.`);
+      }
       return {
         indexed: library.itemCount,
         matched: Math.max(0, library.itemCount - library.unmatchedCount),
         unmatched: library.unmatchedCount,
-        removed: 0,
-        logs: [`${library.name} was scanned recently.`],
+        removed,
+        logs,
       };
     }
     const logs: string[] = [];
@@ -103,7 +149,7 @@ export class LibraryIndexService {
     const entries = await this.list(library, library.smbRemotePath ?? '');
     const videos = entries.filter((entry) => !entry.isDirectory && this.isVideo(entry.name));
     const folders = entries.filter((entry) => entry.isDirectory);
-    const onDiskKeys = this.collectSourceKeys(library, kind, videos, folders);
+    const onDiskKeys = await this.buildOnDiskKeys(library, kind, videos, folders);
     let indexed = 0;
     let matched = 0;
     let lookups = 0;
@@ -160,13 +206,37 @@ export class LibraryIndexService {
     return { indexed, matched, unmatched, removed, logs };
   }
 
-  /** Paths currently present in the library folder (same rules as indexing, no TMDB cap). */
-  private collectSourceKeys(
+  async pruneLibraryFromDisk(library: MediaLibraryDocument, kind: CatalogKind): Promise<number> {
+    let entries: SmbListedEntry[];
+    try {
+      entries = await this.list(library, library.smbRemotePath ?? '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not read library folder.';
+      this.logger.warn(`Skip prune for ${library.name}: ${message}`);
+      return 0;
+    }
+    const videos = entries.filter((entry) => !entry.isDirectory && this.isVideo(entry.name));
+    const folders = entries.filter((entry) => entry.isDirectory);
+    const onDiskKeys = await this.buildOnDiskKeys(library, kind, videos, folders);
+    const removed = await this.removeStaleTitles(library, kind, onDiskKeys);
+    if (removed > 0) {
+      const remaining = await this.titles
+        .countDocuments({ kind, sourceKey: new RegExp(`^${String(library._id)}:`) })
+        .exec();
+      library.itemCount = remaining;
+      library.missingCount = 0;
+      await library.save();
+    }
+    return removed;
+  }
+
+  /** Paths with playable video on disk (folders without video are treated as deleted). */
+  private async buildOnDiskKeys(
     library: MediaLibraryDocument,
     kind: CatalogKind,
     videos: SmbListedEntry[],
     folders: SmbListedEntry[],
-  ): Set<string> {
+  ): Promise<Set<string>> {
     const keys = new Set<string>();
     if (kind === 'movie' && videos.length > 0 && videos.length >= folders.length) {
       for (const file of videos) {
@@ -175,10 +245,35 @@ export class LibraryIndexService {
       return keys;
     }
     const source = kind === 'series' ? folders : folders.length > 0 ? folders : videos;
-    for (const entry of source) {
-      keys.add(this.sourceKey(library, entry.path));
+    const capped = source.slice(0, MAX_TITLES);
+    for (const entry of capped) {
+      if (entry.isDirectory) {
+        if (await this.entryHasPlayableVideo(library, entry)) {
+          keys.add(this.sourceKey(library, entry.path));
+        }
+      } else if (this.isVideo(entry.name)) {
+        keys.add(this.sourceKey(library, entry.path));
+      }
     }
     return keys;
+  }
+
+  private async entryHasPlayableVideo(
+    library: MediaLibraryDocument,
+    entry: SmbListedEntry,
+  ): Promise<boolean> {
+    if (!entry.isDirectory) return this.isVideo(entry.name);
+    try {
+      const inner = await this.list(library, entry.path);
+      if (inner.some((row) => !row.isDirectory && this.isVideo(row.name))) return true;
+      for (const sub of inner.filter((row) => row.isDirectory).slice(0, 16)) {
+        const deep = await this.list(library, sub.path);
+        if (deep.some((row) => !row.isDirectory && this.isVideo(row.name))) return true;
+      }
+      return false;
+    } catch {
+      return true;
+    }
   }
 
   /** Drop catalog rows tied to this library whose file/folder was deleted from storage. */
