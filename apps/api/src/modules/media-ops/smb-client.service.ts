@@ -96,7 +96,7 @@ export class SmbClientService {
 
     const caseMatch = shares.find((name) => name.toLowerCase() === stored.toLowerCase());
     if (caseMatch) return caseMatch;
-    if (shares.length === 1) return shares[0];
+    if (shares.length === 1 && shares[0]) return shares[0];
 
     if (/tb-storage/i.test(stored)) {
       const dataStorage = shares.find((name) => name.toLowerCase() === 'data-storage');
