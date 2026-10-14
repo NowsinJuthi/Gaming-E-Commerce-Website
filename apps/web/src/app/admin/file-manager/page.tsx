@@ -178,7 +178,6 @@ export default function AdminFileManagerPage() {
     setDisplayProgress(0);
     setUploadPhase("upload");
     setUploadNote(null);
-    const bytes = totalPickBytes(pickedFiles);
     try {
       const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles, {
         onProgress: ({ loaded, total, phase }) => {
