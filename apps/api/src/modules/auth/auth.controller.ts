@@ -74,6 +74,31 @@ export class AuthController {
 
   @Public()
   @HttpCode(HttpStatus.OK)
+  @Post('browser-session/resync')
+  async resyncBrowserSession(@Req() req: Request) {
+    const cookieToken = this.readCookie(req, this.refreshCookieName);
+    if (!cookieToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    if (
+      !isBrowserAuthRequest({
+        origin: req.headers.origin,
+        cookie: req.headers.cookie,
+      })
+    ) {
+      throw new UnauthorizedException('Browser session required');
+    }
+    const result = await this.auth.resyncBrowserSession(cookieToken);
+    const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    return omitSecretsFromBrowserSession({
+      csrfToken: result.csrfToken,
+      user: result.user,
+      expiresIn: accessMaxAge,
+    });
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
     @Body() dto: RefreshTokenDto,

@@ -17,6 +17,7 @@ import {
   clearBrowserSession,
   getAccessExpiresAt,
   getAccessToken,
+  getSessionMeta,
   hasAuthSession,
   persistBrowserSession,
   setAccessToken,
@@ -541,6 +542,8 @@ const PROACTIVE_REFRESH_RETRY_MS = 30_000;
 const REFRESH_LOCK_KEY = "authRefreshLock";
 const REFRESH_LOCK_TTL_MS = 15_000;
 const REFRESH_GRACE_RETRY_MS = 500;
+const MAX_CSRF_RECOVERY_ATTEMPTS = 3;
+let refreshCsrfFailStreak = 0;
 const TAB_ID =
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -596,6 +599,73 @@ async function waitForPeerRefresh(
   return false;
 }
 
+async function resyncCsrfFromCookie(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/browser-session/resync`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as {
+      csrfToken: string;
+      user?: { roles?: string[]; isGuest?: boolean };
+      expiresIn?: number;
+    };
+    const prior = getSessionMeta();
+    persistBrowserSession({
+      csrfToken: data.csrfToken,
+      roles: data.user?.roles ?? prior?.roles,
+      isGuest: data.user?.isGuest ?? prior?.isGuest,
+      expiresIn: data.expiresIn,
+    });
+    window.dispatchEvent(new Event("auth-change"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function applyRefreshResponse(data: {
+  csrfToken: string;
+  user?: { roles?: string[]; isGuest?: boolean };
+  expiresIn?: number;
+}): void {
+  refreshCsrfFailStreak = 0;
+  persistBrowserSession({
+    csrfToken: data.csrfToken,
+    roles: data.user?.roles,
+    isGuest: data.user?.isGuest,
+    expiresIn: data.expiresIn,
+  });
+  window.dispatchEvent(new Event("auth-change"));
+  scheduleProactiveRefresh();
+}
+
+async function handleRefreshAuthFailure(
+  csrfToken: string,
+  primaryStatus: number,
+  retryStatus: number,
+): Promise<boolean> {
+  if (primaryStatus !== 403 && retryStatus !== 403) {
+    clearTokens();
+    return false;
+  }
+  if (refreshCsrfFailStreak < MAX_CSRF_RECOVERY_ATTEMPTS && (await resyncCsrfFromCookie())) {
+    refreshCsrfFailStreak += 1;
+    const nextCsrf = getStored("refreshToken");
+    if (nextCsrf) return performRefreshOnce(nextCsrf);
+  }
+  refreshCsrfFailStreak += 1;
+  if (refreshCsrfFailStreak >= MAX_CSRF_RECOVERY_ATTEMPTS) {
+    clearTokens();
+    return false;
+  }
+  scheduleProactiveRefreshRetry(20_000);
+  return false;
+}
+
 async function performRefreshOnce(csrfToken: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
@@ -610,12 +680,14 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
     if (!res.ok) {
       const currentToken = getStored("refreshToken");
       if (currentToken && currentToken !== csrfToken) {
+        refreshCsrfFailStreak = 0;
         return true;
       }
       if (res.status === 401 || res.status === 403) {
         await new Promise((resolve) => setTimeout(resolve, REFRESH_GRACE_RETRY_MS));
         const tokenAfterWait = getStored("refreshToken");
         if (tokenAfterWait && tokenAfterWait !== csrfToken) {
+          refreshCsrfFailStreak = 0;
           return true;
         }
         const retryRes = await fetch(`${API_BASE}/auth/refresh`, {
@@ -628,49 +700,31 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
           body: "{}",
         });
         if (retryRes.ok) {
-          const data = (await retryRes.json()) as {
-            accessToken?: string;
-            csrfToken: string;
-            user?: { roles?: string[]; isGuest?: boolean };
-            expiresIn?: number;
-          };
-          persistBrowserSession({
-            csrfToken: data.csrfToken,
-            roles: data.user?.roles,
-            isGuest: data.user?.isGuest,
-            expiresIn: data.expiresIn,
-          });
-          window.dispatchEvent(new Event("auth-change"));
-          scheduleProactiveRefresh();
+          applyRefreshResponse(
+            (await retryRes.json()) as {
+              csrfToken: string;
+              user?: { roles?: string[]; isGuest?: boolean };
+              expiresIn?: number;
+            },
+          );
           return true;
         }
         const tokenAfterRetry = getStored("refreshToken");
         if (tokenAfterRetry && tokenAfterRetry !== csrfToken) {
+          refreshCsrfFailStreak = 0;
           return true;
         }
-        // 403 = CSRF/cookie briefly out of sync (common with multiple tabs). Keep session and retry.
-        if (res.status === 403 || retryRes.status === 403) {
-          scheduleProactiveRefreshRetry(5_000);
-          return false;
-        }
-        clearTokens();
+        return handleRefreshAuthFailure(csrfToken, res.status, retryRes.status);
       }
       return false;
     }
-    const data = (await res.json()) as {
-      accessToken?: string;
-      csrfToken: string;
-      user?: { roles?: string[]; isGuest?: boolean };
-      expiresIn?: number;
-    };
-    persistBrowserSession({
-      csrfToken: data.csrfToken,
-      roles: data.user?.roles,
-      isGuest: data.user?.isGuest,
-      expiresIn: data.expiresIn,
-    });
-    window.dispatchEvent(new Event("auth-change"));
-    scheduleProactiveRefresh();
+    applyRefreshResponse(
+      (await res.json()) as {
+        csrfToken: string;
+        user?: { roles?: string[]; isGuest?: boolean };
+        expiresIn?: number;
+      },
+    );
     return true;
   } catch {
     return false;
@@ -904,13 +958,16 @@ async function fetchWithAuthRetry(
 
 // Kick off proactive refresh on page load if a valid token is already stored.
 if (typeof window !== "undefined") {
-  if (getStored("refreshToken") && !hasAuthSession()) {
-    void tryRefresh().then((ok) => {
+  void (async () => {
+    if (!getStored("refreshToken") && !hasAuthSession()) {
+      await resyncCsrfFromCookie();
+    }
+    if (getStored("refreshToken") || hasAuthSession()) {
+      const ok = await tryRefresh();
       if (ok) scheduleProactiveRefresh();
-    });
-  } else {
-    scheduleProactiveRefresh();
-  }
+      else if (getStored("refreshToken")) scheduleProactiveRefresh();
+    }
+  })();
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
@@ -939,6 +996,7 @@ if (typeof window !== "undefined") {
       event.key === "authSession" ||
       event.key === "refreshToken"
     ) {
+      refreshCsrfFailStreak = 0;
       scheduleProactiveRefresh();
     }
   });

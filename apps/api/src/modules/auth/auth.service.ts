@@ -258,6 +258,27 @@ export class AuthService {
     return csrfToken;
   }
 
+  /** Re-issue CSRF for a valid HttpOnly refresh cookie (localStorage out of sync). */
+  async resyncBrowserSession(refreshToken: string): Promise<{ csrfToken: string; user: PublicUser }> {
+    const tokenHash = this.crypto.hashToken(refreshToken);
+    const session = await this.sessionModel.findOne({ tokenHash, revoked: false }).exec();
+    if (!session || session.expiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const user = await this.users.findById(session.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (
+      user.status === UserStatus.Banned ||
+      user.status === UserStatus.Suspended
+    ) {
+      throw new UnauthorizedException('Account is not active');
+    }
+    const csrfToken = await this.protectBrowserSession(refreshToken);
+    return { csrfToken, user: this.toPublic(user) };
+  }
+
   async assertBrowserCsrf(
     refreshToken: string,
     csrfToken: string | undefined,
