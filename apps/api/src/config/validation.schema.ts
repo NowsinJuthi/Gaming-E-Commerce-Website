@@ -61,8 +61,8 @@ export const validationSchema = Joi.object({
   JWT_REFRESH_TTL: Joi.number()
     .integer()
     .min(300)
-    .max(30 * 24 * 60 * 60)
-    .default(30 * 24 * 60 * 60),
+    .max(10 * 365 * 24 * 60 * 60)
+    .default(10 * 365 * 24 * 60 * 60),
   JWT_GUEST_REFRESH_TTL: Joi.number()
     .integer()
     .min(300)

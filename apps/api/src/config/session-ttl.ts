@@ -1,5 +1,8 @@
-/** Registered admin/customer sessions — bounded even when explicit logout is missed. */
-export const LONG_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** Registered web/admin/customer refresh sessions (≈10 years; renewed on each silent refresh). */
+export const TEN_YEAR_SESSION_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
+
+/** Default when JWT_REFRESH_TTL is unset. */
+export const LONG_SESSION_TTL_SECONDS = TEN_YEAR_SESSION_TTL_SECONDS;
 
 /** MFS phone app only. Stays signed in until the phone logs out. */
 export const MFS_APP_SESSION_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;

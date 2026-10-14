@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -226,7 +227,7 @@ export class AuthController {
       'user' in result && result.user.isGuest === true;
     const refreshMaxAge = isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86_400)
-      : (this.config.get<number>('jwt.refreshTtl') ?? 2_592_000);
+      : (this.config.get<number>('jwt.refreshTtl') ?? LONG_SESSION_TTL_SECONDS);
     const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
     const domain = this.authCookieDomain();
     res.cookie(
