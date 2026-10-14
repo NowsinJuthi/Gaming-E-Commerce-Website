@@ -1,7 +1,7 @@
 .shell {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 11000;
   overflow: hidden;
   background: #000;
   color: #fff;
@@ -102,11 +102,17 @@
 }
 
 .hiddenChrome {
-  opacity: 0;
   pointer-events: none;
 }
 
-/* Keep the seek bar usable while the rest of the chrome auto-hides (PC + phone). */
+.hiddenChrome .shade,
+.hiddenChrome .skin {
+  opacity: 0;
+}
+
+/* Keep the top bar and seek controls visible. Parent opacity would hide both. */
+.hiddenChrome .top,
+.hiddenChrome .mTop,
 .hiddenChrome .bottom,
 .hiddenChrome .mDock {
   opacity: 1;
