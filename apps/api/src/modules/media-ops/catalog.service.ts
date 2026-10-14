@@ -196,14 +196,38 @@ export class CatalogService {
       { id: 'trending', title: 'Trending', items: trending },
     ].filter((row) => row.items.length > 0);
     const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
+    const catalogFields =
+      'title year kind posterUrl featured trending seasonCount sourceKey listedAt createdAt updatedAt';
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
       .sort({ listedAt: -1, createdAt: -1, updatedAt: -1 })
-      .select(
-        'title year kind posterUrl featured trending seasonCount sourceKey listedAt createdAt updatedAt',
-      )
+      .select(catalogFields)
       .lean()
       .exec();
+    const recentRows = await this.titles
+      .find({
+        published: true,
+        availability: 'available',
+        listedAt: { $ne: null },
+      })
+      .sort({ listedAt: -1 })
+      .limit(24)
+      .select(catalogFields)
+      .lean()
+      .exec();
+    const mapCard = (doc: (typeof catalog)[number]) => ({
+      id: String(doc._id),
+      title: doc.title,
+      year: doc.year,
+      kind: doc.kind,
+      posterUrl: doc.posterUrl ?? null,
+      featured: doc.featured,
+      trending: doc.trending,
+      seasonCount: doc.seasonCount ?? null,
+      libraryId: libraryIdFromSource(doc.sourceKey),
+      listedAt: doc.listedAt ? new Date(doc.listedAt).getTime() : null,
+      sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
+    });
     return {
       hero: (featured.length > 0 ? featured : items).slice(0, 6),
       rows: shelves,
@@ -211,19 +235,8 @@ export class CatalogService {
         id: String(library._id),
         name: library.name,
       })),
-      items: catalog.map((doc) => ({
-        id: String(doc._id),
-        title: doc.title,
-        year: doc.year,
-        kind: doc.kind,
-        posterUrl: doc.posterUrl ?? null,
-        featured: doc.featured,
-        trending: doc.trending,
-        seasonCount: doc.seasonCount ?? null,
-        libraryId: libraryIdFromSource(doc.sourceKey),
-        listedAt: doc.listedAt ? new Date(doc.listedAt).getTime() : null,
-        sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
-      })),
+      recentUploads: recentRows.map((doc) => mapCard(doc)),
+      items: catalog.map((doc) => mapCard(doc)),
     };
   }
 

@@ -30,6 +30,8 @@ export type MediaHome = {
   hero: MediaCard[];
   rows: MediaRow[];
   items: MediaCard[];
+  /** Newest Samba uploads (listedAt), from API. */
+  recentUploads?: MediaCard[];
   libraries: MediaLibraryMenu[];
 };
 
@@ -46,6 +48,7 @@ export function parseMediaHome(data: unknown): MediaHome {
     hero: Array.isArray(payload.hero) ? payload.hero : [],
     rows,
     items,
+    recentUploads: Array.isArray(payload.recentUploads) ? payload.recentUploads : [],
     libraries: Array.isArray(payload.libraries) ? payload.libraries : [],
   };
 }

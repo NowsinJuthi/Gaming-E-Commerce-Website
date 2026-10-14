@@ -96,20 +96,26 @@ export class LibraryIndexService {
     const libRoot = (library.smbRemotePath ?? '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     let indexed = 0;
     let matched = 0;
+    let recentMarks = 0;
 
     if (kind === 'movie') {
       for (const item of uploaded) {
         const rel = this.pathRelativeToLibrary(libRoot, item.remote);
         const name = rel.split('/').filter(Boolean).pop() ?? rel;
         if (!name || !this.isVideo(name)) continue;
+        recentMarks += await this.markRecentlyUploaded(library, kind, rel, name);
         const entry: SmbListedEntry = {
           name,
           path: rel,
           isDirectory: false,
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
-        if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
-        await this.markRecentlyUploaded(library, rel, name);
+        try {
+          if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Catalog upsert failed.';
+          this.logger.warn(`Upload index ${name}: ${message}`);
+        }
         indexed += 1;
       }
     } else {
@@ -129,20 +135,30 @@ export class LibraryIndexService {
           isDirectory: false,
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
-        if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
-        await this.markRecentlyUploaded(library, rel, name);
+        recentMarks += await this.markRecentlyUploaded(library, kind, rel, name);
+        try {
+          if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Catalog upsert failed.';
+          this.logger.warn(`Upload index ${name}: ${message}`);
+        }
         indexed += 1;
       }
       for (const folderPath of folderPaths) {
         const name = folderPath.split('/').filter(Boolean).pop() ?? folderPath;
+        recentMarks += await this.markRecentlyUploaded(library, kind, folderPath, name);
         const entry: SmbListedEntry = {
           name,
           path: folderPath,
           isDirectory: true,
           sizeBytes: null,
         };
-        if (await this.upsertFromFolder(library, kind, entry, () => true, true)) matched += 1;
-        await this.markRecentlyUploaded(library, folderPath, name);
+        try {
+          if (await this.upsertFromFolder(library, kind, entry, () => true, true)) matched += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Catalog upsert failed.';
+          this.logger.warn(`Upload index ${name}: ${message}`);
+        }
         indexed += 1;
       }
     }
@@ -151,6 +167,7 @@ export class LibraryIndexService {
     const unmatched = Math.max(0, indexed - matched);
     const logs = [
       `${library.name}: indexed ${indexed} uploaded item${indexed === 1 ? '' : 's'}, ${matched} matched on TMDB.`,
+      `Recently added: ${recentMarks} catalog row${recentMarks === 1 ? '' : 's'} stamped.`,
     ];
     if (!this.tmdb.enabled()) {
       logs.push('TMDB_API_KEY is missing, so posters cannot be matched.');
@@ -511,27 +528,49 @@ export class LibraryIndexService {
   /** Ensure /media “Recently added” sees uploads even when an older scan used a different sourceKey path. */
   private async markRecentlyUploaded(
     library: MediaLibraryDocument,
+    kind: CatalogKind,
     relativePath: string,
     fileName: string,
-  ): Promise<void> {
+  ): Promise<number> {
     const now = new Date();
     const libId = String(library._id);
     const exactKey = this.sourceKey(library, relativePath);
     const safeName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await this.titles
-      .updateMany(
-        {
-          $or: [
-            { sourceKey: exactKey },
-            {
-              sourceKey: new RegExp(`^${libId}:`),
-              videoFileName: { $regex: new RegExp(`^${safeName}$`, 'i') },
-            },
-          ],
-        },
-        { $set: { listedAt: now } },
-      )
+    const parsed = this.parseTitle(fileName);
+    const titleEscaped = parsed.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const orClauses: Record<string, unknown>[] = [
+      { sourceKey: exactKey },
+      {
+        sourceKey: new RegExp(`^${libId}:`),
+        videoFileName: { $regex: new RegExp(`^${safeName}$`, 'i') },
+      },
+    ];
+    if (parsed.title) {
+      orClauses.push({
+        sourceKey: new RegExp(`^${libId}:`),
+        title: new RegExp(`^${titleEscaped}$`, 'i'),
+        ...(parsed.year ? { year: parsed.year } : {}),
+      });
+    }
+    let result = await this.titles
+      .updateMany({ kind, $or: orClauses }, { $set: { listedAt: now } })
       .exec();
+    let modified = result.modifiedCount ?? 0;
+    if (modified === 0 && parsed.title) {
+      result = await this.titles
+        .updateMany(
+          {
+            kind,
+            published: true,
+            title: new RegExp(`^${titleEscaped}$`, 'i'),
+            ...(parsed.year ? { year: parsed.year } : {}),
+          },
+          { $set: { listedAt: now } },
+        )
+        .exec();
+      modified = result.modifiedCount ?? 0;
+    }
+    return modified;
   }
 
   private pathRelativeToLibrary(libRoot: string, fullOnShare: string): string {
