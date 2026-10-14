@@ -58,7 +58,7 @@ export function Toaster() {
     <>
       {/* Backdrop — visual only; dismiss via OK button */}
       <div
-        className="fixed inset-0 z-[9998] animate-fade-in bg-black/40 backdrop-blur-sm"
+        className="pointer-events-none fixed inset-0 z-[9998] animate-fade-in bg-black/40 backdrop-blur-sm"
         aria-hidden
       />
 

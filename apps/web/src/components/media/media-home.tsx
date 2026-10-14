@@ -11,7 +11,6 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
@@ -87,7 +86,6 @@ export function MediaHome({
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const detailsCacheRef = useRef<Map<string, MediaDetails>>(new Map());
-  const [portalReady, setPortalReady] = useState(false);
   const catalogById = useMemo(() => {
     const map = new Map<string, MediaCard>();
     for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
@@ -192,6 +190,7 @@ export function MediaHome({
         if (!entries.some((entry) => entry.isIntersecting)) return;
         if (loadingMoreRef.current) return;
         loadingMoreRef.current = true;
+        observer.disconnect();
         setLoadingMore(true);
         const offset = catalogItems.length;
         void getMediaBrowse({
@@ -212,7 +211,7 @@ export function MediaHome({
               return merged;
             });
             setCatalogTotal(result.total);
-            setHasMore(result.hasMore);
+            setHasMore(result.hasMore && result.items.length > 0);
           })
           .finally(() => {
             loadingMoreRef.current = false;
@@ -329,10 +328,6 @@ export function MediaHome({
       cancelled = true;
     };
   }, [catalogById, recentRevision]);
-
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
 
   useEffect(() => {
     setInfo(null);
@@ -545,18 +540,15 @@ export function MediaHome({
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
-      {info && portalReady
-        ? createPortal(
-            <MovieInfo
-              key={info.id}
-              card={info}
-              details={details}
-              castRow={castRow}
-              onClose={() => setInfo(null)}
-            />,
-            document.body,
-          )
-        : null}
+      {info ? (
+        <MovieInfo
+          key={info.id}
+          card={info}
+          details={details}
+          castRow={castRow}
+          onClose={() => setInfo(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -494,7 +494,7 @@ export function Header({
 
   return (
     <>
-      <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
+      <header className="site-header isolate pointer-events-auto fixed top-0 left-0 right-0 z-[100] border-b">
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
@@ -771,7 +771,7 @@ export function Header({
       {/* Mobile nav drawer — only shown when no external sidebar handler */}
       {menuOpen && !onOpenMobileMenu && (
         <div
-          className="fixed inset-x-0 bottom-0 top-14 z-40 sm:top-16 lg:hidden"
+          className="fixed inset-x-0 bottom-0 top-14 z-[90] sm:top-16 lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"
