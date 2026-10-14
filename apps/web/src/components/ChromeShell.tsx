@@ -87,7 +87,7 @@ export function ChromeShell({
                 <Header />
                 <div
                   id="main-content"
-                  className={`min-w-0 pt-14 sm:pt-16${isCompactStorefrontMain ? "" : " flex-1"}`}
+                  className={`min-w-0 mt-14 sm:mt-16${isCompactStorefrontMain ? "" : " flex-1"}`}
                 >
                   {children}
                 </div>

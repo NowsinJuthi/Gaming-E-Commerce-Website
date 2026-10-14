@@ -494,7 +494,7 @@ export function Header({
 
   return (
     <>
-      <header className="site-header isolate pointer-events-auto fixed top-0 left-0 right-0 z-[100] border-b">
+      <header className="site-header isolate pointer-events-auto fixed top-0 left-0 right-0 z-[1000] border-b">
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >

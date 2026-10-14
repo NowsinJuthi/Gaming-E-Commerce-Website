@@ -4,8 +4,6 @@
   gap: 0.65rem;
   padding-bottom: 4rem;
   position: relative;
-  z-index: 0;
-  isolation: isolate;
 }
 
 /* Do not use position:sticky + backdrop-filter — WebKit/Chrome expand the
