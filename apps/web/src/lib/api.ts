@@ -1134,12 +1134,10 @@ export async function authSmbMediaUpload<T>(
   options?: AuthFormDataRequestOptions,
 ): Promise<T> {
   const url = resolveSmbMediaUploadProxyUrl(serverId);
-  const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
-  const csrf = getStored("refreshToken");
-  const headers = !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined;
+  // HttpOnly access cookie + credentials; avoid custom headers on upload host (fewer CORS preflights).
   let res: Response;
   try {
-    res = await formDataWithAuthRetry(url, form, headers, options?.onProgress);
+    res = await formDataWithAuthRetry(url, form, undefined, options?.onProgress);
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(

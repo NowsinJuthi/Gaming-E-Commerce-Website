@@ -26,6 +26,7 @@ export function buildContentSecurityPolicy(nonce?: string): string {
     "NEXT_PUBLIC_WS_URL",
     "INTERNAL_API_URL",
     "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN",
   ]);
 
   const scriptSrc = [
