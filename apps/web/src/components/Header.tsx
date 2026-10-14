@@ -494,23 +494,7 @@ export function Header({
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
-            {/* Admin refresh — mobile only (storefront: no theme/bell on mobile) */}
-            {isAdminRoute ? (
-              <button
-                type="button"
-                onClick={refreshAdminPage}
-                disabled={adminRefreshing}
-                className={`${iconBtn} lg:hidden`}
-                aria-label="Refresh page"
-              >
-                <RefreshIcon
-                  className={`h-5 w-5${adminRefreshing ? " animate-spin" : ""}`}
-                  aria-hidden
-                />
-              </button>
-            ) : null}
-
-            {/* Mobile nav + search — left side */}
+            {/* Mobile nav + search — left side (admin: menu before refresh) */}
             <button
               type="button"
               onClick={() => {
@@ -527,6 +511,21 @@ export function Header({
             >
               <MenuIcon />
             </button>
+
+            {isAdminRoute ? (
+              <button
+                type="button"
+                onClick={refreshAdminPage}
+                disabled={adminRefreshing}
+                className={`${iconBtn} lg:hidden`}
+                aria-label="Refresh page"
+              >
+                <RefreshIcon
+                  className={`h-5 w-5${adminRefreshing ? " animate-spin" : ""}`}
+                  aria-hidden
+                />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
