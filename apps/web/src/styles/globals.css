@@ -36397,6 +36397,18 @@ body:not(.recaptcha-badge-visible) .grecaptcha-badge {
   opacity: 0 !important;
 }
 
+/*
+ * WebKit can deliver header-band taps to #main-content on /media (composited catalog).
+ * Pass stray hits through; children keep pointer-events: auto for posters/filters.
+ */
+html.media-catalog-route #main-content {
+  pointer-events: none;
+}
+
+html.media-catalog-route #main-content > * {
+  pointer-events: auto;
+}
+
 @media (max-width: 767px) {
   .admin-panel,
   .customer-panel {

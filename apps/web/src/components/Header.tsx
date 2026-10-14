@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { getCart, getMe, logoutUser } from "@/lib/api";
 import { useCanAccessAdminPanel } from "@/hooks/useAdminPermissions";
 import { getPrimaryRoleLabel } from "@/lib/admin-order-view";
@@ -355,6 +356,7 @@ export function Header({
   const [term, setTerm] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [headerPortaled, setHeaderPortaled] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const { refreshing: adminRefreshing, refresh: refreshAdminPage } =
     useAdminHeaderRefresh();
@@ -452,6 +454,10 @@ export function Header({
     setUserOpen(false);
   }, [pathname]);
 
+  useLayoutEffect(() => {
+    setHeaderPortaled(true);
+  }, []);
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -498,7 +504,7 @@ export function Header({
     </span>
   );
 
-  return (
+  const headerChrome = (
     <>
       <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[1000] border-b">
         <div
@@ -823,6 +829,12 @@ export function Header({
       )}
     </>
   );
+
+  if (headerPortaled && typeof document !== "undefined") {
+    return createPortal(headerChrome, document.body);
+  }
+
+  return headerChrome;
 }
 
 function MenuIcon() {

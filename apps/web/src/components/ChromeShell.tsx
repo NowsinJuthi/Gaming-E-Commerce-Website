@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ContactSocialProvider } from "@/components/ContactSocialProvider";
@@ -46,6 +47,17 @@ export function ChromeShell({
   const isAdmin = pathname?.startsWith("/admin");
   const isCustomerPanel = isCustomerPanelRoute(pathname);
   const isCompactStorefrontMain = pathname === "/";
+  const isMediaCatalog = pathname === "/media";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "media-catalog-route",
+      Boolean(isMediaCatalog),
+    );
+    return () => {
+      document.documentElement.classList.remove("media-catalog-route");
+    };
+  }, [isMediaCatalog]);
 
   if (isAdmin || isCustomerPanel) {
     return (
