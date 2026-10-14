@@ -440,6 +440,12 @@ export function Header({
     };
   }, [menuOpen]);
 
+  useIsomorphicLayoutEffect(() => {
+    setMenuOpen(false);
+    setSearchOpen(false);
+    setUserOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
