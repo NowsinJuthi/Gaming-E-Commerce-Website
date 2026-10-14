@@ -81,7 +81,13 @@ export type LibraryIndexedItem = {
 };
 
 export function indexMediaLibrary(id: string) {
-  return authRequest<{ indexed: number; matched: number; unmatched: number; logs: string[] }>(
+  return authRequest<{
+    indexed: number;
+    matched: number;
+    unmatched: number;
+    removed?: number;
+    logs: string[];
+  }>(
     `/admin/libraries/${id}/index`,
     { method: "POST" },
   );

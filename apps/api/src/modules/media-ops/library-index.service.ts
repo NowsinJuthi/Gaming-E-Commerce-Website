@@ -46,8 +46,14 @@ export class LibraryIndexService {
     }
   }
 
-  async syncLibrary(id: string): Promise<{ indexed: number; matched: number; unmatched: number; logs: string[] }> {
-    const empty = { indexed: 0, matched: 0, unmatched: 0, logs: ['Library not found.'] };
+  async syncLibrary(id: string): Promise<{
+    indexed: number;
+    matched: number;
+    unmatched: number;
+    removed: number;
+    logs: string[];
+  }> {
+    const empty = { indexed: 0, matched: 0, unmatched: 0, removed: 0, logs: ['Library not found.'] };
     if (!Types.ObjectId.isValid(id)) return empty;
     const library = await this.libraries.findById(id).exec();
     if (!library) return empty;
@@ -79,12 +85,13 @@ export class LibraryIndexService {
     library: MediaLibraryDocument,
     kind: CatalogKind,
     force: boolean,
-  ): Promise<{ indexed: number; matched: number; unmatched: number; logs: string[] }> {
+  ): Promise<{ indexed: number; matched: number; unmatched: number; removed: number; logs: string[] }> {
     if (!force && library.lastIndexedAt && Date.now() - library.lastIndexedAt.getTime() < FRESH_MS) {
       return {
         indexed: library.itemCount,
         matched: Math.max(0, library.itemCount - library.unmatchedCount),
         unmatched: library.unmatchedCount,
+        removed: 0,
         logs: [`${library.name} was scanned recently.`],
       };
     }
@@ -96,6 +103,7 @@ export class LibraryIndexService {
     const entries = await this.list(library, library.smbRemotePath ?? '');
     const videos = entries.filter((entry) => !entry.isDirectory && this.isVideo(entry.name));
     const folders = entries.filter((entry) => entry.isDirectory);
+    const onDiskKeys = this.collectSourceKeys(library, kind, videos, folders);
     let indexed = 0;
     let matched = 0;
     let lookups = 0;
@@ -134,6 +142,7 @@ export class LibraryIndexService {
     }
 
     const unmatched = Math.max(0, indexed - matched);
+    const removed = await this.removeStaleTitles(library, kind, onDiskKeys);
     library.itemCount = indexed;
     library.missingCount = 0;
     library.unmatchedCount = unmatched;
@@ -142,10 +151,58 @@ export class LibraryIndexService {
     if (this.tmdb.enabled() && Date.now() >= lookupDeadline && unmatched > matched) {
       logs.push('TMDB time limit reached. Run Full scan again to match the remaining titles.');
     }
+    if (removed > 0) {
+      logs.push(`Removed ${removed} title${removed === 1 ? '' : 's'} that are no longer on disk.`);
+    }
     logs.unshift(
       `${library.name}: ${indexed} titles, ${matched} matched on TMDB, ${unmatched} without a poster.`,
     );
-    return { indexed, matched, unmatched, logs };
+    return { indexed, matched, unmatched, removed, logs };
+  }
+
+  /** Paths currently present in the library folder (same rules as indexing, no TMDB cap). */
+  private collectSourceKeys(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    videos: SmbListedEntry[],
+    folders: SmbListedEntry[],
+  ): Set<string> {
+    const keys = new Set<string>();
+    if (kind === 'movie' && videos.length > 0 && videos.length >= folders.length) {
+      for (const file of videos) {
+        keys.add(this.sourceKey(library, file.path));
+      }
+      return keys;
+    }
+    const source = kind === 'series' ? folders : folders.length > 0 ? folders : videos;
+    for (const entry of source) {
+      keys.add(this.sourceKey(library, entry.path));
+    }
+    return keys;
+  }
+
+  /** Drop catalog rows tied to this library whose file/folder was deleted from storage. */
+  private async removeStaleTitles(
+    library: MediaLibraryDocument,
+    kind: CatalogKind,
+    onDiskKeys: Set<string>,
+  ): Promise<number> {
+    const libId = String(library._id);
+    const prefix = `${libId}:`;
+    const rows = await this.titles
+      .find({ kind, sourceKey: new RegExp(`^${libId}:`) })
+      .select('_id sourceKey')
+      .lean()
+      .exec();
+    const staleIds = rows
+      .filter((row) => {
+        const key = row.sourceKey;
+        return typeof key === 'string' && key.startsWith(prefix) && !onDiskKeys.has(key);
+      })
+      .map((row) => row._id);
+    if (!staleIds.length) return 0;
+    const result = await this.titles.deleteMany({ _id: { $in: staleIds } }).exec();
+    return result.deletedCount ?? 0;
   }
 
   private async upsertFromFile(

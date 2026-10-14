@@ -15,6 +15,11 @@ import {
   SmbServer,
   SmbServerDocument,
 } from '../../database/schemas/smb-server.schema';
+import {
+  CatalogKind,
+  CatalogTitle,
+  CatalogTitleDocument,
+} from '../../database/schemas/catalog-title.schema';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { SmbClientService } from './smb-client.service';
 
@@ -63,6 +68,8 @@ export class MediaOpsService {
     private readonly libraries: Model<MediaLibraryDocument>,
     @InjectModel(SmbServer.name)
     private readonly servers: Model<SmbServerDocument>,
+    @InjectModel(CatalogTitle.name)
+    private readonly catalogTitles: Model<CatalogTitleDocument>,
     private readonly crypto: CryptoService,
     private readonly smb: SmbClientService,
   ) {}
@@ -131,8 +138,13 @@ export class MediaOpsService {
   }
 
   async removeLibrary(id: string) {
-    const result = await this.libraries.deleteOne({ _id: id }).exec();
-    if (!result.deletedCount) throw new NotFoundException('Media library not found.');
+    const library = await this.libraries.findById(id).exec();
+    if (!library) throw new NotFoundException('Media library not found.');
+    const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
+    await this.catalogTitles
+      .deleteMany({ kind, sourceKey: new RegExp(`^${String(library._id)}:`) })
+      .exec();
+    await this.libraries.deleteOne({ _id: library._id }).exec();
     return { deleted: true };
   }
 
