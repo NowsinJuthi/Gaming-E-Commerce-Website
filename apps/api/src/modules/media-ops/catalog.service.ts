@@ -221,6 +221,7 @@ export class CatalogService {
         trending: doc.trending,
         seasonCount: doc.seasonCount ?? null,
         libraryId: libraryIdFromSource(doc.sourceKey),
+        listedAt: doc.listedAt ? new Date(doc.listedAt).getTime() : null,
         sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
       })),
     };

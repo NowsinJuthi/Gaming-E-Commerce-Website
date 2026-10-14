@@ -10,6 +10,8 @@ export type MediaCard = {
   trending: boolean;
   seasonCount: number | null;
   libraryId?: string | null;
+  /** Set when added/re-uploaded via admin Samba upload (ms since epoch). */
+  listedAt?: number | null;
   sortAt?: number;
 };
 

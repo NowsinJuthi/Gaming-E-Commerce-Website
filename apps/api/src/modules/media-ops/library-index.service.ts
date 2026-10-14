@@ -109,6 +109,7 @@ export class LibraryIndexService {
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
         if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
+        await this.markRecentlyUploaded(library, rel, name);
         indexed += 1;
       }
     } else {
@@ -129,6 +130,7 @@ export class LibraryIndexService {
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
         if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
+        await this.markRecentlyUploaded(library, rel, name);
         indexed += 1;
       }
       for (const folderPath of folderPaths) {
@@ -140,6 +142,7 @@ export class LibraryIndexService {
           sizeBytes: null,
         };
         if (await this.upsertFromFolder(library, kind, entry, () => true, true)) matched += 1;
+        await this.markRecentlyUploaded(library, folderPath, name);
         indexed += 1;
       }
     }
@@ -503,6 +506,32 @@ export class LibraryIndexService {
 
   private sourceKey(library: MediaLibraryDocument, relativePath: string): string {
     return `${String(library._id)}:${relativePath.replace(/\\/g, '/')}`;
+  }
+
+  /** Ensure /media “Recently added” sees uploads even when an older scan used a different sourceKey path. */
+  private async markRecentlyUploaded(
+    library: MediaLibraryDocument,
+    relativePath: string,
+    fileName: string,
+  ): Promise<void> {
+    const now = new Date();
+    const libId = String(library._id);
+    const exactKey = this.sourceKey(library, relativePath);
+    const safeName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await this.titles
+      .updateMany(
+        {
+          $or: [
+            { sourceKey: exactKey },
+            {
+              sourceKey: new RegExp(`^${libId}:`),
+              videoFileName: { $regex: new RegExp(`^${safeName}$`, 'i') },
+            },
+          ],
+        },
+        { $set: { listedAt: now } },
+      )
+      .exec();
   }
 
   private pathRelativeToLibrary(libRoot: string, fullOnShare: string): string {

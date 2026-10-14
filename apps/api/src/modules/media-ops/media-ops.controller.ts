@@ -253,19 +253,32 @@ export class MediaOpsController {
       throw new BadRequestException('Choose at least one video file or folder.');
     }
     const result = await this.media.uploadToShare(id, path, batch, libKind);
-    void this.index
-      .syncUploadedPaths(result.library.id, result.uploadedPaths)
-      .catch(() => undefined);
-    return {
-      uploaded: result.uploaded,
-      library: result.library,
+    let indexResult = {
       indexed: 0,
       matched: 0,
       unmatched: 0,
       removed: 0,
+      logs: [] as string[],
+    };
+    try {
+      indexResult = await this.index.syncUploadedPaths(
+        result.library.id,
+        result.uploadedPaths,
+      );
+    } catch {
+      indexResult.logs = ['Catalog index for uploaded files failed. Try Full scan on the library.'];
+    }
+    return {
+      uploaded: result.uploaded,
+      library: result.library,
+      indexed: indexResult.indexed,
+      matched: indexResult.matched,
+      unmatched: indexResult.unmatched,
+      removed: indexResult.removed,
       logs: [
         `Uploaded ${result.uploaded} file(s) to Samba.`,
-        'TMDB matching for the uploaded file(s) only — usually ready within a minute.',
+        ...indexResult.logs,
+        'Refresh /media to see titles under Recently added.',
       ],
     };
   }

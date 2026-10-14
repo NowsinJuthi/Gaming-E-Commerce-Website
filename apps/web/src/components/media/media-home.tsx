@@ -105,7 +105,17 @@ export function MediaHome({ home: initialHome }: { home: MediaHome }) {
   const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
   const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
 
-  const recentlyAdded = useMemo(() => libraryItems.slice(0, RECENTLY_ADDED_LIMIT), [libraryItems]);
+  const recentlyAdded = useMemo(() => {
+    const withUploadStamp = libraryItems.filter(
+      (item) => typeof item.listedAt === "number" && item.listedAt > 0,
+    );
+    if (withUploadStamp.length > 0) {
+      return [...withUploadStamp]
+        .sort((a, b) => (b.listedAt ?? 0) - (a.listedAt ?? 0))
+        .slice(0, RECENTLY_ADDED_LIMIT);
+    }
+    return libraryItems.slice(0, RECENTLY_ADDED_LIMIT);
+  }, [libraryItems]);
 
   const libraryHeading = useMemo(() => {
     if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
