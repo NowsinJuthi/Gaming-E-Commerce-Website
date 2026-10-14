@@ -40,13 +40,13 @@ function MobileProfileThemeToggle() {
   return (
     <button
       type="button"
-      className="shell-icon-btn h-9 w-9 min-h-0 min-w-0 p-0 ring-1 ring-brand/60 bg-brand/10 lg:hidden"
+      className="shell-icon-btn lg:hidden"
       aria-label={
         isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
       }
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
-      <ThemePreferenceIcon preference={display} className="h-4 w-4 text-brand" />
+      <ThemePreferenceIcon preference={display} className="h-5 w-5 text-brand" />
     </button>
   );
 }
