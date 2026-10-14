@@ -38,6 +38,18 @@ function serialize(doc: CatalogTitleDocument) {
   };
 }
 
+function serializeAdmin(doc: CatalogTitleDocument) {
+  return {
+    ...serialize(doc),
+    kind: doc.kind,
+    overview: doc.overview ?? '',
+    runtimeMinutes: doc.runtimeMinutes ?? null,
+    rating: doc.rating ?? null,
+    genres: doc.genres ?? [],
+    backdropUrl: doc.backdropUrl ?? null,
+  };
+}
+
 @Injectable()
 export class CatalogService {
   constructor(
@@ -197,6 +209,54 @@ export class CatalogService {
     return { updated: result.modifiedCount };
   }
 
+  async adminOne(kind: CatalogKind, id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
+    const doc = await this.titles.findOne({ _id: id, kind }).exec();
+    if (!doc) throw new NotFoundException('Title not found.');
+    return serializeAdmin(doc);
+  }
+
+  async applyFromTmdb(kind: CatalogKind, id: string, tmdbId: number, updateArtwork = true) {
+    if (!this.tmdb.enabled()) {
+      throw new BadRequestException('TMDB_API_KEY is not configured on the server.');
+    }
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
+    const doc = await this.titles.findOne({ _id: id, kind }).exec();
+    if (!doc) throw new NotFoundException('Title not found.');
+    const meta =
+      kind === 'series'
+        ? await this.tmdb.detailsSeriesById(tmdbId, updateArtwork)
+        : await this.tmdb.detailsMovieById(tmdbId, updateArtwork);
+    if (!meta) {
+      throw new NotFoundException(`No TMDB ${kind} found for id ${tmdbId}.`);
+    }
+    doc.title = meta.title.slice(0, 200);
+    if (meta.year) doc.year = meta.year;
+    doc.overview = meta.overview || null;
+    doc.runtimeMinutes = meta.runtimeMinutes;
+    doc.rating = meta.rating;
+    doc.genres = meta.genres;
+    doc.backdropUrl = meta.backdropUrl;
+    doc.directors = meta.directors;
+    doc.writers = meta.writers;
+    doc.cast = meta.cast;
+    doc.detailsLoaded = true;
+    if (updateArtwork && meta.posterUrl) doc.posterUrl = meta.posterUrl;
+    await doc.save();
+    return serializeAdmin(doc);
+  }
+
+  async uploadPoster(kind: CatalogKind, id: string, buffer: Buffer) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
+    const doc = await this.titles.findOne({ _id: id, kind }).exec();
+    if (!doc) throw new NotFoundException('Title not found.');
+    const posterUrl = await this.tmdb.savePosterBuffer(buffer);
+    if (!posterUrl) throw new BadRequestException('Poster upload could not be processed.');
+    doc.posterUrl = posterUrl;
+    await doc.save();
+    return serializeAdmin(doc);
+  }
+
   async update(
     kind: CatalogKind,
     id: string,
@@ -210,6 +270,10 @@ export class CatalogService {
       posterUrl: string | null;
       videoFileName: string | null;
       seasonCount: number | null;
+      overview: string | null;
+      runtimeMinutes: number | null;
+      rating: number | null;
+      genres: string[];
     }>,
   ) {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Title not found.');
@@ -224,7 +288,11 @@ export class CatalogService {
     if (patch.posterUrl !== undefined) doc.posterUrl = patch.posterUrl;
     if (patch.videoFileName !== undefined) doc.videoFileName = patch.videoFileName;
     if (patch.seasonCount !== undefined) doc.seasonCount = patch.seasonCount;
+    if (patch.overview !== undefined) doc.overview = patch.overview?.trim() || null;
+    if (patch.runtimeMinutes !== undefined) doc.runtimeMinutes = patch.runtimeMinutes;
+    if (patch.rating !== undefined) doc.rating = patch.rating;
+    if (patch.genres !== undefined) doc.genres = patch.genres;
     await doc.save();
-    return serialize(doc);
+    return serializeAdmin(doc);
   }
 }

@@ -1,4 +1,4 @@
-import { authRequest } from "@/lib/api";
+import { API_BASE, authRequest } from "@/lib/api";
 
 export type CatalogItem = {
   id: string;
@@ -22,6 +22,21 @@ export type CatalogPage = {
   pageSize: number;
   pageCount: number;
 };
+
+export type CatalogKind = "movie" | "series";
+
+export type AdminCatalogDetail = CatalogItem & {
+  kind: CatalogKind;
+  overview: string;
+  runtimeMinutes: number | null;
+  rating: number | null;
+  genres: string[];
+  backdropUrl: string | null;
+};
+
+function catalogResource(kind: CatalogKind): "movie-collections" | "series-collections" {
+  return kind === "series" ? "series-collections" : "movie-collections";
+}
 
 export type CatalogBulkAction =
   | "publish"
@@ -78,4 +93,44 @@ export function updateSeriesCollection(
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+export function getCatalogDetail(kind: CatalogKind, id: string) {
+  return authRequest<AdminCatalogDetail>(`/admin/${catalogResource(kind)}/${id}`);
+}
+
+export function applyCatalogFromTmdb(
+  kind: CatalogKind,
+  id: string,
+  tmdbId: number,
+  updateArtwork = true,
+) {
+  return authRequest<AdminCatalogDetail>(`/admin/${catalogResource(kind)}/${id}/tmdb`, {
+    method: "POST",
+    body: JSON.stringify({ tmdbId, updateArtwork }),
+  });
+}
+
+export async function uploadCatalogPoster(kind: CatalogKind, id: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/admin/${catalogResource(kind)}/${id}/poster`, {
+    method: "POST",
+    body: form,
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = "Poster upload failed.";
+    try {
+      const data = JSON.parse(text) as { message?: string | string[] };
+      if (typeof data.message === "string") message = data.message;
+      else if (Array.isArray(data.message)) message = data.message.join(", ");
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as AdminCatalogDetail;
 }

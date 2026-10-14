@@ -1,10 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -18,6 +32,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { CatalogKind } from '../../database/schemas/catalog-title.schema';
+import { catalogPosterUploadMulterOptions } from '../../shared/uploads/catalog-poster-upload.multer';
 import { CatalogBulkAction, CatalogService } from './catalog.service';
 
 class BulkBody {
@@ -73,6 +88,40 @@ class UpdateBody {
   @IsInt()
   @Min(0)
   seasonCount?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  overview?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  runtimeMinutes?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  rating?: number | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  genres?: string[];
+}
+
+class TmdbApplyBody {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  tmdbId!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  updateArtwork?: boolean;
 }
 
 @Controller()
@@ -110,6 +159,23 @@ export class CatalogController {
     return this.catalog.update('movie', id, body);
   }
 
+  @Get('admin/movie-collections/:id')
+  getMovie(@Param('id') id: string) {
+    return this.catalog.adminOne('movie', id);
+  }
+
+  @Post('admin/movie-collections/:id/tmdb')
+  applyTmdbMovie(@Param('id') id: string, @Body() body: TmdbApplyBody) {
+    return this.catalog.applyFromTmdb('movie', id, body.tmdbId, body.updateArtwork !== false);
+  }
+
+  @Post('admin/movie-collections/:id/poster')
+  @UseInterceptors(FileInterceptor('file', catalogPosterUploadMulterOptions))
+  uploadMoviePoster(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+    if (!file?.buffer?.length) throw new BadRequestException('Choose a poster image to upload.');
+    return this.catalog.uploadPoster('movie', id, file.buffer);
+  }
+
   @Get('admin/series-collections')
   listSeries(@Query('q') q?: string, @Query('page') page?: string) {
     return this.catalog.list('series' satisfies CatalogKind, q, Number(page));
@@ -123,5 +189,22 @@ export class CatalogController {
   @Patch('admin/series-collections/:id')
   updateSeries(@Param('id') id: string, @Body() body: UpdateBody) {
     return this.catalog.update('series', id, body);
+  }
+
+  @Get('admin/series-collections/:id')
+  getSeries(@Param('id') id: string) {
+    return this.catalog.adminOne('series', id);
+  }
+
+  @Post('admin/series-collections/:id/tmdb')
+  applyTmdbSeries(@Param('id') id: string, @Body() body: TmdbApplyBody) {
+    return this.catalog.applyFromTmdb('series', id, body.tmdbId, body.updateArtwork !== false);
+  }
+
+  @Post('admin/series-collections/:id/poster')
+  @UseInterceptors(FileInterceptor('file', catalogPosterUploadMulterOptions))
+  uploadSeriesPoster(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+    if (!file?.buffer?.length) throw new BadRequestException('Choose a poster image to upload.');
+    return this.catalog.uploadPoster('series', id, file.buffer);
   }
 }

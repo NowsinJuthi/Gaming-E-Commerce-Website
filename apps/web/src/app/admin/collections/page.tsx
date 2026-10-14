@@ -10,6 +10,7 @@ import {
 export default function AdminCollectionsPage() {
   return (
     <CatalogCollectionsPage
+      kind="movie"
       title="Movie collections"
       description="Browse titles, edit in a popup, and run bulk publish / feature / trending actions."
       emptyHint="Add a title from Add Manually Movies."

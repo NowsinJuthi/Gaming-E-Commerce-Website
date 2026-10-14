@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { LayersIcon } from "@/components/admin/icons";
 import styles from "@/app/admin/collections/collections-page.module.css";
-import type { CatalogBulkAction, CatalogItem } from "@/lib/catalog-api";
+import { CatalogEditDialog } from "@/components/admin/catalog-edit-dialog";
+import type { CatalogBulkAction, CatalogItem, CatalogKind } from "@/lib/catalog-api";
 
 function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`;
@@ -14,6 +15,7 @@ function formatBytes(value: number): string {
 }
 
 type Props = {
+  kind: CatalogKind;
   title: string;
   description: string;
   emptyHint: string;
@@ -25,6 +27,7 @@ type Props = {
 };
 
 export function CatalogCollectionsPage({
+  kind,
   title,
   description,
   emptyHint,
@@ -294,27 +297,28 @@ export function CatalogCollectionsPage({
             </div>
           </div>
         ) : null}
-        {edit ? (
-          <EditDialog
-            item={edit}
-            showSeasons={showSeasons}
-            busy={busy}
-            onClose={() => setEdit(null)}
-            onSave={async (body) => {
-              setBusy(true);
-              setError(null);
-              try {
-                await save(edit.id, body);
-                setEdit(null);
-                await reload();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not save.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        ) : null}
+        <CatalogEditDialog
+          kind={kind}
+          itemId={edit?.id ?? null}
+          open={Boolean(edit)}
+          showSeasons={showSeasons}
+          onClose={() => setEdit(null)}
+          onSave={async (body) => {
+            if (!edit) return;
+            setBusy(true);
+            setError(null);
+            try {
+              await save(edit.id, body);
+              setEdit(null);
+              await reload();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not save.");
+              throw err;
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
       </div>
     </AdminPageLayout>
   );
@@ -345,102 +349,5 @@ function Action({
     <button type="button" className="dashboard-pro-btn-ghost" disabled={disabled} onClick={onClick}>
       {children}
     </button>
-  );
-}
-
-function EditDialog({
-  item,
-  showSeasons,
-  busy,
-  onClose,
-  onSave,
-}: {
-  item: CatalogItem;
-  showSeasons: boolean;
-  busy: boolean;
-  onClose: () => void;
-  onSave: (body: Record<string, unknown>) => Promise<void>;
-}) {
-  const [title, setTitle] = useState(item.title);
-  const [year, setYear] = useState(String(item.releaseYear));
-  const [posterUrl, setPosterUrl] = useState(item.posterUrl ?? "");
-  const [published, setPublished] = useState(item.published);
-  const [featured, setFeatured] = useState(item.featured);
-  const [trending, setTrending] = useState(item.trending);
-  const [availability, setAvailability] = useState(item.availability);
-  const [seasonCount, setSeasonCount] = useState(String(item.seasonCount ?? ""));
-
-  return (
-    <div className="rounded-xl border border-border/50 bg-elevated p-4">
-      <h2 className="text-base font-semibold">Edit {item.title}</h2>
-      <form
-        className="mt-3 grid gap-3 sm:grid-cols-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void onSave({
-            title,
-            year: Number(year),
-            posterUrl: posterUrl.trim() || null,
-            published,
-            featured,
-            trending,
-            availability,
-            ...(showSeasons
-              ? { seasonCount: seasonCount.trim() ? Number(seasonCount) : null }
-              : {}),
-          });
-        }}
-      >
-        <label className="text-xs">
-          Title
-          <input className="admin-input mt-1 w-full" value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <label className="text-xs">
-          Year
-          <input className="admin-input mt-1 w-full" value={year} onChange={(e) => setYear(e.target.value)} required />
-        </label>
-        <label className="text-xs sm:col-span-2">
-          Poster URL
-          <input className="admin-input mt-1 w-full" value={posterUrl} onChange={(e) => setPosterUrl(e.target.value)} />
-        </label>
-        {showSeasons ? (
-          <label className="text-xs">
-            Seasons
-            <input className="admin-input mt-1 w-full" value={seasonCount} onChange={(e) => setSeasonCount(e.target.value)} />
-          </label>
-        ) : null}
-        <label className="text-xs">
-          Availability
-          <select
-            className="admin-input mt-1 w-full"
-            value={availability}
-            onChange={(e) => setAvailability(e.target.value as CatalogItem["availability"])}
-          >
-            <option value="available">available</option>
-            <option value="unavailable">unavailable</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
-          Published
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
-          Featured
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={trending} onChange={(e) => setTrending(e.target.checked)} />
-          Trending
-        </label>
-        <div className="flex gap-2 sm:col-span-2">
-          <button type="submit" className="dashboard-pro-btn" disabled={busy}>
-            Save
-          </button>
-          <button type="button" className="dashboard-pro-btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
   );
 }
