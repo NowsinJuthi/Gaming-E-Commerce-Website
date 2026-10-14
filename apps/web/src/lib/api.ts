@@ -668,11 +668,8 @@ async function handleRefreshAuthFailure(
     return true;
   }
   refreshCsrfFailStreak += 1;
-  if (refreshCsrfFailStreak >= MAX_CSRF_RECOVERY_ATTEMPTS) {
-    clearTokens();
-    return false;
-  }
-  scheduleProactiveRefreshRetry(15_000);
+  // Keep the browser signed in. A failed silent refresh must not log the user out.
+  scheduleProactiveRefreshRetry(60_000);
   return false;
 }
 
@@ -801,8 +798,12 @@ function scheduleProactiveRefresh(): void {
   const expiresAt = getAccessTokenExpiry();
   if (!expiresAt) return;
 
-  // Aim to refresh 90 s before expiry.
-  const delay = expiresAt - Date.now() - 90_000;
+  // Renew long-lived cookies at least every 12h. setTimeout cannot wait years.
+  const MAX_REFRESH_DELAY_MS = 12 * 60 * 60 * 1000;
+  const delay = Math.min(
+    expiresAt - Date.now() - 90_000,
+    MAX_REFRESH_DELAY_MS,
+  );
   if (delay <= 0) {
     // Already expired or about to — refresh immediately.
     void tryRefresh().then((ok) => {

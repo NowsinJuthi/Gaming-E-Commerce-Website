@@ -89,7 +89,8 @@ export class AuthController {
       throw new UnauthorizedException('Browser session required');
     }
     const result = await this.auth.resyncBrowserSession(cookieToken);
-    const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    const accessMaxAge =
+      this.config.get<number>('jwt.accessTtl') ?? LONG_SESSION_TTL_SECONDS;
     return omitSecretsFromBrowserSession({
       csrfToken: result.csrfToken,
       user: result.user,
@@ -253,7 +254,9 @@ export class AuthController {
     const refreshMaxAge = isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86_400)
       : (this.config.get<number>('jwt.refreshTtl') ?? LONG_SESSION_TTL_SECONDS);
-    const accessMaxAge = this.config.get<number>('jwt.accessTtl') ?? 900;
+    const accessMaxAge = isGuest
+      ? refreshMaxAge
+      : (this.config.get<number>('jwt.accessTtl') ?? LONG_SESSION_TTL_SECONDS);
     const domain = this.authCookieDomain();
     res.cookie(
       ACCESS_COOKIE_NAME,

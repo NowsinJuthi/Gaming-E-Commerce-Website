@@ -571,11 +571,17 @@ export class AuthService {
     opts?: { accessTtlOverride?: number; refreshTtlOverride?: number },
   ): Promise<AuthTokens> {
     const accessSecret = this.config.getOrThrow<string>('jwt.accessSecret');
-    const accessTtl = opts?.accessTtlOverride ?? (this.config.get<number>('jwt.accessTtl') ?? 900);
+    const configuredAccess =
+      this.config.get<number>('jwt.accessTtl') ?? LONG_SESSION_TTL_SECONDS;
     const defaultRefreshTtl = user.isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86400)
       : (this.config.get<number>('jwt.refreshTtl') ??
         LONG_SESSION_TTL_SECONDS);
+    const accessTtl =
+      opts?.accessTtlOverride ??
+      (user.isGuest
+        ? Math.min(configuredAccess, defaultRefreshTtl)
+        : configuredAccess);
     const refreshTtl = opts?.refreshTtlOverride ?? defaultRefreshTtl;
 
     const payload: JwtPayload = {

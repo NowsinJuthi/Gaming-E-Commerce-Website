@@ -52,7 +52,11 @@ export const validationSchema = Joi.object({
     then: productionSecret.required(),
     otherwise: Joi.string().min(8).required(),
   }),
-  JWT_ACCESS_TTL: Joi.number().default(900),
+  JWT_ACCESS_TTL: Joi.number()
+    .integer()
+    .min(300)
+    .max(10 * 365 * 24 * 60 * 60)
+    .default(10 * 365 * 24 * 60 * 60),
   JWT_REFRESH_SECRET: Joi.when('NODE_ENV', {
     is: 'production',
     then: productionSecret.required(),

@@ -2,8 +2,16 @@ import { registerAs } from '@nestjs/config';
 import {
   GUEST_SESSION_TTL_SECONDS,
   LONG_SESSION_TTL_SECONDS,
+  TEN_YEAR_SESSION_TTL_SECONDS,
   parsePositiveSeconds,
 } from '../session-ttl';
+
+/** 15-minute access tokens logged people out whenever cookie refresh failed. */
+function resolveRegisteredAccessTtl(raw: string | undefined): number {
+  const parsed = parsePositiveSeconds(raw, TEN_YEAR_SESSION_TTL_SECONDS);
+  if (parsed <= 900) return TEN_YEAR_SESSION_TTL_SECONDS;
+  return Math.min(parsed, TEN_YEAR_SESSION_TTL_SECONDS);
+}
 
 function requireSecret(envVar: string, devFallback: string): string {
   const value = process.env[envVar];
@@ -21,10 +29,12 @@ function requireSecret(envVar: string, devFallback: string): string {
 export const jwtConfig = registerAs('jwt', () => ({
   accessSecret: requireSecret('JWT_ACCESS_SECRET', 'change-me-access'),
   /**
-   * Short-lived access JWT for web/admin/customer (`/auth/login`).
-   * Silently renewed via refresh token — does not affect the MFS SMS app.
+   * Registered web/admin/customer access JWT (`/auth/login`).
+   * Kept for 10 years so a missed silent refresh does not sign the user out.
+   * The MFS SMS app passes its own TTL and is not affected.
+   * A stale JWT_ACCESS_TTL of 900 (the old 15-minute default) is ignored.
    */
-  accessTtl: parsePositiveSeconds(process.env.JWT_ACCESS_TTL, 900),
+  accessTtl: resolveRegisteredAccessTtl(process.env.JWT_ACCESS_TTL),
   refreshSecret: requireSecret('JWT_REFRESH_SECRET', 'change-me-refresh'),
   /**
    * Registered web/admin/customer refresh sessions (`/auth/login`, `/auth/refresh`).
