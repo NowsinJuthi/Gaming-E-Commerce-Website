@@ -155,5 +155,6 @@ sudo /opt/uniqbd.com/deploy/deploy/ubuntu22.04/rebuild-web.sh
 | API 502 | API on `127.0.0.1:4000`, `journalctl -u uniqbd-api -n 80` |
 | Mongo errors | Atlas IP whitelist, `MONGODB_URI` in `apps/api/.env` |
 | SSL | aaPanel cert paths in Nginx vhost |
+| Admin upload **413** | Merge repo `uniqbd.com` nginx (`client_max_body_size 25g`, `location ^~ /api/admin/media-shares/` → `:4000`), `nginx -t && reload`. Files **>100MB** through **Cloudflare proxied** DNS still hit CF’s limit — use DNS-only (grey cloud) for upload tests or copy via Samba on LAN. |
 
 More: [README.md](./README.md) · [aaPanel README](../aapanel/README.md)
