@@ -11,6 +11,7 @@ import {
   UserIcon,
 } from "@/components/admin/icons";
 import { ThemePreferenceIcon } from "@/components/theme/ThemeToggle";
+import { resolveTheme } from "@/lib/theme";
 import { useThemeStore } from "@/stores/theme-store";
 
 type Props = {
@@ -32,34 +33,21 @@ function MobileProfileThemeToggle() {
   const theme = useThemeStore((s) => s.theme);
   const hydrated = useThemeStore((s) => s.hydrated);
   const setTheme = useThemeStore((s) => s.setTheme);
-  const activeLight = hydrated && theme === "light";
-  const activeDark = hydrated && theme === "dark";
+  const resolved = hydrated ? resolveTheme(theme) : resolveTheme("system");
+  const isDark = resolved === "dark" || resolved === "gaming" || resolved === "amoled";
+  const display = isDark ? "dark" : "light";
 
   return (
-    <div className="flex shrink-0 items-center gap-1 lg:hidden" role="group" aria-label="Theme">
-      <button
-        type="button"
-        className={`shell-icon-btn h-9 w-9 min-h-0 min-w-0 p-0${
-          activeLight ? " ring-1 ring-brand/60 bg-brand/10" : ""
-        }`}
-        aria-label="Light mode"
-        aria-pressed={activeLight}
-        onClick={() => setTheme("light")}
-      >
-        <ThemePreferenceIcon preference="light" className="h-4 w-4 text-brand" />
-      </button>
-      <button
-        type="button"
-        className={`shell-icon-btn h-9 w-9 min-h-0 min-w-0 p-0${
-          activeDark ? " ring-1 ring-brand/60 bg-brand/10" : ""
-        }`}
-        aria-label="Dark mode"
-        aria-pressed={activeDark}
-        onClick={() => setTheme("dark")}
-      >
-        <ThemePreferenceIcon preference="dark" className="h-4 w-4 text-brand" />
-      </button>
-    </div>
+    <button
+      type="button"
+      className="shell-icon-btn h-9 w-9 min-h-0 min-w-0 p-0 ring-1 ring-brand/60 bg-brand/10 lg:hidden"
+      aria-label={
+        isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
+      }
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+    >
+      <ThemePreferenceIcon preference={display} className="h-4 w-4 text-brand" />
+    </button>
   );
 }
 
