@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
+  canSeekWithinCurrentPack,
   displayTimelineSeconds,
-  isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
 import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
@@ -804,8 +804,22 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
             if (!previous || previous.sessionId !== data.sessionId) return data;
             if (previous.status === "ready" && data.status === "ready" && previous.startSeconds === data.startSeconds) {
               const sameSubtitles = JSON.stringify(previous.subtitles) === JSON.stringify(data.subtitles);
-              if (sameSubtitles && previous.complete === data.complete && previous.message === data.message) return previous;
-              return { ...previous, subtitles: data.subtitles, complete: data.complete, message: data.message };
+              const sameDuration = previous.durationSeconds === data.durationSeconds;
+              if (
+                sameSubtitles &&
+                sameDuration &&
+                previous.complete === data.complete &&
+                previous.message === data.message
+              ) {
+                return previous;
+              }
+              return {
+                ...previous,
+                subtitles: data.subtitles,
+                complete: data.complete,
+                message: data.message,
+                durationSeconds: data.durationSeconds || previous.durationSeconds,
+              };
             }
             return data;
           });
@@ -854,8 +868,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const movie = sessionRef.current?.durationSeconds ?? 0;
       const mediaTime = displayTimelineSeconds(video.currentTime, origin, movie);
       setCurrent(mediaTime);
-      const known = sessionRef.current?.durationSeconds ?? 0;
-      const nextDuration = known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0);
+      const snap = sessionRef.current;
+      const known = snap?.durationSeconds ?? 0;
+      const packComplete = snap?.complete ?? false;
+      let nextDuration = known;
+      if (nextDuration <= 0) {
+        const fromMedia = origin + (Number.isFinite(video.duration) ? video.duration : 0);
+        if (fromMedia > 0 && packComplete) nextDuration = fromMedia;
+      }
       if (nextDuration > 0) durationHintRef.current = nextDuration;
       setDuration(nextDuration);
     };
@@ -1113,7 +1133,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setCurrent(absolute);
     remember(absolute);
 
-    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
+    const packComplete = currentSession.complete;
+    if (
+      targetIsInCurrentPack &&
+      canSeekWithinCurrentPack(video, localTarget, packComplete)
+    ) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;

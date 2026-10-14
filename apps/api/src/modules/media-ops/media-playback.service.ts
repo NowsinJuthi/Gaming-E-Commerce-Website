@@ -453,15 +453,39 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private isMatroskaPath(file: string): boolean {
+    return /\.(mkv|webm)$/i.test((file.split('?')[0] ?? '').split(/[/\\]/).pop() ?? '');
+  }
+
+  private ffmpegInputArgs(file: string, streaming: boolean, startSeconds: number): string[] {
+    const remote = file.startsWith('http://');
+    const mkv = !streaming && this.isMatroskaPath(file);
+    return [
+      ...(!streaming && startSeconds > 0.5 ? ['-ss', startSeconds.toFixed(3)] : []),
+      ...(remote ? ['-seekable', '1'] : []),
+      '-probesize', mkv ? '32M' : '5M',
+      '-analyzeduration', mkv ? '15M' : '2M',
+      '-fflags', mkv ? '+genpts+igndts+discardcorrupt' : '+genpts+discardcorrupt',
+      '-i', streaming ? 'pipe:0' : file,
+    ];
+  }
+
   private async probe(session: Session, file: string) {
-    const raw = await this.runCapture(this.bin('ffprobe'), [
-      '-v', 'error',
-      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
-      '-show_entries', 'stream=codec_type,codec_name,width,height:stream_tags=language,title',
-      '-show_entries', 'format=duration',
-      '-of', 'json',
-      file,
-    ]);
+    const mkv = this.isMatroskaPath(file);
+    const raw = await this.runCapture(
+      this.bin('ffprobe'),
+      [
+        '-v', 'error',
+        ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
+        '-probesize', mkv ? '32M' : '5M',
+        '-analyzeduration', mkv ? '15M' : '2M',
+        '-show_entries', 'stream=codec_type,codec_name,width,height:stream_tags=language,title',
+        '-show_entries', 'format=duration',
+        '-of', 'json',
+        file,
+      ],
+      mkv ? 90_000 : 30_000,
+    );
     const parsed = JSON.parse(raw) as {
       streams?: Array<{
         codec_type?: string;
@@ -478,7 +502,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.width = video?.width ?? 0;
     session.height = video?.height ?? 0;
     const duration = Number(parsed.format?.duration);
-    session.durationSeconds = Number.isFinite(duration) ? duration : 0;
+    session.durationSeconds =
+      Number.isFinite(duration) && duration > 0
+        ? duration
+        : session.durationSeconds > 0
+          ? session.durationSeconds
+          : session.runtimeSeconds;
     let audioOrdinal = 0;
     session.audioTracks = streams
       .filter((stream) => stream.codec_type === 'audio')
@@ -508,27 +537,28 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const segment = join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
     const audio = session.audioTracks[session.audioIndex];
     const streaming = Boolean(session.incoming);
+    const mkv = !streaming && this.isMatroskaPath(file);
+    const codec = this.codecArgs(session, audio?.codec ?? '');
+    const hlsFlags = codec.copyVideo
+      ? 'omit_endlist+temp_file+split_by_time'
+      : 'independent_segments+omit_endlist+temp_file';
     const args = [
       '-hide_banner', '-loglevel', 'error', ...(streaming ? [] : ['-nostdin']), '-y',
-      ...(!streaming && session.startSeconds > 0.5 ? ['-ss', session.startSeconds.toFixed(3)] : []),
-      ...(file.startsWith('http://') ? ['-seekable', '1'] : []),
-      '-probesize', '5M',
-      '-analyzeduration', '2M',
-      '-fflags', '+genpts+discardcorrupt',
-      '-i', streaming ? 'pipe:0' : file,
+      ...this.ffmpegInputArgs(file, streaming, session.startSeconds),
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
       '-sn', '-dn',
       '-muxdelay', '0',
       '-muxpreload', '0',
-      ...this.codecArgs(session, audio?.codec ?? ''),
+      ...(mkv ? ['-reset_timestamps', '1'] : []),
+      ...codec.args,
       '-f', 'hls',
       '-hls_time', '4',
       '-hls_init_time', '2',
       '-hls_list_size', '0',
       '-start_number', '0',
       '-hls_playlist_type', 'event',
-      '-hls_flags', 'independent_segments+omit_endlist+temp_file',
+      '-hls_flags', hlsFlags,
       '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
@@ -564,37 +594,50 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.message = '';
   }
 
-  private codecArgs(session: Session, audioCodec: string): string[] {
+  private codecArgs(
+    session: Session,
+    audioCodec: string,
+  ): { args: string[]; copyVideo: boolean } {
     const height = session.quality === '1080' ? 1080 : session.quality === '480' ? 480 : session.quality === '720' ? 720 : 0;
     const copyVideo = session.videoCodec === 'h264' && height === 0;
     const copyAudio = audioCodec === 'aac' || audioCodec === 'mp3';
     if (copyVideo && copyAudio) {
-      return audioCodec === 'aac'
-        ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
-        : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy'];
+      return {
+        copyVideo: true,
+        args:
+          audioCodec === 'aac'
+            ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
+            : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy'],
+      };
     }
     if (copyVideo) {
-      return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000'];
+      return {
+        copyVideo: true,
+        args: ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000'],
+      };
     }
     const target = height || 720;
-    return [
-      '-vf', `scale=-2:'min(ih,${target})'`,
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '26',
-      '-pix_fmt', 'yuv420p',
-      '-profile:v', 'main',
-      '-g', '96',
-      '-keyint_min', '96',
-      '-sc_threshold', '0',
-      '-bf', '0',
-      '-refs', '1',
-      '-x264-params', 'rc-lookahead=0:sync-lookahead=0',
-      '-c:a', 'aac',
-      '-ac', '2',
-      '-b:a', '192k',
-      '-ar', '48000',
-    ];
+    return {
+      copyVideo: false,
+      args: [
+        '-vf', `scale=-2:'min(ih,${target})'`,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '26',
+        '-pix_fmt', 'yuv420p',
+        '-profile:v', 'main',
+        '-g', '96',
+        '-keyint_min', '96',
+        '-sc_threshold', '0',
+        '-bf', '0',
+        '-refs', '1',
+        '-x264-params', 'rc-lookahead=0:sync-lookahead=0',
+        '-c:a', 'aac',
+        '-ac', '2',
+        '-b:a', '192k',
+        '-ar', '48000',
+      ],
+    };
   }
 
   private async extractCaptions(session: Session, file: string, token: number) {
