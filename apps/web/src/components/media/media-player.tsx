@@ -9,6 +9,7 @@ import {
   displayTimelineSeconds,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
+import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
 import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
 import styles from "./media-player.module.css";
 
@@ -452,6 +453,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const rateRef = useRef(1);
   const durationHintRef = useRef(0);
   const [session, setSession] = useState<PlaybackSession | null>(null);
+  useLiveMediaWatch({
+    active: session?.status === "ready",
+    titleId,
+    titleName: session?.title ?? "Media",
+    episodeName: session?.episodeName,
+  });
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);

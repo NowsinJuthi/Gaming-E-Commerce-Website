@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/Toaster";
 import { LiveChatLauncher } from "@/components/chat/LiveChatLauncher";
 import { StoreEventsProvider } from "@/components/StoreEventsProvider";
 import { QueryProvider } from "@/components/QueryProvider";
+import { SitePresenceTracker } from "@/components/analytics/SitePresenceTracker";
 
 export function ChromeShell({
   children,
@@ -52,6 +53,7 @@ export function ChromeShell({
           <SiteAppearanceProvider initialAppearance={initialAppearance}>
             <DocumentFaviconHead />
             <StoreEventsProvider />
+            <SitePresenceTracker />
             <a href="#main-content" className="skip-link">
               Skip to content
             </a>
@@ -74,6 +76,7 @@ export function ChromeShell({
             Skip to content
           </a>
           <div className="chrome-shell flex min-h-screen min-w-0 flex-col">
+            <SitePresenceTracker />
             <ReferralTracker />
             <SiteMenusProvider initialMenus={initialSiteMenus}>
               <ContactSocialProvider
