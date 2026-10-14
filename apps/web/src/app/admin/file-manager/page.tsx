@@ -21,9 +21,23 @@ import { CLOUDFLARE_PROXY_UPLOAD_BYTES } from "@/lib/api";
 
 const VIDEO_ACCEPT = ".mkv,.mp4,.avi,.mov,.wmv,.m4v,.ts,.m2ts,.webm,.mpg,.mpeg,video/*";
 const LARGE_UPLOAD_HOST = Boolean(process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim());
+/** Network upload 0–70%; Samba write animates 70–98%; done = 100%. */
+const UPLOAD_PHASE_MAX = 70;
+const SAVING_PHASE_CAP = 98;
 
 function totalPickBytes(files: File[]) {
   return files.reduce((sum, file) => sum + file.size, 0);
+}
+
+function mapNetworkProgress(loaded: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.min(UPLOAD_PHASE_MAX, Math.round((loaded / total) * UPLOAD_PHASE_MAX));
+}
+
+function savingTick(fileSize: number): { intervalMs: number; step: number } {
+  if (fileSize > 2 * 1024 * 1024 * 1024) return { intervalMs: 450, step: 0.35 };
+  if (fileSize > 500 * 1024 * 1024) return { intervalMs: 320, step: 0.55 };
+  return { intervalMs: 220, step: 0.85 };
 }
 
 export default function AdminFileManagerPage() {
@@ -54,12 +68,41 @@ export default function AdminFileManagerPage() {
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "upload" | "samba">("idle");
+  const uploadPctRef = useRef(0);
+  const savingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
     () => servers.find((server) => server.id === selectedId) ?? null,
     [servers, selectedId],
+  );
+
+  const clearSavingTimer = useCallback(() => {
+    if (savingTimerRef.current) {
+      clearInterval(savingTimerRef.current);
+      savingTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearSavingTimer(), [clearSavingTimer]);
+
+  const setDisplayProgress = useCallback((next: number) => {
+    uploadPctRef.current = next;
+    setUploadPct(next);
+  }, []);
+
+  const startSavingProgress = useCallback(
+    (fileSize: number) => {
+      clearSavingTimer();
+      const { intervalMs, step } = savingTick(fileSize);
+      savingTimerRef.current = setInterval(() => {
+        const prev = uploadPctRef.current;
+        if (prev >= SAVING_PHASE_CAP) return;
+        setDisplayProgress(Math.min(SAVING_PHASE_CAP, prev + step));
+      }, intervalMs);
+    },
+    [clearSavingTimer, setDisplayProgress],
   );
 
   const reload = useCallback(async () => {
@@ -131,22 +174,27 @@ export default function AdminFileManagerPage() {
     }
     setBusy(true);
     setUploadError(null);
-    setUploadPct(0);
+    clearSavingTimer();
+    setDisplayProgress(0);
     setUploadPhase("upload");
     setUploadNote(null);
+    const bytes = totalPickBytes(pickedFiles);
     try {
       const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles, {
         onProgress: ({ loaded, total, phase }) => {
           if (phase === "processing") {
             setUploadPhase("samba");
-            setUploadPct(100);
+            setDisplayProgress(UPLOAD_PHASE_MAX);
+            startSavingProgress(bytes);
             return;
           }
           if (total > 0) {
-            setUploadPct(Math.min(99, Math.round((loaded / total) * 100)));
+            setDisplayProgress(mapNetworkProgress(loaded, total));
           }
         },
       });
+      clearSavingTimer();
+      setDisplayProgress(100);
       setUploadNote(
         result.logs?.[1] ??
           `Uploaded ${result.uploaded} file(s). Scan runs in the background — check Movie/Series collections shortly.`,
@@ -156,12 +204,13 @@ export default function AdminFileManagerPage() {
       setEntries(data.entries);
       await reload();
     } catch (err) {
+      clearSavingTimer();
       setUploadNote(null);
       setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setBusy(false);
       setUploadPhase("idle");
-      setUploadPct(0);
+      setDisplayProgress(0);
     }
   }
 
@@ -499,7 +548,11 @@ export default function AdminFileManagerPage() {
                       disabled={busy || pickedFiles.length === 0}
                       onClick={() => void startUpload()}
                     >
-                      {busy ? "Working…" : "↑ Start upload"}
+                      {busy
+                        ? uploadPhase === "samba"
+                          ? `Writing ${Math.round(uploadPct)}%`
+                          : `Uploading ${Math.round(uploadPct)}%`
+                        : "↑ Start upload"}
                     </button>
                   </div>
                   <div className={styles.dropZone}>
@@ -580,18 +633,14 @@ export default function AdminFileManagerPage() {
                       <div className={styles.uploadProgressWrap} aria-live="polite">
                         <div className={styles.uploadProgressTrack}>
                           <div
-                            className={
-                              uploadPhase === "samba"
-                                ? `${styles.uploadProgressBar} ${styles.uploadProgressBarIndeterminate}`
-                                : styles.uploadProgressBar
-                            }
-                            style={uploadPhase === "upload" ? { width: `${uploadPct}%` } : undefined}
+                            className={styles.uploadProgressBar}
+                            style={{ width: `${Math.min(100, Math.max(2, uploadPct))}%` }}
                           />
                         </div>
                         <p className={styles.uploadProgressLabel}>
                           {uploadPhase === "upload"
-                            ? `Sending to server… ${uploadPct}%${totalPickBytes(pickedFiles) > 0 ? ` · ${formatBytes(totalPickBytes(pickedFiles))}` : ""}`
-                            : "Writing to Samba storage… this can take several minutes for large files."}
+                            ? `Sending to server… ${Math.round(uploadPct)}% · ${formatBytes(totalPickBytes(pickedFiles))}`
+                            : `Writing to Samba… ${Math.round(uploadPct)}% (large files can take several minutes)`}
                         </p>
                       </div>
                     ) : null}

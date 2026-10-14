@@ -1,9 +1,4 @@
-import {
-  authFormDataRequest,
-  authRequest,
-  resolveSambaMediaUploadUrl,
-  type AuthFormDataProgress,
-} from "@/lib/api";
+import { authRequest, authSmbMediaUpload, type AuthFormDataProgress } from "@/lib/api";
 
 export type MediaLibraryKind = "movies" | "tv";
 
@@ -206,9 +201,5 @@ export async function uploadSmbMedia(
     const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
     form.append("files", file, rel);
   }
-  // Default: api.uniqbd.com (auth cookies). Same-origin uniqbd.com only when LARGE_UPLOAD_ORIGIN is set.
-  const path = process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim()
-    ? resolveSambaMediaUploadUrl(serverId)
-    : `/admin/media-shares/${serverId}/upload`;
-  return authFormDataRequest<SmbUploadResult>(path, form, { onProgress: opts?.onProgress });
+  return authSmbMediaUpload<SmbUploadResult>(serverId, form, { onProgress: opts?.onProgress });
 }

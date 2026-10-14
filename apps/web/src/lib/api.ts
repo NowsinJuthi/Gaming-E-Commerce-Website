@@ -987,12 +987,12 @@ function largeUploadOrigin(): string | null {
   return raw.replace(/\/$/, "");
 }
 
-export function resolveSambaMediaUploadUrl(serverId: string): string {
-  const path = `/api/admin/media-shares/${serverId}/upload`;
+/** Movie-Server style: Next.js streams to API (same-origin or grey-cloud upload host). */
+export function resolveSmbMediaUploadProxyUrl(serverId: string): string {
   const direct = largeUploadOrigin();
-  if (direct) return `${direct}${path}`;
-  if (typeof window !== "undefined") return `${window.location.origin}${path}`;
-  return `${API_BASE.replace(/\/api\/?$/, "")}${path}`;
+  const origin =
+    direct || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${origin.replace(/\/$/, "")}/api/smb-media-upload/${serverId}`;
 }
 
 function resolveAuthUploadUrl(path: string): string {
@@ -1045,8 +1045,18 @@ function xhrFormDataPost(
         }),
       );
     });
-    xhr.addEventListener("error", () => reject(new ApiError("Upload network error.", 0)));
+    xhr.addEventListener("error", () =>
+      reject(
+        new ApiError(
+          url.includes("upload.") && typeof window !== "undefined" && !url.startsWith(window.location.origin)
+            ? "Upload network error. Check upload.uniqbd.com SSL and nginx (/api/smb-media-upload/ → port 3000, CORS from uniqbd.com)."
+            : "Upload network error. Keep this page open and ensure nginx allows large POSTs to /api/smb-media-upload/.",
+          0,
+        ),
+      ),
+    );
     xhr.addEventListener("abort", () => reject(new ApiError("Upload cancelled.", 0)));
+    xhr.timeout = 0;
     xhr.send(form);
   });
 }
@@ -1108,6 +1118,39 @@ export async function authFormDataRequest<T>(
         : " If the file is over ~100MB and Cloudflare is proxied (orange cloud), set NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN to a grey-cloud host (see deploy docs) and rebuild web, or copy files via Samba on the storage LAN.";
       throw new ApiError(
         `Upload rejected (413 — body too large). On the VPS, merge repo nginx for uniqbd.com (client_max_body_size 25g and /api/admin/media-shares/ → port 4000), then nginx -t && reload.${cfHint}`,
+        413,
+      );
+    }
+    await throwApiError(res);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** Samba video upload via Next streaming route (avoids API rewrite / CORS to Nest). */
+export async function authSmbMediaUpload<T>(
+  serverId: string,
+  form: FormData,
+  options?: AuthFormDataRequestOptions,
+): Promise<T> {
+  const url = resolveSmbMediaUploadProxyUrl(serverId);
+  const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
+  const csrf = getStored("refreshToken");
+  const headers = !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined;
+  let res: Response;
+  try {
+    res = await formDataWithAuthRetry(url, form, headers, options?.onProgress);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(
+      "Upload failed before the server responded. If the file is very large, use upload.uniqbd.com (grey cloud) or copy via Samba on the storage LAN.",
+      0,
+    );
+  }
+  if (!res.ok) {
+    if (res.status === 413) {
+      throw new ApiError(
+        "File too large for the web proxy or Cloudflare. Use grey-cloud upload.uniqbd.com or Samba on the storage LAN.",
         413,
       );
     }
