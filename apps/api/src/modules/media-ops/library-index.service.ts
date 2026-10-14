@@ -73,6 +73,88 @@ export class LibraryIndexService {
     return result;
   }
 
+  /** Index only paths just uploaded to Samba (no full library folder scan). */
+  async syncUploadedPaths(
+    id: string,
+    uploaded: { remote: string; sizeBytes: number }[],
+  ): Promise<{
+    indexed: number;
+    matched: number;
+    unmatched: number;
+    removed: number;
+    logs: string[];
+  }> {
+    const empty = { indexed: 0, matched: 0, unmatched: 0, removed: 0, logs: ['Library not found.'] };
+    if (!Types.ObjectId.isValid(id) || uploaded.length === 0) {
+      if (!Types.ObjectId.isValid(id)) return empty;
+      return { ...empty, logs: ['No uploaded paths to index.'] };
+    }
+    const library = await this.libraries.findById(id).exec();
+    if (!library) return empty;
+
+    const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
+    const libRoot = (library.smbRemotePath ?? '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    let indexed = 0;
+    let matched = 0;
+
+    if (kind === 'movie') {
+      for (const item of uploaded) {
+        const rel = this.pathRelativeToLibrary(libRoot, item.remote);
+        const name = rel.split('/').filter(Boolean).pop() ?? rel;
+        if (!name || !this.isVideo(name)) continue;
+        const entry: SmbListedEntry = {
+          name,
+          path: rel,
+          isDirectory: false,
+          sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
+        };
+        if (await this.upsertFromFile(library, kind, entry, () => true)) matched += 1;
+        indexed += 1;
+      }
+    } else {
+      const folderPaths = new Set<string>();
+      for (const item of uploaded) {
+        const rel = this.pathRelativeToLibrary(libRoot, item.remote);
+        const parts = rel.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          folderPaths.add(parts.slice(0, -1).join('/'));
+          continue;
+        }
+        const name = parts[0] ?? rel;
+        if (!name || !this.isVideo(name)) continue;
+        const entry: SmbListedEntry = {
+          name,
+          path: rel,
+          isDirectory: false,
+          sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
+        };
+        if (await this.upsertFromFile(library, kind, entry, () => true)) matched += 1;
+        indexed += 1;
+      }
+      for (const folderPath of folderPaths) {
+        const name = folderPath.split('/').filter(Boolean).pop() ?? folderPath;
+        const entry: SmbListedEntry = {
+          name,
+          path: folderPath,
+          isDirectory: true,
+          sizeBytes: null,
+        };
+        if (await this.upsertFromFolder(library, kind, entry, () => true)) matched += 1;
+        indexed += 1;
+      }
+    }
+
+    await this.refreshLibraryCounts(library);
+    const unmatched = Math.max(0, indexed - matched);
+    const logs = [
+      `${library.name}: indexed ${indexed} uploaded item${indexed === 1 ? '' : 's'}, ${matched} matched on TMDB.`,
+    ];
+    if (!this.tmdb.enabled()) {
+      logs.push('TMDB_API_KEY is missing, so posters cannot be matched.');
+    }
+    return { indexed, matched, unmatched, removed: 0, logs };
+  }
+
   /** Drop catalog rows whose files were removed from storage (debounced, for /media home). */
   maybePruneAllLibraries(): void {
     const now = Date.now();
@@ -405,6 +487,33 @@ export class LibraryIndexService {
 
   private sourceKey(library: MediaLibraryDocument, relativePath: string): string {
     return `${String(library._id)}:${relativePath.replace(/\\/g, '/')}`;
+  }
+
+  private pathRelativeToLibrary(libRoot: string, fullOnShare: string): string {
+    const full = fullOnShare.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    if (!libRoot) return full;
+    if (full === libRoot) return '';
+    if (full.startsWith(`${libRoot}/`)) return full.slice(libRoot.length + 1);
+    return full;
+  }
+
+  private async refreshLibraryCounts(library: MediaLibraryDocument): Promise<void> {
+    const libId = String(library._id);
+    const prefix = `^${libId}:`;
+    const [total, withoutPoster] = await Promise.all([
+      this.titles.countDocuments({ sourceKey: new RegExp(prefix) }).exec(),
+      this.titles
+        .countDocuments({
+          sourceKey: new RegExp(prefix),
+          $or: [{ posterUrl: null }, { posterUrl: '' }],
+        })
+        .exec(),
+    ]);
+    library.itemCount = total;
+    library.unmatchedCount = withoutPoster;
+    library.missingCount = 0;
+    library.lastIndexedAt = new Date();
+    await library.save();
   }
 
   private parseTitle(name: string): { title: string; year: number | null } {

@@ -331,6 +331,7 @@ export class MediaOpsService {
     let auth = await this.syncResolvedShare(server, password);
     const base = browsePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     let uploaded = 0;
+    const uploadedPaths: { remote: string; sizeBytes: number }[] = [];
     try {
       for (const file of files) {
         const rel = sanitizeUploadRelativePath(file.originalname || file.filename);
@@ -339,6 +340,7 @@ export class MediaOpsService {
         }
         const remote = base ? `${base}/${rel}` : rel;
         const shareUsed = await this.smb.uploadLocalFile(auth, remote, file.path);
+        uploadedPaths.push({ remote, sizeBytes: file.size });
         if (shareUsed !== auth.share) {
           server.share = shareUsed;
           auth = { ...auth, share: shareUsed };
@@ -364,7 +366,7 @@ export class MediaOpsService {
       await Promise.all(files.map((file) => unlink(file.path).catch(() => undefined)));
     }
     const library = await this.resolveLibraryForShare(server, base, kind);
-    return { uploaded, library };
+    return { uploaded, library, uploadedPaths };
   }
 
   async addLibraryFromShare(input: {

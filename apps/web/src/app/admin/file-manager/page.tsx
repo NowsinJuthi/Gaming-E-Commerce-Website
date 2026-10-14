@@ -202,7 +202,7 @@ export default function AdminFileManagerPage() {
       setDisplayProgress(100);
       setUploadNote(
         result.logs?.[1] ??
-          `Uploaded ${result.uploaded} file(s). Scan runs in the background — check Movie/Series collections shortly.`,
+          `Uploaded ${result.uploaded} file(s). TMDB runs for those files only — check Movie/Series collections shortly.`,
       );
       resetPickers();
       const data = await loadBrowse(selected.id, browsePath);

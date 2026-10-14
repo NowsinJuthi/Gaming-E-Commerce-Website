@@ -253,7 +253,9 @@ export class MediaOpsController {
       throw new BadRequestException('Choose at least one video file or folder.');
     }
     const result = await this.media.uploadToShare(id, path, batch, libKind);
-    void this.index.syncLibrary(result.library.id).catch(() => undefined);
+    void this.index
+      .syncUploadedPaths(result.library.id, result.uploadedPaths)
+      .catch(() => undefined);
     return {
       uploaded: result.uploaded,
       library: result.library,
@@ -263,7 +265,7 @@ export class MediaOpsController {
       removed: 0,
       logs: [
         `Uploaded ${result.uploaded} file(s) to Samba.`,
-        'Library scan and TMDB matching run in the background (about 1–2 minutes).',
+        'TMDB matching for the uploaded file(s) only — usually ready within a minute.',
       ],
     };
   }
