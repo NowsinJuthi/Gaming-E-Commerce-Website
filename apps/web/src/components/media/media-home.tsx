@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
-import { readRecentWatched } from "@/lib/media-recent-watched";
+import { readRecentWatched, syncRecentFromLegacyWatchKeys } from "@/lib/media-recent-watched";
 import type { MediaCard, MediaHome } from "@/lib/media-home-api";
 
 type MediaDetails = {
@@ -49,6 +49,7 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [recentRevision, setRecentRevision] = useState(0);
+  const [recentCards, setRecentCards] = useState<MediaCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const catalogById = useMemo(() => new Map(source.map((item) => [item.id, item])), [source]);
   const libraryItems = useMemo(
@@ -78,23 +79,63 @@ export function MediaHome({ home }: { home: MediaHome }) {
   const searchActive = searchQuery.trim().length > 0;
   const showSearchHints = searchActive;
 
-  const recentlyWatched = useMemo(() => {
-    void recentRevision;
-    return readRecentWatched()
-      .map((entry) => catalogById.get(entry.id))
-      .filter((item): item is MediaCard => Boolean(item));
-  }, [catalogById, recentRevision]);
-
   useEffect(() => {
     const refresh = () => setRecentRevision((value) => value + 1);
+    syncRecentFromLegacyWatchKeys();
     refresh();
     window.addEventListener("uniqbd-media-recent-changed", refresh);
     window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
     return () => {
       window.removeEventListener("uniqbd-media-recent-changed", refresh);
       window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
     };
   }, []);
+
+  useEffect(() => {
+    void recentRevision;
+    let cancelled = false;
+
+    const entries = readRecentWatched();
+    if (entries.length === 0) {
+      setRecentCards([]);
+      return;
+    }
+
+    void (async () => {
+      const cards: MediaCard[] = [];
+      for (const entry of entries) {
+        const cached = catalogById.get(entry.id);
+        if (cached) {
+          cards.push(cached);
+          continue;
+        }
+        try {
+          const response = await fetch(`${API_BASE}/media/titles/${entry.id}`);
+          if (!response.ok) continue;
+          const data = (await response.json()) as MediaDetails;
+          cards.push({
+            id: entry.id,
+            title: data.title,
+            year: data.year,
+            kind: data.kind,
+            posterUrl: data.posterUrl,
+            featured: false,
+            trending: false,
+            seasonCount: null,
+          });
+        } catch {
+          /* skip unavailable titles */
+        }
+      }
+      if (!cancelled) setRecentCards(cards);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogById, recentRevision]);
 
   useEffect(() => {
     if (!info) {
@@ -120,8 +161,8 @@ export function MediaHome({ home }: { home: MediaHome }) {
     <div className={styles.page}>
       <h1 className="sr-only">Media</h1>
 
-      {!searchActive && recentlyWatched.length > 0 ? (
-        <RecentlyWatchedSlider items={recentlyWatched} onSelect={setInfo} />
+      {!searchActive && recentCards.length > 0 ? (
+        <RecentlyWatchedSlider items={recentCards} onSelect={setInfo} />
       ) : null}
 
       <section className={styles.panel}>

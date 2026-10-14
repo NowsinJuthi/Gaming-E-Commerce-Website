@@ -775,7 +775,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       startSeconds: saved > 15 ? saved : 0,
     })
       .then((next) => {
-        if (!stop) setSession(next);
+        if (!stop) {
+          setSession(next);
+          touchRecentWatched(titleId);
+        }
       })
       .catch((reason: unknown) => {
         if (!stop) setError(reason instanceof Error ? reason.message : "Playback could not start.");
