@@ -156,7 +156,7 @@ export class AuthService {
     return { user: this.toPublic(user), ...tokens };
   }
 
-  private static readonly REFRESH_REUSE_RACE_WINDOW_MS = 30_000;
+  private static readonly REFRESH_REUSE_RACE_WINDOW_MS = 60_000;
 
   async refresh(
     dto: RefreshTokenDto,

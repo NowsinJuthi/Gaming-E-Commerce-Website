@@ -648,6 +648,11 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
         if (tokenAfterRetry && tokenAfterRetry !== csrfToken) {
           return true;
         }
+        // 403 = CSRF/cookie briefly out of sync (common with multiple tabs). Keep session and retry.
+        if (res.status === 403 || retryRes.status === 403) {
+          scheduleProactiveRefreshRetry(5_000);
+          return false;
+        }
         clearTokens();
       }
       return false;
