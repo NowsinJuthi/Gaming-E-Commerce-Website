@@ -7,14 +7,18 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { MEDIA_LIBRARY_KINDS, type MediaLibraryKind } from '../../database/schemas/media-library.schema';
+import { smbVideoUploadMulterOptions } from '../../shared/uploads/smb-video-upload.multer';
 import { LibraryIndexService } from './library-index.service';
 import { MediaOpsService } from './media-ops.service';
 
@@ -187,5 +191,30 @@ export class MediaOpsController {
   @Get('admin/media-shares/:id/browse')
   browse(@Param('id') id: string, @Query('path') path?: string) {
     return this.media.browse(id, path ?? '');
+  }
+
+  @Post('admin/media-shares/:id/upload')
+  @UseInterceptors(FilesInterceptor('files', 50, smbVideoUploadMulterOptions))
+  async uploadToShare(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('path') path?: string,
+    @Body('kind') kind?: MediaLibraryKind,
+  ) {
+    const libKind: MediaLibraryKind = kind === 'tv' ? 'tv' : 'movies';
+    const result = await this.media.uploadToShare(id, path ?? '', files ?? [], libKind);
+    const scan = await this.index.syncLibrary(result.library.id);
+    return {
+      uploaded: result.uploaded,
+      library: result.library,
+      indexed: scan.indexed,
+      matched: scan.matched,
+      unmatched: scan.unmatched,
+      removed: scan.removed,
+      logs: [
+        `Uploaded ${result.uploaded} file(s) to Samba.`,
+        ...scan.logs,
+      ],
+    };
   }
 }

@@ -20,8 +20,19 @@ import {
   CatalogTitle,
   CatalogTitleDocument,
 } from '../../database/schemas/catalog-title.schema';
+import { unlink } from 'fs/promises';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { SmbClientService } from './smb-client.service';
+
+const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
+
+function sanitizeUploadRelativePath(input: string): string {
+  const normalized = input.replace(/\\/g, '/').replace(/^\/+/, '');
+  return normalized
+    .split('/')
+    .filter((part) => part && part !== '.' && part !== '..')
+    .join('/');
+}
 
 function serializeLibrary(doc: MediaLibraryDocument) {
   return {
@@ -231,6 +242,45 @@ export class MediaOpsService {
     }
   }
 
+  async uploadToShare(
+    serverId: string,
+    browsePath: string,
+    files: Express.Multer.File[],
+    kind: MediaLibraryKind,
+  ) {
+    if (!files.length) {
+      throw new BadRequestException('Choose at least one video file or folder.');
+    }
+    const server = await this.requireServer(serverId);
+    const password = this.openPassword(server);
+    const auth = this.auth(server, password);
+    const base = browsePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    let uploaded = 0;
+    try {
+      for (const file of files) {
+        const rel = sanitizeUploadRelativePath(file.originalname || file.filename);
+        if (!rel || !this.isVideoFileName(rel)) {
+          throw new BadRequestException(`Unsupported video file: ${file.originalname || file.filename}`);
+        }
+        const remote = base ? `${base}/${rel}` : rel;
+        await this.smb.uploadLocalFile(auth, remote, file.path);
+        uploaded += 1;
+      }
+      server.lastOkAt = new Date();
+      server.lastError = null;
+      await server.save();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload to Samba failed.';
+      server.lastError = message;
+      await server.save();
+      throw new BadRequestException(message);
+    } finally {
+      await Promise.all(files.map((file) => unlink(file.path).catch(() => undefined)));
+    }
+    const library = await this.resolveLibraryForShare(server, base, kind);
+    return { uploaded, library };
+  }
+
   async addLibraryFromShare(input: {
     serverId: string;
     path: string;
@@ -257,6 +307,56 @@ export class MediaOpsService {
         throw new ConflictException('A library with this name and kind already exists.');
       }
       throw error;
+    }
+  }
+
+  private isVideoFileName(name: string): boolean {
+    const base = name.split('/').pop() ?? name;
+    const dot = base.lastIndexOf('.');
+    if (dot < 0) return false;
+    return VIDEO_EXT.has(base.slice(dot).toLowerCase());
+  }
+
+  private async resolveLibraryForShare(
+    server: SmbServerDocument,
+    remotePath: string,
+    kind: MediaLibraryKind,
+  ) {
+    const normalized = remotePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const candidates = await this.libraries.find({ smbServerId: server._id, enabled: true }).exec();
+    let best: MediaLibraryDocument | null = null;
+    let bestLen = -1;
+    for (const lib of candidates) {
+      const root = (lib.smbRemotePath ?? '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const underRoot =
+        root === normalized ||
+        (root.length === 0 && normalized.length >= 0) ||
+        (root.length > 0 && (normalized === root || normalized.startsWith(`${root}/`)));
+      if (underRoot && root.length > bestLen) {
+        best = lib;
+        bestLen = root.length;
+      }
+    }
+    if (best) return serializeLibrary(best);
+
+    const folderName = normalized ? normalized.split('/').filter(Boolean).pop() || normalized : server.share;
+    let name = folderName.trim().slice(0, 80) || server.share.slice(0, 80);
+    try {
+      return await this.addLibraryFromShare({
+        serverId: String(server._id),
+        path: normalized,
+        name,
+        kind,
+      });
+    } catch (error) {
+      if (!(error instanceof ConflictException)) throw error;
+      name = `${folderName} (${kind})`.slice(0, 80);
+      return this.addLibraryFromShare({
+        serverId: String(server._id),
+        path: normalized,
+        name,
+        kind,
+      });
     }
   }
 

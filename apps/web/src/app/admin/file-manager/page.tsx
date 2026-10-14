@@ -12,6 +12,7 @@ import {
   listSmbServers,
   saveSmbPassword,
   testSmbServer,
+  uploadSmbMedia,
   type AdminSmbServer,
   type MediaLibraryKind,
   type SmbBrowseEntry,
@@ -41,6 +42,9 @@ export default function AdminFileManagerPage() {
   const [libraryKind, setLibraryKind] = useState<MediaLibraryKind>("movies");
   const [pendingDir, setPendingDir] = useState<SmbBrowseEntry | null>(null);
   const [pickLabel, setPickLabel] = useState<string | null>(null);
+  const [pickedFiles, setPickedFiles] = useState<File[]>([]);
+  const [uploadKind, setUploadKind] = useState<MediaLibraryKind>("movies");
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,6 +102,35 @@ export default function AdminFileManagerPage() {
     setPendingDir({ name: entry.name, path: entry.path, isDirectory: true });
     setLibraryName(entry.name);
     setLibraryKind(pathLooksLikeTv(`${entry.path} ${entry.name}`) ? "tv" : "movies");
+  }
+
+  function resetPickers() {
+    setPickedFiles([]);
+    setPickLabel(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  }
+
+  async function startUpload() {
+    if (!selected || pickedFiles.length === 0) return;
+    setBusy(true);
+    setError(null);
+    setUploadNote("Uploading to Samba and scanning library…");
+    try {
+      const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles);
+      setUploadNote(
+        `Done: ${result.uploaded} file(s) uploaded · ${result.indexed} indexed · ${result.matched} matched on TMDB.`,
+      );
+      resetPickers();
+      const data = await loadBrowse(selected.id, browsePath);
+      setEntries(data.entries);
+      await reload();
+    } catch (err) {
+      setUploadNote(null);
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onCreate(event: React.FormEvent) {
@@ -189,7 +222,8 @@ export default function AdminFileManagerPage() {
                       setSelectedId(server.id);
                       setBrowsePath("");
                       setPendingDir(null);
-                      setPickLabel(null);
+                      resetPickers();
+                      setUploadNote(null);
                       setError(null);
                     }}
                   >
@@ -390,8 +424,25 @@ export default function AdminFileManagerPage() {
                         {uncPath}
                       </p>
                     </div>
-                    <button type="button" className={styles.uploadStart} disabled={!pickLabel}>
-                      ↑ Start upload
+                    <label className={styles.field}>
+                      <span className="sr-only">Content type</span>
+                      <select
+                        className={styles.select}
+                        value={uploadKind}
+                        onChange={(event) => setUploadKind(event.target.value as MediaLibraryKind)}
+                        disabled={busy}
+                      >
+                        <option value="movies">Movie upload</option>
+                        <option value="tv">Series upload</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className={styles.uploadStart}
+                      disabled={busy || pickedFiles.length === 0}
+                      onClick={() => void startUpload()}
+                    >
+                      {busy ? "Working…" : "↑ Start upload"}
                     </button>
                   </div>
                   <div className={styles.dropZone}>
@@ -404,7 +455,14 @@ export default function AdminFileManagerPage() {
                       aria-hidden
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        setPickLabel(file ? file.name : null);
+                        if (folderInputRef.current) folderInputRef.current.value = "";
+                        if (file) {
+                          setPickedFiles([file]);
+                          setPickLabel(file.name);
+                          if (pathLooksLikeTv(file.name)) setUploadKind("tv");
+                        } else {
+                          resetPickers();
+                        }
                       }}
                     />
                     <input
@@ -416,23 +474,50 @@ export default function AdminFileManagerPage() {
                       aria-hidden
                       multiple
                       onChange={(event) => {
-                        const files = event.target.files;
-                        setPickLabel(files?.length ? `${files.length} video files` : null);
+                        const list = event.target.files;
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (!list?.length) {
+                          resetPickers();
+                          return;
+                        }
+                        const files = Array.from(list).filter((file) => isVideoFileName(file.name));
+                        if (!files.length) {
+                          setError("No video files found in that folder.");
+                          resetPickers();
+                          return;
+                        }
+                        setPickedFiles(files);
+                        const root =
+                          (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath?.split("/")[0] ??
+                          "folder";
+                        setPickLabel(`${files.length} video file(s) · ${root}`);
+                        if (pathLooksLikeTv(root)) setUploadKind("tv");
                       }}
-                      {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+                      {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
                     />
                     <div className={styles.pickActions}>
-                      <button type="button" className={styles.pickButton} onClick={() => fileInputRef.current?.click()}>
+                      <button
+                        type="button"
+                        className={styles.pickButton}
+                        disabled={busy}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
                         Choose file
                       </button>
-                      <button type="button" className={styles.pickButton} onClick={() => folderInputRef.current?.click()}>
+                      <button
+                        type="button"
+                        className={styles.pickButton}
+                        disabled={busy}
+                        onClick={() => folderInputRef.current?.click()}
+                      >
                         Choose folder
                       </button>
                     </div>
                     <p className={styles.fileMeta}>
                       {pickLabel ??
-                        "Single video or a whole folder (subfolders kept). MKV, MP4, AVI, MOV, and other video formats."}
+                        "Upload adds files here, links or creates a media library, then scans TMDB for posters."}
                     </p>
+                    {uploadNote ? <p className={styles.fileMeta}>{uploadNote}</p> : null}
                   </div>
                 </section>
 
@@ -461,7 +546,7 @@ export default function AdminFileManagerPage() {
                                   if (!entry.isDirectory) return;
                                   setBrowsePath(entry.path);
                                   setPendingDir(null);
-                                  setPickLabel(null);
+                                  resetPickers();
                                 }}
                               >
                                 <FolderIcon />
@@ -589,6 +674,10 @@ function ServerStatusBadge({ server }: { server: AdminSmbServer }) {
 
 function pathLooksLikeTv(value: string): boolean {
   return /\b(tv|series|season|episode|anime)\b/i.test(value);
+}
+
+function isVideoFileName(name: string): boolean {
+  return /\.(mkv|mp4|avi|mov|wmv|m4v|ts|m2ts|webm|mpg|mpeg)$/i.test(name);
 }
 
 function browseErrorMessage(err: unknown): string {

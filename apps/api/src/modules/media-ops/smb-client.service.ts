@@ -1,7 +1,8 @@
 import { execFile, spawn, type ChildProcess } from 'child_process';
-import { constants } from 'fs';
+import { createReadStream, constants } from 'fs';
 import { open, unlink, type FileHandle } from 'fs/promises';
 import type { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -42,6 +43,8 @@ type SmbStreamClient = {
     path: string,
     options?: { start?: number; end?: number },
   ) => Promise<Readable & { fileSize?: number }>;
+  createWriteStream: (path: string) => NodeJS.WritableStream;
+  mkdir: (path: string) => Promise<void>;
   disconnect: () => void;
 };
 
@@ -206,6 +209,147 @@ export class SmbClientService {
       return this.listWithSmbclient(auth, base);
     }
     return this.listWithSmb2(auth, base);
+  }
+
+  /** Copy a local temp file onto the share at remoteRelativePath (e.g. Movies/Film.mkv). */
+  async uploadLocalFile(auth: SmbAuth, remoteRelativePath: string, localFilePath: string): Promise<void> {
+    const normalized = this.normalizeRemotePath(remoteRelativePath);
+    if (!normalized) throw new Error('Remote path is required.');
+    if (localFilePath.includes('"')) throw new Error('Local path is not allowed.');
+    const parts = normalized.split('/');
+    const fileName = parts.pop();
+    if (!fileName || fileName.includes('"')) throw new Error('Remote file name is not allowed.');
+    const dir = parts.join('/');
+    if (dir) await this.ensureRemoteDir(auth, dir);
+    if (process.platform === 'linux') {
+      await this.putFileLinux(auth, dir, localFilePath, fileName);
+      return;
+    }
+    await this.putFileSmb2(auth, dir, localFilePath, fileName);
+  }
+
+  private async ensureRemoteDir(auth: SmbAuth, remoteDir: string): Promise<void> {
+    const parts = this.normalizeRemotePath(remoteDir).split('/').filter(Boolean);
+    if (process.platform === 'linux') {
+      let parent = '';
+      for (const part of parts) {
+        const safe = part.replace(/"/g, '');
+        try {
+          await this.runSmbclient(auth, `mkdir "${safe}"`, parent);
+        } catch (error) {
+          const raw = this.execText(error);
+          if (!/exists|COLLISION|already/i.test(raw)) {
+            this.logger.debug(`Samba mkdir ${parent}/${safe}: ${raw.slice(0, 120)}`);
+          }
+        }
+        parent = parent ? `${parent}/${part}` : part;
+      }
+      return;
+    }
+    const client = await this.createStreamClient(auth);
+    try {
+      let built = '';
+      for (const part of parts) {
+        built = built ? `${built}\\${part}` : part;
+        try {
+          await client.mkdir(built);
+        } catch {
+          /* may already exist */
+        }
+      }
+    } finally {
+      client.disconnect();
+    }
+  }
+
+  private async putFileLinux(
+    auth: SmbAuth,
+    remoteDir: string,
+    localFilePath: string,
+    remoteName: string,
+  ): Promise<void> {
+    const attempts = this.authAttempts(auth);
+    let lastError: unknown;
+    for (const attempt of attempts) {
+      try {
+        await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB3');
+        return;
+      } catch (error) {
+        lastError = error;
+        const raw = this.execText(error);
+        if (this.isUnreachable(raw)) break;
+        if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
+          try {
+            await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB2');
+            return;
+          } catch (smb2Error) {
+            lastError = smb2Error;
+          }
+        }
+        if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
+      }
+    }
+    throw new Error(this.formatLinuxSmbError(lastError));
+  }
+
+  private spawnPut(
+    auth: SmbAuth,
+    remoteDir: string,
+    localFilePath: string,
+    remoteName: string,
+    protocol: 'SMB2' | 'SMB3',
+  ): Promise<void> {
+    const share = auth.share.trim().replace(/^[\\/]+|[\\/]+$/g, '');
+    const args = [
+      `//${auth.host}/${share}`,
+      '-U',
+      this.linuxUser(auth),
+      `--password=${auth.password}`,
+      '-p',
+      String(auth.port ?? 445),
+      '-m',
+      protocol,
+    ];
+    const domain = (auth.domain ?? '').trim();
+    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
+      args.push('-W', domain);
+    }
+    const cleaned = remoteDir.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    if (cleaned) args.push('-D', cleaned);
+    args.push('-c', `put "${localFilePath}" "${remoteName.replace(/"/g, '')}"`);
+    return new Promise((resolve, reject) => {
+      const child = spawn('smbclient', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let output = '';
+      const collect = (chunk: Buffer) => {
+        output = `${output}${chunk.toString('utf8')}`.slice(-4000);
+      };
+      child.stdout?.on('data', collect);
+      child.stderr?.on('data', collect);
+      child.on('error', (error) => reject(error));
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(output || `smbclient exited ${code ?? 'unknown'}`));
+      });
+    });
+  }
+
+  private async putFileSmb2(
+    auth: SmbAuth,
+    remoteDir: string,
+    localFilePath: string,
+    remoteName: string,
+  ): Promise<void> {
+    const client = await this.createStreamClient(auth);
+    const remote = (remoteDir ? `${remoteDir}\\${remoteName}` : remoteName).replace(/\//g, '\\');
+    try {
+      const dest = client.createWriteStream(remote);
+      await pipeline(createReadStream(localFilePath), dest);
+    } finally {
+      client.disconnect();
+    }
   }
 
   private async listWithSmbclient(auth: SmbAuth, base: string): Promise<SmbListedEntry[]> {

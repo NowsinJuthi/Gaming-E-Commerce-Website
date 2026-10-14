@@ -1,4 +1,4 @@
-import { authRequest } from "@/lib/api";
+import { API_BASE, authRequest } from "@/lib/api";
 
 export type MediaLibraryKind = "movies" | "tv";
 
@@ -159,4 +159,48 @@ export function addSmbLibrary(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export type SmbUploadResult = {
+  uploaded: number;
+  library: AdminMediaLibrary;
+  indexed: number;
+  matched: number;
+  unmatched: number;
+  removed?: number;
+  logs: string[];
+};
+
+export async function uploadSmbMedia(
+  serverId: string,
+  browsePath: string,
+  kind: MediaLibraryKind,
+  files: File[],
+): Promise<SmbUploadResult> {
+  const form = new FormData();
+  form.append("path", browsePath);
+  form.append("kind", kind);
+  for (const file of files) {
+    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    form.append("files", file, rel);
+  }
+  const res = await fetch(`${API_BASE}/admin/media-shares/${serverId}/upload`, {
+    method: "POST",
+    body: form,
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = "Could not upload to Samba.";
+    try {
+      const data = JSON.parse(text) as { message?: string | string[] };
+      if (typeof data.message === "string") message = data.message;
+      else if (Array.isArray(data.message)) message = data.message.join(", ");
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as SmbUploadResult;
 }
