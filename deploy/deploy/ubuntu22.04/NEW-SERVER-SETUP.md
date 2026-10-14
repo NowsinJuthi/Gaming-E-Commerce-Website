@@ -122,6 +122,12 @@ Services: `uniqbd-web`, `uniqbd-api`, `redis-server` — enabled on boot.
 | `@` | A | VPS IP | Proxied |
 | `www` | CNAME | `uniqbd.com` | Proxied |
 | `api` | A | VPS IP | Proxied |
+| `upload` (optional) | A | VPS IP | **DNS only** (grey) |
+
+For **Samba file manager** uploads over ~100MB, add `upload.uniqbd.com` grey-cloud,
+nginx from `deploy/deploy/aapanel/nginx/upload.uniqbd.com.conf`, set
+`NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN=https://upload.uniqbd.com` in `apps/web/.env.local`,
+rebuild web. Main site can stay proxied.
 
 Ensure vhosts include `cloudflare-real-ip.conf` and (production)
 `cloudflare-origin-allow.conf`.
@@ -132,7 +138,7 @@ Ensure vhosts include `cloudflare-real-ip.conf` and (production)
 
 ```bash
 cd /opt/uniqbd.com
-sudo -u uniqbd git pull origin main
+sudo bash deploy/deploy/ubuntu22.04/git-pull.sh
 find deploy -name '*.sh' -exec sed -i 's/\r$//' {} +
 sudo bash deploy/deploy/ubuntu22.04/deploy.sh
 ```
@@ -156,5 +162,6 @@ sudo /opt/uniqbd.com/deploy/deploy/ubuntu22.04/rebuild-web.sh
 | Mongo errors | Atlas IP whitelist, `MONGODB_URI` in `apps/api/.env` |
 | SSL | aaPanel cert paths in Nginx vhost |
 | Admin upload **413** | Merge repo `uniqbd.com` nginx (`client_max_body_size 25g`, `location ^~ /api/admin/media-shares/` → `:4000`), `nginx -t && reload`. Files **>100MB** through **Cloudflare proxied** DNS still hit CF’s limit — use DNS-only (grey cloud) for upload tests or copy via Samba on LAN. |
+| `git pull` **insufficient permission** on `.git/objects` | Something ran git as **root**. Fix: `sudo chown -R uniqbd:uniqbd /opt/uniqbd.com/.git` then `sudo bash deploy/deploy/ubuntu22.04/git-pull.sh` (or full `chown -R uniqbd:uniqbd /opt/uniqbd.com`). Always pull before `rebuild-*.sh`. |
 
 More: [README.md](./README.md) · [aaPanel README](../aapanel/README.md)

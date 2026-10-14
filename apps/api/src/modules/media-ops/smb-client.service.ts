@@ -715,7 +715,7 @@ export class SmbClientService {
       return 'Access denied for this Samba share.';
     }
     if (nt === 'NT_STATUS_BAD_NETWORK_NAME') {
-      return 'Share name was not found. Use the share name shown by the storage server, not the Windows drive label.';
+      return 'Share name was not found. Use the Samba share name from smbclient -L //host -U user (often Data-Storage), not a Windows drive label like 12TB-Storage.';
     }
     if (nt === 'NT_STATUS_HOST_UNREACHABLE' || nt === 'NT_STATUS_IO_TIMEOUT' || nt === 'NT_STATUS_CONNECTION_REFUSED') {
       return 'The website server cannot reach this storage server on port 445.';

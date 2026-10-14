@@ -978,6 +978,23 @@ export async function authRequest<T>(
   return authRequestRaw<T>(path, init);
 }
 
+/** Cloudflare proxied orange-cloud uploads are capped near 100MB regardless of nginx. */
+export const CLOUDFLARE_PROXY_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+function largeUploadOrigin(): string | null {
+  const raw = process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/$/, "");
+}
+
+export function resolveSambaMediaUploadUrl(serverId: string): string {
+  const path = `/api/admin/media-shares/${serverId}/upload`;
+  const direct = largeUploadOrigin();
+  if (direct) return `${direct}${path}`;
+  if (typeof window !== "undefined") return `${window.location.origin}${path}`;
+  return `${API_BASE.replace(/\/api\/?$/, "")}${path}`;
+}
+
 function resolveAuthUploadUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
   if (typeof window !== "undefined" && path.startsWith("/api/")) {
@@ -987,22 +1004,94 @@ function resolveAuthUploadUrl(path: string): string {
   return `${API_BASE}${normalized}`;
 }
 
+export type AuthFormDataProgress = {
+  loaded: number;
+  total: number;
+  phase: "upload" | "processing";
+};
+
+export type AuthFormDataRequestOptions = {
+  onProgress?: (progress: AuthFormDataProgress) => void;
+};
+
+function xhrFormDataPost(
+  url: string,
+  form: FormData,
+  headers: Record<string, string> | undefined,
+  onProgress?: (progress: AuthFormDataProgress) => void,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(key, value);
+      }
+    }
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!onProgress || !event.lengthComputable) return;
+      onProgress({ loaded: event.loaded, total: event.total, phase: "upload" });
+    });
+    xhr.upload.addEventListener("loadend", () => {
+      onProgress?.({ loaded: 1, total: 1, phase: "processing" });
+    });
+    xhr.addEventListener("load", () => {
+      resolve(
+        new Response(xhr.responseText, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: { "Content-Type": xhr.getResponseHeader("Content-Type") ?? "application/json" },
+        }),
+      );
+    });
+    xhr.addEventListener("error", () => reject(new ApiError("Upload network error.", 0)));
+    xhr.addEventListener("abort", () => reject(new ApiError("Upload cancelled.", 0)));
+    xhr.send(form);
+  });
+}
+
+async function formDataWithAuthRetry(
+  url: string,
+  form: FormData,
+  headers: Record<string, string> | undefined,
+  onProgress?: (progress: AuthFormDataProgress) => void,
+): Promise<Response> {
+  const run = () =>
+    onProgress
+      ? xhrFormDataPost(url, form, headers, onProgress)
+      : fetch(url, {
+          method: "POST",
+          body: form,
+          cache: "no-store",
+          credentials: "include",
+          headers,
+        });
+  let res = await run();
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await run();
+    } else if (getStored("refreshToken")) {
+      throw new ApiError(SESSION_REFRESH_FAILED_MSG, 503);
+    }
+  }
+  return res;
+}
+
 /** Multipart upload with cookie session + 401 refresh (do not set Content-Type). */
-export async function authFormDataRequest<T>(path: string, form: FormData): Promise<T> {
-  const url = resolveAuthUploadUrl(path);
+export async function authFormDataRequest<T>(
+  path: string,
+  form: FormData,
+  options?: AuthFormDataRequestOptions,
+): Promise<T> {
+  const url = path.startsWith("http://") || path.startsWith("https://") ? path : resolveAuthUploadUrl(path);
   const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
   const csrf = getStored("refreshToken");
-  const run = () =>
-    fetch(url, {
-      method: "POST",
-      body: form,
-      cache: "no-store",
-      credentials: "include",
-      headers: !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined,
-    });
+  const headers = !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined;
   let res: Response;
   try {
-    res = await fetchWithAuthRetry(run);
+    res = await formDataWithAuthRetry(url, form, headers, options?.onProgress);
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
@@ -1014,8 +1103,11 @@ export async function authFormDataRequest<T>(path: string, form: FormData): Prom
   }
   if (!res.ok) {
     if (res.status === 413) {
+      const cfHint = largeUploadOrigin()
+        ? ""
+        : " If the file is over ~100MB and Cloudflare is proxied (orange cloud), set NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN to a grey-cloud host (see deploy docs) and rebuild web, or copy files via Samba on the storage LAN.";
       throw new ApiError(
-        "File is too large for the current upload limit. Reload nginx on the server (client_max_body_size 25g on uniqbd.com), or if Cloudflare is proxied, use DNS-only (grey cloud) for upload or keep movies under 100MB.",
+        `Upload rejected (413 — body too large). On the VPS, merge repo nginx for uniqbd.com (client_max_body_size 25g and /api/admin/media-shares/ → port 4000), then nginx -t && reload.${cfHint}`,
         413,
       );
     }

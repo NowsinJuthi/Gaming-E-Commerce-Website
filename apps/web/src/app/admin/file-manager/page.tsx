@@ -17,8 +17,14 @@ import {
   type MediaLibraryKind,
   type SmbBrowseEntry,
 } from "@/lib/media-ops-api";
+import { CLOUDFLARE_PROXY_UPLOAD_BYTES } from "@/lib/api";
 
 const VIDEO_ACCEPT = ".mkv,.mp4,.avi,.mov,.wmv,.m4v,.ts,.m2ts,.webm,.mpg,.mpeg,video/*";
+const LARGE_UPLOAD_HOST = Boolean(process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim());
+
+function totalPickBytes(files: File[]) {
+  return files.reduce((sum, file) => sum + file.size, 0);
+}
 
 export default function AdminFileManagerPage() {
   const [servers, setServers] = useState<AdminSmbServer[]>([]);
@@ -46,6 +52,8 @@ export default function AdminFileManagerPage() {
   const [pickedFiles, setPickedFiles] = useState<File[]>([]);
   const [uploadKind, setUploadKind] = useState<MediaLibraryKind>("movies");
   const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<"idle" | "upload" | "samba">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,11 +122,31 @@ export default function AdminFileManagerPage() {
 
   async function startUpload() {
     if (!selected || pickedFiles.length === 0) return;
+    const bytes = totalPickBytes(pickedFiles);
+    if (!LARGE_UPLOAD_HOST && bytes > CLOUDFLARE_PROXY_UPLOAD_BYTES * 0.95) {
+      setUploadError(
+        "Total size is over Cloudflare’s ~100MB limit while the site is proxied. Copy the file onto the Samba share from your LAN, or set up upload.uniqbd.com (grey cloud) with NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN and rebuild web.",
+      );
+      return;
+    }
     setBusy(true);
     setUploadError(null);
-    setUploadNote("Uploading to Samba… Large files can take several minutes.");
+    setUploadPct(0);
+    setUploadPhase("upload");
+    setUploadNote(null);
     try {
-      const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles);
+      const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles, {
+        onProgress: ({ loaded, total, phase }) => {
+          if (phase === "processing") {
+            setUploadPhase("samba");
+            setUploadPct(100);
+            return;
+          }
+          if (total > 0) {
+            setUploadPct(Math.min(99, Math.round((loaded / total) * 100)));
+          }
+        },
+      });
       setUploadNote(
         result.logs?.[1] ??
           `Uploaded ${result.uploaded} file(s). Scan runs in the background — check Movie/Series collections shortly.`,
@@ -132,6 +160,8 @@ export default function AdminFileManagerPage() {
       setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setBusy(false);
+      setUploadPhase("idle");
+      setUploadPct(0);
     }
   }
 
@@ -193,7 +223,14 @@ export default function AdminFileManagerPage() {
                 <Field label="Display name" value={name} onChange={setName} placeholder="Data-Storage" />
                 <Field label="Server IP / host" value={host} onChange={setHost} placeholder="192.168.0.10" required />
                 <Field label="Port" value={port} onChange={setPort} />
-                <Field label="Share name" value={share} onChange={setShare} placeholder="Data-Storage" required />
+                <Field
+                  label="Share name"
+                  value={share}
+                  onChange={setShare}
+                  placeholder="Data-Storage"
+                  hint="Samba share from smbclient -L //host -U user — not a Windows drive label (e.g. 12TB-Storage)."
+                  required
+                />
                 <Field label="Username" value={username} onChange={setUsername} placeholder="samba-user" required />
                 <Field label="Password" value={password} onChange={setPassword} type="password" required />
                 <Field label="Domain (optional)" value={domain} onChange={setDomain} placeholder="WORKGROUP" />
@@ -419,9 +456,16 @@ export default function AdminFileManagerPage() {
                 </div>
 
                 {uploadError ? (
-                  <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-                    {uploadError}
-                  </p>
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                    <p className="m-0">{uploadError}</p>
+                    {uploadError.includes("Share name was not found") && selected ? (
+                      <p className="mb-0 mt-2 text-xs text-rose-200/90">
+                        Fix: delete this server, reconnect with the correct share (sidebar shows{" "}
+                        <strong>{selected.share}</strong>). On the storage box:{" "}
+                        <code className="text-[0.7rem]">smbclient -L //{selected.host} -U {selected.username}</code>
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 <section className={styles.uploadPanel} aria-label="Upload video">
@@ -430,6 +474,11 @@ export default function AdminFileManagerPage() {
                       <h3 className={styles.uploadTitle}>Upload to Samba</h3>
                       <p className={styles.uploadPath} title={uncPath}>
                         {uncPath}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {LARGE_UPLOAD_HOST
+                          ? "Large uploads use the dedicated upload host (bypasses Cloudflare size cap)."
+                          : "Through Cloudflare (orange cloud), browser uploads above ~100MB fail — use Samba on the storage LAN or configure upload.uniqbd.com (grey cloud)."}
                       </p>
                     </div>
                     <label className={styles.field}>
@@ -527,6 +576,25 @@ export default function AdminFileManagerPage() {
                         : "Upload adds files here, links or creates a media library, then scans TMDB for posters."}
                     </p>
                     {uploadNote ? <p className={styles.fileMeta}>{uploadNote}</p> : null}
+                    {uploadPhase !== "idle" ? (
+                      <div className={styles.uploadProgressWrap} aria-live="polite">
+                        <div className={styles.uploadProgressTrack}>
+                          <div
+                            className={
+                              uploadPhase === "samba"
+                                ? `${styles.uploadProgressBar} ${styles.uploadProgressBarIndeterminate}`
+                                : styles.uploadProgressBar
+                            }
+                            style={uploadPhase === "upload" ? { width: `${uploadPct}%` } : undefined}
+                          />
+                        </div>
+                        <p className={styles.uploadProgressLabel}>
+                          {uploadPhase === "upload"
+                            ? `Sending to server… ${uploadPct}%${totalPickBytes(pickedFiles) > 0 ? ` · ${formatBytes(totalPickBytes(pickedFiles))}` : ""}`
+                            : "Writing to Samba storage… this can take several minutes for large files."}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </section>
 
@@ -689,6 +757,13 @@ function isVideoFileName(name: string): boolean {
   return /\.(mkv|mp4|avi|mov|wmv|m4v|ts|m2ts|webm|mpg|mpeg)$/i.test(name);
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function browseErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not browse this share.";
   if (/failed to fetch/i.test(message)) {
@@ -702,6 +777,7 @@ function Field({
   value,
   onChange,
   placeholder,
+  hint,
   required,
   type = "text",
 }: {
@@ -709,6 +785,7 @@ function Field({
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
   required?: boolean;
   type?: string;
 }) {
@@ -723,6 +800,7 @@ function Field({
         required={required}
         onChange={(event) => onChange(event.target.value)}
       />
+      {hint ? <p className={styles.fieldHint}>{hint}</p> : null}
     </div>
   );
 }

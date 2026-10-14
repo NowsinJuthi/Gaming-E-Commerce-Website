@@ -315,7 +315,10 @@ export class MediaOpsService {
       server.lastError = null;
       await server.save();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Upload to Samba failed.';
+      let message = error instanceof Error ? error.message : 'Upload to Samba failed.';
+      if (/Share name was not found/i.test(message)) {
+        message = `${message} Configured share for this connection: "${server.share}". On the storage server run: smbclient -L //${server.host} -U ${server.username}`;
+      }
       server.lastError = message;
       await server.save();
       throw new BadRequestException(message);
