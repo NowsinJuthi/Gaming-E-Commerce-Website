@@ -273,12 +273,6 @@ export const ADMIN_NAV: NavSection[] = [
             keywords: ["overview", "stats", "count", "libraries"],
           },
           {
-            href: "/admin/libraries",
-            label: "Media library",
-            icon: LayersIcon,
-            keywords: ["folder", "scan", "movies", "tv"],
-          },
-          {
             href: "/admin/collections",
             label: "Movie collections",
             icon: BoxIcon,
@@ -289,6 +283,12 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Series collections",
             icon: LayersIcon,
             keywords: ["series", "tv", "seasons", "catalog"],
+          },
+          {
+            href: "/admin/libraries",
+            label: "Media library",
+            icon: LayersIcon,
+            keywords: ["folder", "scan", "movies", "tv"],
           },
           {
             href: "/admin/file-manager",
