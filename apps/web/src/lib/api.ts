@@ -978,6 +978,32 @@ export async function authRequest<T>(
   return authRequestRaw<T>(path, init);
 }
 
+/** Multipart upload with cookie session + 401 refresh (do not set Content-Type). */
+export async function authFormDataRequest<T>(path: string, form: FormData): Promise<T> {
+  const csrf = getStored("refreshToken");
+  const run = () =>
+    fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+      credentials: "include",
+      headers: csrf ? { "X-CSRF-Token": csrf } : undefined,
+    });
+  let res: Response;
+  try {
+    res = await fetchWithAuthRetry(run);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(
+      "Upload could not reach the server. Check your connection, file size (Cloudflare may block uploads over ~100MB on the API domain), and try again.",
+      0,
+    );
+  }
+  if (!res.ok) await throwApiError(res);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
 export function authFetch<T>(path: string): Promise<T> {
   return authRequest<T>(path);
 }

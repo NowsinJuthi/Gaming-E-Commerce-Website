@@ -7,10 +7,13 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -203,22 +206,27 @@ export class MediaOpsController {
   async uploadToShare(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body('path') path?: string,
-    @Body('kind') kind?: MediaLibraryKind,
+    @Req() req: Request,
   ) {
-    const libKind: MediaLibraryKind = kind === 'tv' ? 'tv' : 'movies';
-    const result = await this.media.uploadToShare(id, path ?? '', files ?? [], libKind);
-    const scan = await this.index.syncLibrary(result.library.id);
+    const body = req.body as { path?: string; kind?: string };
+    const path = typeof body.path === 'string' ? body.path : '';
+    const libKind: MediaLibraryKind = body.kind === 'tv' ? 'tv' : 'movies';
+    const batch = files ?? [];
+    if (!batch.length) {
+      throw new BadRequestException('Choose at least one video file or folder.');
+    }
+    const result = await this.media.uploadToShare(id, path, batch, libKind);
+    void this.index.syncLibrary(result.library.id).catch(() => undefined);
     return {
       uploaded: result.uploaded,
       library: result.library,
-      indexed: scan.indexed,
-      matched: scan.matched,
-      unmatched: scan.unmatched,
-      removed: scan.removed,
+      indexed: 0,
+      matched: 0,
+      unmatched: 0,
+      removed: 0,
       logs: [
         `Uploaded ${result.uploaded} file(s) to Samba.`,
-        ...scan.logs,
+        'Library scan and TMDB matching run in the background (about 1–2 minutes).',
       ],
     };
   }

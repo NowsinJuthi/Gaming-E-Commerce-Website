@@ -115,11 +115,12 @@ export default function AdminFileManagerPage() {
     if (!selected || pickedFiles.length === 0) return;
     setBusy(true);
     setError(null);
-    setUploadNote("Uploading to Samba and scanning library…");
+    setUploadNote("Uploading to Samba… Large files can take several minutes.");
     try {
       const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles);
       setUploadNote(
-        `Done: ${result.uploaded} file(s) uploaded · ${result.indexed} indexed · ${result.matched} matched on TMDB.`,
+        result.logs?.[1] ??
+          `Uploaded ${result.uploaded} file(s). Scan runs in the background — check Movie/Series collections shortly.`,
       );
       resetPickers();
       const data = await loadBrowse(selected.id, browsePath);
@@ -514,8 +515,9 @@ export default function AdminFileManagerPage() {
                       </button>
                     </div>
                     <p className={styles.fileMeta}>
-                      {pickLabel ??
-                        "Upload adds files here, links or creates a media library, then scans TMDB for posters."}
+                      {pickLabel
+                        ? `Selected: ${pickLabel}`
+                        : "Upload adds files here, links or creates a media library, then scans TMDB for posters."}
                     </p>
                     {uploadNote ? <p className={styles.fileMeta}>{uploadNote}</p> : null}
                   </div>

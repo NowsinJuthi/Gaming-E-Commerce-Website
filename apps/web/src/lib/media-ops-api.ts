@@ -1,4 +1,4 @@
-import { API_BASE, authRequest } from "@/lib/api";
+import { authFormDataRequest, authRequest } from "@/lib/api";
 
 export type MediaLibraryKind = "movies" | "tv";
 
@@ -200,23 +200,5 @@ export async function uploadSmbMedia(
     const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
     form.append("files", file, rel);
   }
-  const res = await fetch(`${API_BASE}/admin/media-shares/${serverId}/upload`, {
-    method: "POST",
-    body: form,
-    cache: "no-store",
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    let message = "Could not upload to Samba.";
-    try {
-      const data = JSON.parse(text) as { message?: string | string[] };
-      if (typeof data.message === "string") message = data.message;
-      else if (Array.isArray(data.message)) message = data.message.join(", ");
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message);
-  }
-  return (await res.json()) as SmbUploadResult;
+  return authFormDataRequest<SmbUploadResult>(`/admin/media-shares/${serverId}/upload`, form);
 }

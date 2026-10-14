@@ -482,7 +482,7 @@ export class SmbClientService {
     if (cleaned) args.push('-D', cleaned);
     args.push('-c', command);
     const { stdout } = await execFileAsync('smbclient', args, {
-      timeout: 20_000,
+      timeout: 60_000,
       maxBuffer: 4_000_000,
     });
     return stdout;
