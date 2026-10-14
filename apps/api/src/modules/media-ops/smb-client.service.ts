@@ -1,8 +1,7 @@
 import { execFile, spawn, type ChildProcess } from 'child_process';
-import { createReadStream, constants } from 'fs';
+import { constants } from 'fs';
 import { open, unlink, type FileHandle } from 'fs/promises';
 import type { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 import { promisify } from 'util';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -22,8 +21,6 @@ export type SmbListedEntry = {
   path: string;
   isDirectory: boolean;
   sizeBytes: number | null;
-  /** File/folder mtime from storage when available (ms since epoch). */
-  modifiedAtMs?: number | null;
 };
 
 export type SmbIncoming = {
@@ -45,8 +42,6 @@ type SmbStreamClient = {
     path: string,
     options?: { start?: number; end?: number },
   ) => Promise<Readable & { fileSize?: number }>;
-  createWriteStream: (path: string) => NodeJS.WritableStream;
-  mkdir: (path: string) => Promise<void>;
   disconnect: () => void;
 };
 
@@ -83,29 +78,6 @@ export class SmbClientService {
     } finally {
       client.close?.();
     }
-  }
-
-  /**
-   * Map a saved connection share to the real Samba share name (e.g. Data-Storage, not 12TB-Storage).
-   */
-  async resolveEffectiveShare(auth: SmbAuth): Promise<string> {
-    const stored = auth.share.trim();
-    if (!stored || process.platform !== 'linux') return stored;
-
-    const shares = await this.listDiskShares(auth).catch(() => [] as string[]);
-    if (shares.length === 0) return stored;
-    if (shares.includes(stored)) return stored;
-
-    const caseMatch = shares.find((name) => name.toLowerCase() === stored.toLowerCase());
-    if (caseMatch) return caseMatch;
-    if (shares.length === 1 && shares[0]) return shares[0];
-
-    if (/tb-storage/i.test(stored)) {
-      const dataStorage = shares.find((name) => name.toLowerCase() === 'data-storage');
-      if (dataStorage) return dataStorage;
-    }
-
-    return stored;
   }
 
   /** Copy one share file onto the website server. The local path must already have a parent directory. */
@@ -236,170 +208,6 @@ export class SmbClientService {
     return this.listWithSmb2(auth, base);
   }
 
-  /** Copy a local temp file onto the share at remoteRelativePath (e.g. Movies/Film.mkv). */
-  async uploadLocalFile(auth: SmbAuth, remoteRelativePath: string, localFilePath: string): Promise<string> {
-    const normalized = this.normalizeRemotePath(remoteRelativePath);
-    if (!normalized) throw new Error('Remote path is required.');
-    if (localFilePath.includes('"')) throw new Error('Local path is not allowed.');
-    const parts = normalized.split('/');
-    const fileName = parts.pop();
-    if (!fileName || fileName.includes('"')) throw new Error('Remote file name is not allowed.');
-    const dir = parts.join('/');
-    if (dir) await this.ensureRemoteDir(auth, dir);
-    if (process.platform === 'linux') {
-      return this.putFileLinux(auth, dir, localFilePath, fileName);
-    }
-    await this.putFileSmb2(auth, dir, localFilePath, fileName);
-    return auth.share.trim();
-  }
-
-  private async ensureRemoteDir(auth: SmbAuth, remoteDir: string): Promise<void> {
-    const parts = this.normalizeRemotePath(remoteDir).split('/').filter(Boolean);
-    if (process.platform === 'linux') {
-      let parent = '';
-      for (const part of parts) {
-        const safe = part.replace(/"/g, '');
-        try {
-          await this.runSmbclient(auth, `mkdir "${safe}"`, parent);
-        } catch (error) {
-          const raw = this.execText(error);
-          if (!/exists|COLLISION|already/i.test(raw)) {
-            this.logger.debug(`Samba mkdir ${parent}/${safe}: ${raw.slice(0, 120)}`);
-          }
-        }
-        parent = parent ? `${parent}/${part}` : part;
-      }
-      return;
-    }
-    const client = await this.createStreamClient(auth);
-    try {
-      let built = '';
-      for (const part of parts) {
-        built = built ? `${built}\\${part}` : part;
-        try {
-          await client.mkdir(built);
-        } catch {
-          /* may already exist */
-        }
-      }
-    } finally {
-      client.disconnect();
-    }
-  }
-
-  private async putFileLinux(
-    auth: SmbAuth,
-    remoteDir: string,
-    localFilePath: string,
-    remoteName: string,
-  ): Promise<string> {
-    const attempts = this.authAttempts(auth);
-    let lastError: unknown;
-    for (const attempt of attempts) {
-      try {
-        await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB3');
-        return attempt.share.trim();
-      } catch (error) {
-        lastError = error;
-        const raw = this.execText(error);
-        if (this.isUnreachable(raw)) break;
-        if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
-          try {
-            await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB2');
-            return attempt.share.trim();
-          } catch (smb2Error) {
-            lastError = smb2Error;
-          }
-        }
-        if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
-      }
-    }
-
-    const baseAuth = attempts[0] ?? auth;
-    const shares = await this.listDiskShares(baseAuth).catch(() => [] as string[]);
-    const wanted = auth.share.trim();
-    const fallbackShares = [
-      ...(shares.length === 1 && shares[0]!.toLowerCase() !== wanted.toLowerCase() ? [shares[0]!] : []),
-      ...shares.filter((share) => share.toLowerCase() !== wanted.toLowerCase()),
-    ];
-    const seen = new Set<string>();
-    for (const share of fallbackShares) {
-      const key = share.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      try {
-        await this.spawnPut({ ...baseAuth, share }, remoteDir, localFilePath, remoteName, 'SMB3');
-        return share;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    const message = this.formatLinuxSmbError(lastError);
-    const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
-    throw new Error(`${message}${shareHint}`);
-  }
-
-  private spawnPut(
-    auth: SmbAuth,
-    remoteDir: string,
-    localFilePath: string,
-    remoteName: string,
-    protocol: 'SMB2' | 'SMB3',
-  ): Promise<void> {
-    const share = auth.share.trim().replace(/^[\\/]+|[\\/]+$/g, '');
-    const args = [
-      `//${auth.host}/${share}`,
-      '-U',
-      this.linuxUser(auth),
-      `--password=${auth.password}`,
-      '-p',
-      String(auth.port ?? 445),
-      '-m',
-      protocol,
-    ];
-    const domain = (auth.domain ?? '').trim();
-    if (domain && domain !== '.' && domain.toUpperCase() !== 'WORKGROUP') {
-      args.push('-W', domain);
-    }
-    const cleaned = remoteDir.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    if (cleaned) args.push('-D', cleaned);
-    args.push('-c', `put "${localFilePath}" "${remoteName.replace(/"/g, '')}"`);
-    return new Promise((resolve, reject) => {
-      const child = spawn('smbclient', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-      let output = '';
-      const collect = (chunk: Buffer) => {
-        output = `${output}${chunk.toString('utf8')}`.slice(-4000);
-      };
-      child.stdout?.on('data', collect);
-      child.stderr?.on('data', collect);
-      child.on('error', (error) => reject(error));
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(output || `smbclient exited ${code ?? 'unknown'}`));
-      });
-    });
-  }
-
-  private async putFileSmb2(
-    auth: SmbAuth,
-    remoteDir: string,
-    localFilePath: string,
-    remoteName: string,
-  ): Promise<void> {
-    const client = await this.createStreamClient(auth);
-    const remote = (remoteDir ? `${remoteDir}\\${remoteName}` : remoteName).replace(/\//g, '\\');
-    try {
-      const dest = client.createWriteStream(remote);
-      await pipeline(createReadStream(localFilePath), dest);
-    } finally {
-      client.disconnect();
-    }
-  }
-
   private async listWithSmbclient(auth: SmbAuth, base: string): Promise<SmbListedEntry[]> {
     const output = await this.runSmbclient(auth, 'ls', base);
     const entries: SmbListedEntry[] = [];
@@ -418,7 +226,6 @@ export class SmbClientService {
         path: rel.replace(/\\/g, '/'),
         isDirectory,
         sizeBytes: parsed.sizeBytes,
-        modifiedAtMs: parsed.modifiedAtMs,
       });
     }
     if (entries.length === 0 && /NT_STATUS_/.test(output)) {
@@ -531,7 +338,7 @@ export class SmbClientService {
     if (cleaned) args.push('-D', cleaned);
     args.push('-c', command);
     const { stdout } = await execFileAsync('smbclient', args, {
-      timeout: 60_000,
+      timeout: 20_000,
       maxBuffer: 4_000_000,
     });
     return stdout;
@@ -735,29 +542,19 @@ export class SmbClientService {
   /** smbclient `ls` lines are not grepable; `-g` does not apply to directory listings. */
   private parseSmbclientLsLine(
     line: string,
-  ): { name: string; isDirectory: boolean; sizeBytes: number; modifiedAtMs: number | null } | null {
+  ): { name: string; isDirectory: boolean; sizeBytes: number } | null {
     if (/blocks of size|blocks available|^Domain=\[/i.test(line)) return null;
     const human = line.match(
-      /^\s{2}(.+?)\s+([ADHSRN]+)\s+(\d+)\s+\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{2}:\d{2}:\d{2})\s+(\d{4})\s*$/,
+      /^\s{2}(.+?)\s+([ADHSRN]+)\s+(\d+)\s+\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\s*$/,
     );
     const name = human?.[1]?.trim();
     const modes = human?.[2];
     const size = Number(human?.[3]);
-    const month = human?.[4];
-    const day = human?.[5];
-    const time = human?.[6];
-    const year = human?.[7];
     if (!name || !modes) return null;
-    let modifiedAtMs: number | null = null;
-    if (month && day && time && year) {
-      const parsed = Date.parse(`${month} ${day}, ${year} ${time} UTC`);
-      if (Number.isFinite(parsed)) modifiedAtMs = parsed;
-    }
     return {
       name,
       isDirectory: modes.includes('D'),
       sizeBytes: Number.isFinite(size) ? size : 0,
-      modifiedAtMs,
     };
   }
 
@@ -774,7 +571,7 @@ export class SmbClientService {
       return 'Access denied for this Samba share.';
     }
     if (nt === 'NT_STATUS_BAD_NETWORK_NAME') {
-      return 'Share name was not found. Use the Samba share name from smbclient -L //host -U user (often Data-Storage), not a Windows drive label like 12TB-Storage.';
+      return 'Share name was not found. Use the share name shown by the storage server, not the Windows drive label.';
     }
     if (nt === 'NT_STATUS_HOST_UNREACHABLE' || nt === 'NT_STATUS_IO_TIMEOUT' || nt === 'NT_STATUS_CONNECTION_REFUSED') {
       return 'The website server cannot reach this storage server on port 445.';

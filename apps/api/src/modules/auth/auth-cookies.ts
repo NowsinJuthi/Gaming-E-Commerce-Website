@@ -7,7 +7,6 @@ export type AuthCookieFlags = {
   sameSite: 'lax';
   path: string;
   maxAge: number;
-  domain?: string;
 };
 
 /** Browser logins send Origin (or an existing auth cookie). API clients do not. */
@@ -57,16 +56,13 @@ export function readNamedCookie(
 export function accessCookieOptions(input: {
   production: boolean;
   maxAgeSeconds: number;
-  domain?: string | null;
 }): AuthCookieFlags {
-  const domain = input.domain?.trim();
   return {
     httpOnly: true,
     secure: input.production,
     sameSite: 'lax',
     path: '/',
     maxAge: input.maxAgeSeconds * 1000,
-    ...(domain ? { domain } : {}),
   };
 }
 
@@ -74,16 +70,13 @@ export function refreshCookieOptions(input: {
   production: boolean;
   path: string;
   maxAgeSeconds: number;
-  domain?: string | null;
 }): AuthCookieFlags {
-  const domain = input.domain?.trim();
   return {
     httpOnly: true,
     secure: input.production,
     sameSite: 'lax',
     path: input.path,
     maxAge: input.maxAgeSeconds * 1000,
-    ...(domain ? { domain } : {}),
   };
 }
 

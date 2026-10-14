@@ -15,24 +15,8 @@ import {
   SmbServer,
   SmbServerDocument,
 } from '../../database/schemas/smb-server.schema';
-import {
-  CatalogKind,
-  CatalogTitle,
-  CatalogTitleDocument,
-} from '../../database/schemas/catalog-title.schema';
-import { unlink } from 'fs/promises';
 import { CryptoService } from '../../shared/crypto/crypto.service';
 import { SmbClientService } from './smb-client.service';
-
-const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
-
-function sanitizeUploadRelativePath(input: string): string {
-  const normalized = input.replace(/\\/g, '/').replace(/^\/+/, '');
-  return normalized
-    .split('/')
-    .filter((part) => part && part !== '.' && part !== '..')
-    .join('/');
-}
 
 function serializeLibrary(doc: MediaLibraryDocument) {
   return {
@@ -79,8 +63,6 @@ export class MediaOpsService {
     private readonly libraries: Model<MediaLibraryDocument>,
     @InjectModel(SmbServer.name)
     private readonly servers: Model<SmbServerDocument>,
-    @InjectModel(CatalogTitle.name)
-    private readonly catalogTitles: Model<CatalogTitleDocument>,
     private readonly crypto: CryptoService,
     private readonly smb: SmbClientService,
   ) {}
@@ -95,51 +77,6 @@ export class MediaOpsService {
         missing: libraries.reduce((sum, row) => sum + row.missingCount, 0),
         unmatched: libraries.reduce((sum, row) => sum + row.unmatchedCount, 0),
       },
-    };
-  }
-
-  async movieServerDashboard() {
-    const rows = await this.libraries.find().sort({ kind: 1, name: 1 }).exec();
-    const agg = await this.catalogTitles
-      .aggregate<{ _id: { libId: string; kind: CatalogKind }; count: number }>([
-        { $match: { sourceKey: { $exists: true, $nin: [null, ''] } } },
-        {
-          $project: {
-            libId: { $arrayElemAt: [{ $split: ['$sourceKey', ':'] }, 0] },
-          },
-        },
-        { $group: { _id: { libId: '$libId' }, count: { $sum: 1 } } },
-      ])
-      .exec();
-
-    const countByLib = new Map<string, number>();
-    for (const row of agg) {
-      const libId = row._id.libId;
-      if (!Types.ObjectId.isValid(libId)) continue;
-      countByLib.set(libId, row.count);
-    }
-
-    let totalMovies = 0;
-    let totalSeries = 0;
-    const libraries = rows.map((doc) => {
-      const base = serializeLibrary(doc);
-      const catalogCount = countByLib.get(String(doc._id)) ?? 0;
-      if (doc.kind === 'tv') totalSeries += catalogCount;
-      else totalMovies += catalogCount;
-      return {
-        ...base,
-        catalogCount,
-      };
-    });
-
-    return {
-      totals: {
-        libraries: libraries.length,
-        movies: totalMovies,
-        series: totalSeries,
-        catalog: totalMovies + totalSeries,
-      },
-      libraries,
     };
   }
 
@@ -194,13 +131,8 @@ export class MediaOpsService {
   }
 
   async removeLibrary(id: string) {
-    const library = await this.libraries.findById(id).exec();
-    if (!library) throw new NotFoundException('Media library not found.');
-    const kind: CatalogKind = library.kind === 'tv' ? 'series' : 'movie';
-    await this.catalogTitles
-      .deleteMany({ kind, sourceKey: new RegExp(`^${String(library._id)}:`) })
-      .exec();
-    await this.libraries.deleteOne({ _id: library._id }).exec();
+    const result = await this.libraries.deleteOne({ _id: id }).exec();
+    if (!result.deletedCount) throw new NotFoundException('Media library not found.');
     return { deleted: true };
   }
 
@@ -252,35 +184,6 @@ export class MediaOpsService {
     return serializeServer(server);
   }
 
-  async updateServer(
-    id: string,
-    patch: {
-      name?: string;
-      host?: string;
-      port?: number;
-      share?: string;
-      domain?: string;
-    },
-  ) {
-    const server = await this.requireServer(id);
-    if (patch.name !== undefined) server.name = patch.name.trim();
-    if (patch.host !== undefined) server.host = patch.host.trim();
-    if (patch.port !== undefined) server.port = patch.port;
-    if (patch.domain !== undefined) server.domain = patch.domain.trim() || 'WORKGROUP';
-    if (patch.share !== undefined) server.share = patch.share.trim();
-    server.lastError = null;
-    try {
-      await server.save();
-      await this.touchConnection(server);
-      return serializeServer(server);
-    } catch (error) {
-      if ((error as { code?: number }).code === 11000) {
-        throw new ConflictException('Another saved server already uses this host, share, and username.');
-      }
-      throw error;
-    }
-  }
-
   async removeServer(id: string) {
     const inUse = await this.libraries.countDocuments({ smbServerId: id }).exec();
     if (inUse > 0) {
@@ -303,8 +206,7 @@ export class MediaOpsService {
     const server = await this.requireServer(id);
     const password = this.openPassword(server);
     try {
-      const auth = await this.syncResolvedShare(server, password);
-      const entries = await this.smb.list(auth, remotePath);
+      const entries = await this.smb.list(this.auth(server, password), remotePath);
       server.lastOkAt = new Date();
       server.lastError = null;
       await server.save();
@@ -315,58 +217,6 @@ export class MediaOpsService {
       await server.save();
       throw new BadRequestException(message);
     }
-  }
-
-  async uploadToShare(
-    serverId: string,
-    browsePath: string,
-    files: Express.Multer.File[],
-    kind: MediaLibraryKind,
-  ) {
-    if (!files.length) {
-      throw new BadRequestException('Choose at least one video file or folder.');
-    }
-    const server = await this.requireServer(serverId);
-    const password = this.openPassword(server);
-    let auth = await this.syncResolvedShare(server, password);
-    const base = browsePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    let uploaded = 0;
-    const uploadedPaths: { remote: string; sizeBytes: number }[] = [];
-    try {
-      for (const file of files) {
-        const rel = sanitizeUploadRelativePath(file.originalname || file.filename);
-        if (!rel || !this.isVideoFileName(rel)) {
-          throw new BadRequestException(`Unsupported video file: ${file.originalname || file.filename}`);
-        }
-        const remote = base ? `${base}/${rel}` : rel;
-        const shareUsed = await this.smb.uploadLocalFile(auth, remote, file.path);
-        uploadedPaths.push({ remote, sizeBytes: file.size });
-        if (shareUsed !== auth.share) {
-          server.share = shareUsed;
-          auth = { ...auth, share: shareUsed };
-          await server.save();
-          await this.libraries
-            .updateMany({ smbServerId: server._id }, { $set: { smbShare: shareUsed } })
-            .exec();
-        }
-        uploaded += 1;
-      }
-      server.lastOkAt = new Date();
-      server.lastError = null;
-      await server.save();
-    } catch (error) {
-      let message = error instanceof Error ? error.message : 'Upload to Samba failed.';
-      if (/Share name was not found/i.test(message)) {
-        message = `${message} Configured share for this connection: "${server.share}". On the storage server run: smbclient -L //${server.host} -U ${server.username}`;
-      }
-      server.lastError = message;
-      await server.save();
-      throw new BadRequestException(message);
-    } finally {
-      await Promise.all(files.map((file) => unlink(file.path).catch(() => undefined)));
-    }
-    const library = await this.resolveLibraryForShare(server, base, kind);
-    return { uploaded, library, uploadedPaths };
   }
 
   async addLibraryFromShare(input: {
@@ -395,56 +245,6 @@ export class MediaOpsService {
         throw new ConflictException('A library with this name and kind already exists.');
       }
       throw error;
-    }
-  }
-
-  private isVideoFileName(name: string): boolean {
-    const base = name.split('/').pop() ?? name;
-    const dot = base.lastIndexOf('.');
-    if (dot < 0) return false;
-    return VIDEO_EXT.has(base.slice(dot).toLowerCase());
-  }
-
-  private async resolveLibraryForShare(
-    server: SmbServerDocument,
-    remotePath: string,
-    kind: MediaLibraryKind,
-  ) {
-    const normalized = remotePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    const candidates = await this.libraries.find({ smbServerId: server._id, enabled: true }).exec();
-    let best: MediaLibraryDocument | null = null;
-    let bestLen = -1;
-    for (const lib of candidates) {
-      const root = (lib.smbRemotePath ?? '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-      const underRoot =
-        root === normalized ||
-        (root.length === 0 && normalized.length >= 0) ||
-        (root.length > 0 && (normalized === root || normalized.startsWith(`${root}/`)));
-      if (underRoot && root.length > bestLen) {
-        best = lib;
-        bestLen = root.length;
-      }
-    }
-    if (best) return serializeLibrary(best);
-
-    const folderName = normalized ? normalized.split('/').filter(Boolean).pop() || normalized : server.share;
-    let name = folderName.trim().slice(0, 80) || server.share.slice(0, 80);
-    try {
-      return await this.addLibraryFromShare({
-        serverId: String(server._id),
-        path: normalized,
-        name,
-        kind,
-      });
-    } catch (error) {
-      if (!(error instanceof ConflictException)) throw error;
-      name = `${folderName} (${kind})`.slice(0, 80);
-      return this.addLibraryFromShare({
-        serverId: String(server._id),
-        path: normalized,
-        name,
-        kind,
-      });
     }
   }
 
@@ -487,23 +287,9 @@ export class MediaOpsService {
     };
   }
 
-  private async syncResolvedShare(server: SmbServerDocument, password: string) {
-    const auth = this.auth(server, password);
-    const resolved = await this.smb.resolveEffectiveShare(auth);
-    if (resolved === server.share) return auth;
-    server.share = resolved;
-    await server.save();
-    await this.libraries
-      .updateMany({ smbServerId: server._id }, { $set: { smbShare: resolved } })
-      .exec();
-    return { ...auth, share: resolved };
-  }
-
   private async touchConnection(server: SmbServerDocument) {
     try {
-      const password = this.openPassword(server);
-      const auth = await this.syncResolvedShare(server, password);
-      await this.smb.test(auth);
+      await this.smb.test(this.auth(server, this.openPassword(server)));
       server.lastOkAt = new Date();
       server.lastError = null;
     } catch (error) {

@@ -3,169 +3,6 @@
   flex-direction: column;
   gap: 0.65rem;
   padding-bottom: 4rem;
-  position: relative;
-}
-
-/* Do not use position:sticky + backdrop-filter — WebKit/Chrome expand the
-   hit-testing layer across the whole scrollport and block header + catalog taps. */
-.toolbarSticky {
-  position: relative;
-  z-index: 1;
-  margin: 0;
-  padding: 0.15rem 0 0.35rem;
-  background: rgb(var(--bg) / 0.92);
-  box-shadow: 0 10px 28px -18px rgb(0 0 0 / 0.55);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  transform: none;
-  touch-action: manipulation;
-}
-
-.recentSection {
-  min-width: 0;
-  margin-bottom: 0.85rem;
-}
-
-.recentHeading {
-  margin: 0 0 0.45rem;
-  font-size: 0.8125rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  color: rgb(var(--fg));
-}
-
-@media (min-width: 768px) {
-  .recentHeading {
-    font-size: 0.9375rem;
-  }
-}
-
-.recentCarousel {
-  position: relative;
-  min-width: 0;
-}
-
-.recentTrack {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 0.75rem) / 2);
-  gap: 0.75rem;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.recentTrack::-webkit-scrollbar {
-  display: none;
-}
-
-.recentNavBtn {
-  position: absolute;
-  top: 34%;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  height: 2.35rem;
-  width: 2.35rem;
-  border-radius: 999px;
-  border: 1.5px solid rgb(255 255 255 / 0.38);
-  background: rgb(1 19 26 / 0.62);
-  color: rgb(248 250 252);
-  box-shadow: 0 8px 22px rgb(0 0 0 / 0.45);
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
-}
-
-.recentNavBtn:hover {
-  border-color: rgb(38 191 176 / 0.75);
-  background: rgb(1 19 26 / 0.82);
-}
-
-.recentNavBtn:focus-visible {
-  outline: none;
-  border-color: rgb(38 191 176 / 0.85);
-  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.28);
-}
-
-.recentNavPrev {
-  left: -0.15rem;
-}
-
-.recentNavNext {
-  right: -0.15rem;
-}
-
-.recentNavIcon {
-  font-size: 1.65rem;
-  line-height: 1;
-  font-weight: 300;
-  translate: 0 -0.06rem;
-}
-
-@media (min-width: 768px) {
-  .recentNavBtn {
-    height: 2.55rem;
-    width: 2.55rem;
-  }
-
-  .recentNavPrev {
-    left: -0.35rem;
-  }
-
-  .recentNavNext {
-    right: -0.35rem;
-  }
-}
-
-.recentCard {
-  scroll-snap-align: start;
-}
-
-.recentProgressTrack {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 2;
-  pointer-events: none;
-  height: 0.22rem;
-  background: rgb(1 19 26 / 0.88);
-}
-
-.recentProgressFill {
-  display: block;
-  height: 100%;
-  border-radius: 0 0 0.12rem 0.12rem;
-  background: linear-gradient(90deg, rgb(38 191 176), rgb(56 214 198));
-  box-shadow: 0 0 8px rgb(38 191 176 / 0.55);
-}
-
-@media (min-width: 640px) {
-  .recentTrack {
-    grid-auto-columns: calc((100% - 1.5rem) / 3);
-  }
-}
-
-@media (min-width: 768px) {
-  .recentTrack {
-    grid-auto-columns: calc((100% - 2.25rem) / 4);
-  }
-}
-
-@media (min-width: 1024px) {
-  .recentTrack {
-    grid-auto-columns: calc((100% - 3rem) / 5);
-  }
-}
-
-@media (min-width: 1280px) {
-  .recentTrack {
-    grid-auto-columns: calc((100% - 3.75rem) / 6);
-  }
 }
 
 .heading {
@@ -182,7 +19,7 @@
 }
 
 .panel {
-  overflow: visible;
+  overflow: hidden;
   border-radius: 0.9rem;
   border: 1px solid rgb(var(--border) / 0.72);
   background: linear-gradient(180deg, rgb(var(--bg-elevated)) 0%, rgb(var(--bg)) 100%);
@@ -193,8 +30,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .librarySection {
@@ -476,8 +311,6 @@
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
 }
 
 .searchHintPosterLink:focus-visible {
@@ -551,18 +384,9 @@
 }
 
 .catalog {
-  position: relative;
-  z-index: 0;
   display: flex;
   flex-direction: column;
-}
-
-.catalog > .recentHeading {
-  margin-bottom: 0.45rem;
-}
-
-.catalogSection + .catalogSection {
-  margin-top: 1.75rem;
+  gap: 1.75rem;
 }
 
 .catalogSection {
@@ -599,6 +423,7 @@
   gap: 0.35rem;
   overflow-x: auto;
   padding: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 767px) {
@@ -790,40 +615,22 @@
 }
 
 .card {
-  position: relative;
   min-width: 0;
 }
 
 .posterLink {
-  position: relative;
-  z-index: 2;
   display: block;
   width: 100%;
   border: 0;
   background: transparent;
   padding: 0;
-  margin: 0;
-  font: inherit;
-  text-align: inherit;
-  appearance: none;
-  -webkit-tap-highlight-color: transparent;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.posterLink img,
-.posterFallback,
-.playOverlay,
-.playButton {
-  pointer-events: none;
 }
 
 .posterFrame {
   position: relative;
-  z-index: 1;
   display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
@@ -831,7 +638,6 @@
   border-radius: 0.375rem;
   background: linear-gradient(to bottom right, rgb(var(--bg-muted)), #000);
   box-shadow: 0 10px 24px rgb(0 0 0 / 0.22);
-  pointer-events: none;
 }
 
 .posterImage,
@@ -858,19 +664,12 @@
 .playOverlay {
   position: absolute;
   inset: 0;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
   background: linear-gradient(180deg, rgb(1 19 26 / 0.08), rgb(1 19 26 / 0.42));
   opacity: 0;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .playOverlay {
-    display: flex;
-    transition: opacity 0.28s ease;
-  }
+  transition: opacity 0.28s ease;
 }
 
 .posterLink:hover .playOverlay,
@@ -881,7 +680,6 @@
 .playButton {
   height: 3rem;
   width: 3rem;
-  pointer-events: none;
   border-radius: 999px;
   border: 2px solid rgb(38 191 176 / 0.8);
   background: rgb(1 19 26 / 0.45);
@@ -924,56 +722,32 @@
   color: rgb(var(--fg-muted));
 }
 
-.loadMoreSentinel {
-  grid-column: 1 / -1;
-  min-height: 2.5rem;
-  padding: 0.75rem 0 0.25rem;
-  text-align: center;
-  font-size: 0.8125rem;
-  color: rgb(var(--fg-muted));
-}
-
 .empty {
   margin: 0;
   font-size: 0.9rem;
   color: rgb(var(--fg-muted));
 }
 
-.infoOverlay {
+.root {
   position: fixed;
-  top: 3.5rem;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 900;
+  inset: 0;
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  pointer-events: auto;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
-@media (min-width: 640px) {
-  .infoOverlay {
-    top: 4rem;
-  }
-}
-
-.infoBackdrop {
+.backdrop {
   position: absolute;
   inset: 0;
-  z-index: 0;
   border: 0;
   background: rgb(0 0 0 / 0.72);
-  cursor: pointer;
 }
 
-.infoSheet {
+.sheet {
   position: relative;
   z-index: 1;
-  pointer-events: auto;
   display: flex;
   width: min(64rem, 100%);
   max-height: min(92dvh, 880px);
@@ -1106,28 +880,7 @@
   color: rgb(var(--fg) / 0.92);
 }
 
-.overviewMuted {
-  margin: 0;
-  line-height: 1.55;
-  font-size: 0.9rem;
-  color: rgb(var(--fg-muted));
-}
-
-.heroCompact {
-  height: 3.5rem;
-}
-
-.infoSheetCompactHero .headerBlock {
-  margin-top: -2.5rem;
-}
-
-.infoSheetCompactHero .headerCopy {
-  padding-top: 3.2rem;
-}
-
 .actions {
-  position: relative;
-  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
@@ -1145,9 +898,6 @@
 }
 
 .play {
-  border: 0;
-  cursor: pointer;
-  pointer-events: auto;
   background: #26bfb0;
   color: #04211d;
   text-decoration: none;
@@ -1227,101 +977,4 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;
-}
-
-@media (max-width: 639px) {
-  .infoOverlay {
-    align-items: flex-end;
-    padding: 0;
-    top: 3.5rem;
-  }
-
-  .infoSheet {
-    width: 100%;
-    max-height: min(94dvh, 100%);
-    border-radius: 1rem 1rem 0 0;
-    border-bottom: 0;
-  }
-
-  .hero {
-    height: 6.5rem;
-  }
-
-  .heroCompact {
-    height: 2.75rem;
-  }
-
-  .headerBlock {
-    flex-direction: column;
-    align-items: center;
-    margin-top: -2.75rem;
-    padding: 0 1rem 0.85rem;
-    text-align: center;
-  }
-
-  .infoSheetCompactHero .headerBlock {
-    margin-top: -2rem;
-  }
-
-  .poster {
-    height: 7.5rem;
-    width: 5.15rem;
-  }
-
-  .headerCopy {
-    width: 100%;
-    padding-top: 0.65rem;
-  }
-
-  .infoSheetCompactHero .headerCopy {
-    padding-top: 0.65rem;
-  }
-
-  .headerCopy h2 {
-    font-size: 1.125rem;
-    line-height: 1.25;
-    word-break: break-word;
-  }
-
-  .meta {
-    font-size: 0.8125rem;
-  }
-
-  .genres {
-    justify-content: center;
-  }
-
-  .body {
-    padding: 0.85rem 1rem 1.15rem;
-    padding-bottom: max(1.15rem, env(safe-area-inset-bottom, 0px));
-  }
-
-  .actions {
-    flex-direction: column;
-    gap: 0.45rem;
-  }
-
-  .play,
-  .ghost {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .closeBtn {
-    top: 0.55rem;
-    right: 0.55rem;
-  }
-
-  .credits {
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .person {
-    width: 5.25rem;
-  }
-
-  .person span {
-    height: 5.25rem;
-  }
 }

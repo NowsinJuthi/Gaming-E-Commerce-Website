@@ -47,7 +47,6 @@ type SearchHit = {
 type DetailPayload = {
   title?: string;
   name?: string;
-  poster_path?: string | null;
   overview?: string;
   runtime?: number;
   episode_run_time?: number[];
@@ -87,48 +86,6 @@ export class TmdbMetadataService {
 
   async detailsSeries(title: string, year?: number | null): Promise<TmdbDetails | null> {
     return this.details('tv', title, year);
-  }
-
-  async detailsMovieById(
-    tmdbId: number,
-    downloadPoster = true,
-  ): Promise<(TmdbDetails & { posterUrl: string | null }) | null> {
-    return this.detailsById('movie', tmdbId, downloadPoster);
-  }
-
-  async detailsSeriesById(
-    tmdbId: number,
-    downloadPoster = true,
-  ): Promise<(TmdbDetails & { posterUrl: string | null }) | null> {
-    return this.detailsById('tv', tmdbId, downloadPoster);
-  }
-
-  async savePosterBuffer(buffer: Buffer): Promise<string | null> {
-    if (buffer.length < 32 || buffer.length > 8_000_000) return null;
-    const filename = `${createHash('sha1').update(buffer).digest('hex').slice(0, 20)}.webp`;
-    const dir = join(resolveUploadsRoot(), 'posters');
-    const output = join(dir, filename);
-    const prefix = (this.config.get<string>('app.globalPrefix') ?? 'api').replace(/^\/+|\/+$/g, '');
-    const publicUrl = `/${prefix}/uploads/posters/${filename}`;
-    if (existsSync(output)) return publicUrl;
-    try {
-      mkdirSync(dir, { recursive: true });
-      await sharp(buffer)
-        .rotate()
-        .resize(POSTER_WIDTH, POSTER_HEIGHT, {
-          fit: 'inside',
-          withoutEnlargement: true,
-          kernel: sharp.kernel.lanczos3,
-        })
-        .webp({ quality: POSTER_QUALITY, effort: 4, smartSubsample: true })
-        .toFile(output);
-      return publicUrl;
-    } catch (error) {
-      this.logger.warn(
-        `Could not save uploaded poster: ${error instanceof Error ? error.message : 'error'}`,
-      );
-      return null;
-    }
   }
 
   private async search(kind: 'movie' | 'tv', title: string, year?: number | null): Promise<TmdbMatch | null> {
@@ -199,62 +156,6 @@ export class TmdbMetadataService {
         }))
         .filter((person) => person.name)
         .slice(0, 12),
-    };
-  }
-
-  private async detailsById(
-    kind: 'movie' | 'tv',
-    tmdbId: number,
-    downloadPoster: boolean,
-  ): Promise<(TmdbDetails & { posterUrl: string | null }) | null> {
-    if (!this.enabled() || !Number.isFinite(tmdbId) || tmdbId < 1) return null;
-    const path = kind === 'movie' ? `/3/movie/${tmdbId}` : `/3/tv/${tmdbId}`;
-    const params = new URLSearchParams({
-      api_key: this.apiKey(),
-      append_to_response: 'credits',
-    });
-    const data = await this.getJson<DetailPayload>(`${path}?${params.toString()}`);
-    if (!data) return null;
-    const name = (kind === 'movie' ? data.title : data.name)?.trim();
-    if (!name) return null;
-    const date = kind === 'movie' ? data.release_date : data.first_air_date;
-    const parsedYear = date ? Number(date.slice(0, 4)) : null;
-    const crew = data.credits?.crew ?? [];
-    const runtime = kind === 'movie' ? data.runtime : data.episode_run_time?.[0];
-    const posterUrl =
-      downloadPoster && data.poster_path ? await this.savePoster(data.poster_path) : null;
-    return {
-      title: name,
-      year: Number.isFinite(parsedYear) ? parsedYear : null,
-      overview: data.overview?.trim() || '',
-      runtimeMinutes: runtime && runtime > 0 ? Math.round(runtime) : null,
-      rating:
-        typeof data.vote_average === 'number' && data.vote_average > 0
-          ? Math.round(data.vote_average * 10) / 10
-          : null,
-      genres: (data.genres ?? []).map((genre) => genre.name?.trim() || '').filter(Boolean).slice(0, 12),
-      backdropUrl: data.backdrop_path ? `${TMDB_BACKDROP}${data.backdrop_path}` : null,
-      directors:
-        kind === 'tv'
-          ? (data.created_by ?? []).map((person) => person.name?.trim() || '').filter(Boolean).slice(0, 4)
-          : crew
-              .filter((person) => person.job === 'Director')
-              .map((person) => person.name?.trim() || '')
-              .filter(Boolean)
-              .slice(0, 4),
-      writers: crew
-        .filter((person) => person.job === 'Writer' || person.job === 'Screenplay')
-        .map((person) => person.name?.trim() || '')
-        .filter(Boolean)
-        .slice(0, 6),
-      cast: (data.credits?.cast ?? [])
-        .map((person) => ({
-          name: person.name?.trim() || '',
-          profileUrl: person.profile_path ? `${TMDB_PROFILE}${person.profile_path}` : null,
-        }))
-        .filter((person) => person.name)
-        .slice(0, 12),
-      posterUrl,
     };
   }
 

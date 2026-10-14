@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import {
   BellIcon,
   GridIcon,
@@ -11,9 +10,6 @@ import {
   StoreIcon,
   UserIcon,
 } from "@/components/admin/icons";
-import { ThemePreferenceIcon } from "@/components/theme/ThemeToggle";
-import { resolveTheme } from "@/lib/theme";
-import { useThemeStore } from "@/stores/theme-store";
 
 type Props = {
   displayName: string;
@@ -29,37 +25,6 @@ type Props = {
 
 const DRAWER_ITEM_CLS =
   "flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-sm font-bold text-foreground no-underline transition hover:bg-muted";
-
-function MobileProfileThemeToggle() {
-  const theme = useThemeStore((s) => s.theme);
-  const hydrated = useThemeStore((s) => s.hydrated);
-  const setTheme = useThemeStore((s) => s.setTheme);
-  const [animating, setAnimating] = useState(false);
-  const resolved = hydrated ? resolveTheme(theme) : resolveTheme("system");
-  const isDark = resolved === "dark" || resolved === "gaming" || resolved === "amoled";
-  const display = isDark ? "dark" : "light";
-
-  function toggleTheme() {
-    setAnimating(true);
-    setTheme(isDark ? "light" : "dark");
-    window.setTimeout(() => setAnimating(false), 500);
-  }
-
-  return (
-    <button
-      type="button"
-      className={`shell-icon-btn profile-theme-toggle lg:hidden${animating ? " profile-theme-toggle--active" : ""}`}
-      aria-label={
-        isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
-      }
-      onClick={toggleTheme}
-    >
-      <span key={display} className="profile-theme-toggle__icon" aria-hidden>
-        <ThemePreferenceIcon preference={display} className="h-5 w-5 text-brand" />
-      </span>
-    </button>
-  );
-}
 
 export function SiteUserMenu({
   displayName,
@@ -132,13 +97,8 @@ export function SiteUserMenu({
   return (
     <div className={`admin-user-menu${className ? ` ${className}` : ""}`}>
       <div className="admin-user-menu-header">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="admin-user-menu-name truncate">{displayName}</p>
-            <p className="admin-user-menu-meta">{metaLabel}</p>
-          </div>
-          <MobileProfileThemeToggle />
-        </div>
+        <p className="admin-user-menu-name">{displayName}</p>
+        <p className="admin-user-menu-meta">{metaLabel}</p>
       </div>
 
       <div className="admin-user-menu-body">

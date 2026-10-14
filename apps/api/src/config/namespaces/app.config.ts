@@ -27,6 +27,4 @@ export const appConfig = registerAs('app', () => ({
   corsOrigin: parseCorsOrigins(process.env.API_CORS_ORIGIN),
   publicUrl: process.env.API_PUBLIC_URL ?? 'http://localhost:4000',
   uploadsDir: resolveUploadsRoot(),
-  /** e.g. .uniqbd.com so admin (uniqbd.com) and API (api.uniqbd.com) share auth cookies. */
-  authCookieDomain: process.env.AUTH_COOKIE_DOMAIN?.trim() || null,
 }));

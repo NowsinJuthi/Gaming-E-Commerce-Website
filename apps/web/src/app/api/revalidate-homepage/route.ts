@@ -14,7 +14,6 @@ const STOREFRONT_PATHS = [
   "/cart",
   "/login",
   "/register",
-  "/media",
 ];
 
 type RevalidateScope = "website" | "full";

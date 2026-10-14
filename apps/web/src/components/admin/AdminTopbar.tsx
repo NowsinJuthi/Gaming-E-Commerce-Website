@@ -165,7 +165,7 @@ export function AdminTopbar({ pathname, adminName, adminRoleLabel = "Admin", onO
   );
 
   const topbar = (
-    <header className="site-header isolate pointer-events-auto fixed top-0 left-0 right-0 z-[100] border-b">
+    <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
       <div className="site-header-inner admin-topbar-inner grid h-14 w-full grid-cols-[auto_1fr_auto] items-center sm:h-16">
         {/* Left column: hamburger (all screens) + logo (desktop only) */}
         <div className="flex h-full min-w-0 shrink-0 items-center gap-1 px-2 sm:gap-1.5 sm:px-3 lg:w-80 lg:max-w-[20rem] lg:gap-2 lg:px-3">

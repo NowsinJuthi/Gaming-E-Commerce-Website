@@ -5,12 +5,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
-  canSeekWithinCurrentPack,
   displayTimelineSeconds,
+  isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
-import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
-import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
 import styles from "./media-player.module.css";
 
 /** Bust CDN/browser cache when ffmpeg starts a new pack (Movie Server uses t= + g=). */
@@ -453,12 +451,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const rateRef = useRef(1);
   const durationHintRef = useRef(0);
   const [session, setSession] = useState<PlaybackSession | null>(null);
-  useLiveMediaWatch({
-    active: session?.status === "ready",
-    titleId,
-    titleName: session?.title ?? "Media",
-    episodeName: session?.episodeName,
-  });
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
@@ -529,16 +521,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
   const remember = useCallback(
     (seconds: number) => {
-      const durationSeconds =
-        durationHintRef.current ||
-        sessionRef.current?.durationSeconds ||
-        (details?.runtimeMinutes ? details.runtimeMinutes * 60 : 0);
-      if (seconds > 8) {
-        persistWatchProgress(titleId, seconds, durationSeconds);
-        touchRecentWatched(titleId);
-      }
+      if (seconds > 8) localStorage.setItem(`uniqbd-watch:${titleId}`, String(Math.floor(seconds)));
     },
-    [details?.runtimeMinutes, titleId],
+    [titleId],
   );
 
   const post = useCallback(async (url: string, body: Record<string, unknown>) => {
@@ -786,10 +771,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       startSeconds: saved > 15 ? saved : 0,
     })
       .then((next) => {
-        if (!stop) {
-          setSession(next);
-          touchRecentWatched(titleId);
-        }
+        if (!stop) setSession(next);
       })
       .catch((reason: unknown) => {
         if (!stop) setError(reason instanceof Error ? reason.message : "Playback could not start.");
@@ -811,22 +793,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
             if (!previous || previous.sessionId !== data.sessionId) return data;
             if (previous.status === "ready" && data.status === "ready" && previous.startSeconds === data.startSeconds) {
               const sameSubtitles = JSON.stringify(previous.subtitles) === JSON.stringify(data.subtitles);
-              const sameDuration = previous.durationSeconds === data.durationSeconds;
-              if (
-                sameSubtitles &&
-                sameDuration &&
-                previous.complete === data.complete &&
-                previous.message === data.message
-              ) {
-                return previous;
-              }
-              return {
-                ...previous,
-                subtitles: data.subtitles,
-                complete: data.complete,
-                message: data.message,
-                durationSeconds: data.durationSeconds || previous.durationSeconds,
-              };
+              if (sameSubtitles && previous.complete === data.complete && previous.message === data.message) return previous;
+              return { ...previous, subtitles: data.subtitles, complete: data.complete, message: data.message };
             }
             return data;
           });
@@ -875,14 +843,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const movie = sessionRef.current?.durationSeconds ?? 0;
       const mediaTime = displayTimelineSeconds(video.currentTime, origin, movie);
       setCurrent(mediaTime);
-      const snap = sessionRef.current;
-      const known = snap?.durationSeconds ?? 0;
-      const packComplete = snap?.complete ?? false;
-      let nextDuration = known;
-      if (nextDuration <= 0) {
-        const fromMedia = origin + (Number.isFinite(video.duration) ? video.duration : 0);
-        if (fromMedia > 0 && packComplete) nextDuration = fromMedia;
-      }
+      const known = sessionRef.current?.durationSeconds ?? 0;
+      const nextDuration = known > 0 ? known : origin + (Number.isFinite(video.duration) ? video.duration : 0);
       if (nextDuration > 0) durationHintRef.current = nextDuration;
       setDuration(nextDuration);
     };
@@ -1140,11 +1102,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setCurrent(absolute);
     remember(absolute);
 
-    const packComplete = currentSession.complete;
-    if (
-      targetIsInCurrentPack &&
-      canSeekWithinCurrentPack(video, localTarget, packComplete)
-    ) {
+    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;

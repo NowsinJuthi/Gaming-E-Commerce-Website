@@ -10,7 +10,6 @@ import {
 export default function AdminSeriesCollectionsPage() {
   return (
     <CatalogCollectionsPage
-      kind="series"
       title="Series collections"
       description="Browse series, edit in a popup, and run bulk publish / feature / trending actions."
       emptyHint="Import TV libraries or add a series manually."

@@ -3,14 +3,7 @@ import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  Suspense,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getCart, getMe, logoutUser } from "@/lib/api";
 import { useCanAccessAdminPanel } from "@/hooks/useAdminPermissions";
 import { getPrimaryRoleLabel } from "@/lib/admin-order-view";
@@ -252,11 +245,7 @@ function NavLinksFallback({
   return (
     <>
       {primary.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href as "/"}
-          className="site-nav-link"
-        >
+        <Link key={item.href} href={item.href as "/"} className="site-nav-link">
           {item.label}
         </Link>
       ))}
@@ -360,7 +349,6 @@ export function Header({
   const [term, setTerm] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [headerPortaled, setHeaderPortaled] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const { refreshing: adminRefreshing, refresh: refreshAdminPage } =
     useAdminHeaderRefresh();
@@ -452,16 +440,6 @@ export function Header({
     };
   }, [menuOpen]);
 
-  useIsomorphicLayoutEffect(() => {
-    setMenuOpen(false);
-    setSearchOpen(false);
-    setUserOpen(false);
-  }, [pathname]);
-
-  useLayoutEffect(() => {
-    setHeaderPortaled(true);
-  }, []);
-
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -508,15 +486,15 @@ export function Header({
     </span>
   );
 
-  const headerChrome = (
+  return (
     <>
-      <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b">
+      <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
-            {/* Mobile nav (+ storefront search) — admin: menu, refresh; no search */}
+            {/* Hamburger — mobile only */}
             <button
               type="button"
               onClick={() => {
@@ -534,6 +512,7 @@ export function Header({
               <MenuIcon />
             </button>
 
+            {/* Theme toggle or refresh — mobile only */}
             {isAdminRoute ? (
               <button
                 type="button"
@@ -547,16 +526,33 @@ export function Header({
                   aria-hidden
                 />
               </button>
-            ) : null}
-            {!isAdminRoute ? (
+            ) : (
               <button
                 type="button"
-                onClick={() => setSearchOpen((o) => !o)}
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 className={`${iconBtn} lg:hidden`}
-                aria-label="Search"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               >
-                <SearchIcon />
+                {themeToggleIcon}
               </button>
+            )}
+
+            {/* Notification bell — mobile only, sits left of the centered logo */}
+            {loggedIn ? (
+              <Link
+                href={notifHref}
+                className={`${iconBtn} relative lg:hidden`}
+                aria-label={
+                  unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+                }
+              >
+                <BellIcon className="h-5 w-5 text-[#f5b737]" />
+                {unread > 0 ? (
+                  <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                ) : null}
+              </Link>
             ) : null}
 
             {/* Logo — desktop only */}
@@ -634,11 +630,11 @@ export function Header({
               </button>
             )}
 
-            {/* Search — desktop only (mobile search is on the left) */}
+            {/* Search */}
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
-              className={`${iconBtn} hidden lg:grid`}
+              className={iconBtn}
               aria-label="Search"
             >
               <SearchIcon />
@@ -660,7 +656,7 @@ export function Header({
               </Link>
             )}
 
-            {/* Bell — desktop only */}
+            {/* Bell — desktop only (mobile bell is in left column) */}
             {loggedIn ? (
               <Link
                 href={notifHref}
@@ -757,8 +753,8 @@ export function Header({
           </div>
         </div>
 
-        {/* Search bar — storefront only (admin mobile has no search in header) */}
-        {searchOpen && !isAdminRoute && (
+        {/* Search bar */}
+        {searchOpen && (
           <form
             onSubmit={onSearch}
             className={`relative border-t border-border py-3 ${HOME_CONTAINER_CLS}`}
@@ -787,7 +783,7 @@ export function Header({
       {/* Mobile nav drawer — only shown when no external sidebar handler */}
       {menuOpen && !onOpenMobileMenu && (
         <div
-          className="pointer-events-auto fixed inset-x-0 bottom-0 top-14 z-[990] sm:top-16 lg:hidden"
+          className="fixed inset-x-0 bottom-0 top-14 z-40 sm:top-16 lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"
@@ -833,12 +829,6 @@ export function Header({
       )}
     </>
   );
-
-  if (headerPortaled && typeof document !== "undefined") {
-    return createPortal(headerChrome, document.body);
-  }
-
-  return headerChrome;
 }
 
 function MenuIcon() {

@@ -1,4 +1,4 @@
-import { authRequest, authSmbMediaUpload, type AuthFormDataProgress } from "@/lib/api";
+import { authRequest } from "@/lib/api";
 
 export type MediaLibraryKind = "movies" | "tv";
 
@@ -45,22 +45,6 @@ export function listMediaLibraries() {
   }>("/admin/libraries");
 }
 
-export type MovieServerDashboardLibrary = AdminMediaLibrary & {
-  catalogCount: number;
-};
-
-export function getMovieServerDashboard() {
-  return authRequest<{
-    totals: {
-      libraries: number;
-      movies: number;
-      series: number;
-      catalog: number;
-    };
-    libraries: MovieServerDashboardLibrary[];
-  }>("/admin/movie-server/dashboard");
-}
-
 export function createMediaLibrary(body: {
   name: string;
   kind: MediaLibraryKind;
@@ -97,13 +81,7 @@ export type LibraryIndexedItem = {
 };
 
 export function indexMediaLibrary(id: string) {
-  return authRequest<{
-    indexed: number;
-    matched: number;
-    unmatched: number;
-    removed?: number;
-    logs: string[];
-  }>(
+  return authRequest<{ indexed: number; matched: number; unmatched: number; logs: string[] }>(
     `/admin/libraries/${id}/index`,
     { method: "POST" },
   );
@@ -145,16 +123,6 @@ export function saveSmbPassword(id: string, password: string) {
   });
 }
 
-export function updateSmbServer(
-  id: string,
-  body: Partial<{ name: string; host: string; port: number; share: string; domain: string }>,
-) {
-  return authRequest<AdminSmbServer>(`/admin/media-shares/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
 export function deleteSmbServer(id: string) {
   return authRequest<{ deleted: boolean }>(`/admin/media-shares/${id}`, {
     method: "DELETE",
@@ -185,31 +153,4 @@ export function addSmbLibrary(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
-}
-
-export type SmbUploadResult = {
-  uploaded: number;
-  library: AdminMediaLibrary;
-  indexed: number;
-  matched: number;
-  unmatched: number;
-  removed?: number;
-  logs: string[];
-};
-
-export async function uploadSmbMedia(
-  serverId: string,
-  browsePath: string,
-  kind: MediaLibraryKind,
-  files: File[],
-  opts?: { onProgress?: (progress: AuthFormDataProgress) => void },
-): Promise<SmbUploadResult> {
-  const form = new FormData();
-  form.append("path", browsePath);
-  form.append("kind", kind);
-  for (const file of files) {
-    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
-    form.append("files", file, rel);
-  }
-  return authSmbMediaUpload<SmbUploadResult>(serverId, form, { onProgress: opts?.onProgress });
 }

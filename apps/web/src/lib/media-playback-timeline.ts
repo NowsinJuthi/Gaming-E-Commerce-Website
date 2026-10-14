@@ -51,15 +51,3 @@ export function isLocalTimeInPack(
   }
   return false;
 }
-
-/** While ffmpeg is still packaging (EVENT HLS), only seek inside buffered data. */
-export function canSeekWithinCurrentPack(
-  video: HTMLVideoElement,
-  localSeconds: number,
-  packComplete: boolean,
-  slack = 0.5,
-): boolean {
-  if (isLocalTimeBuffered(video, localSeconds, slack)) return true;
-  if (!packComplete) return false;
-  return isLocalTimeInPack(video, localSeconds, slack);
-}

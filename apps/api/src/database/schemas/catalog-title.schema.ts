@@ -77,22 +77,9 @@ export class CatalogTitle {
   /** Stable id for a file or folder imported from a media library. */
   @Prop({ type: String })
   sourceKey?: string;
-
-  /** Bumped when a title is newly uploaded or re-listed (sorts /media catalog). */
-  @Prop({ type: Date, default: null, index: true })
-  listedAt?: Date | null;
-
-  /** Last seen modification time of the file/folder on Samba (detect manual PC uploads). */
-  @Prop({ type: Date, default: null })
-  diskModifiedAt?: Date | null;
-
-  createdAt?: Date;
-  updatedAt?: Date;
 }
 
 export type CatalogTitleDocument = HydratedDocument<CatalogTitle>;
 export const CatalogTitleSchema = SchemaFactory.createForClass(CatalogTitle);
 CatalogTitleSchema.index({ kind: 1, title: 1 });
 CatalogTitleSchema.index({ sourceKey: 1 }, { unique: true, sparse: true });
-CatalogTitleSchema.index({ published: 1, availability: 1, listedAt: -1, createdAt: -1 });
-CatalogTitleSchema.index({ published: 1, availability: 1, year: -1 });

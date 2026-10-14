@@ -17,7 +17,6 @@ import {
   clearBrowserSession,
   getAccessExpiresAt,
   getAccessToken,
-  getSessionMeta,
   hasAuthSession,
   persistBrowserSession,
   setAccessToken,
@@ -542,8 +541,6 @@ const PROACTIVE_REFRESH_RETRY_MS = 30_000;
 const REFRESH_LOCK_KEY = "authRefreshLock";
 const REFRESH_LOCK_TTL_MS = 15_000;
 const REFRESH_GRACE_RETRY_MS = 500;
-const MAX_CSRF_RECOVERY_ATTEMPTS = 3;
-let refreshCsrfFailStreak = 0;
 const TAB_ID =
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -599,80 +596,6 @@ async function waitForPeerRefresh(
   return false;
 }
 
-async function resyncCsrfFromCookie(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/auth/browser-session/resync`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    if (!res.ok) return false;
-    const data = (await res.json()) as {
-      csrfToken: string;
-      user?: { roles?: string[]; isGuest?: boolean };
-      expiresIn?: number;
-    };
-    const prior = getSessionMeta();
-    persistBrowserSession({
-      csrfToken: data.csrfToken,
-      roles: data.user?.roles ?? prior?.roles,
-      isGuest: data.user?.isGuest ?? prior?.isGuest,
-      expiresIn: data.expiresIn,
-    });
-    window.dispatchEvent(new Event("auth-change"));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function applyRefreshResponse(data: {
-  csrfToken: string;
-  user?: { roles?: string[]; isGuest?: boolean };
-  expiresIn?: number;
-}): void {
-  refreshCsrfFailStreak = 0;
-  persistBrowserSession({
-    csrfToken: data.csrfToken,
-    roles: data.user?.roles,
-    isGuest: data.user?.isGuest,
-    expiresIn: data.expiresIn,
-  });
-  window.dispatchEvent(new Event("auth-change"));
-  scheduleProactiveRefresh();
-}
-
-async function recoverSessionAfterRefreshReject(
-  csrfToken: string,
-): Promise<boolean> {
-  if (refreshCsrfFailStreak >= MAX_CSRF_RECOVERY_ATTEMPTS) return false;
-  if (!(await resyncCsrfFromCookie())) return false;
-  refreshCsrfFailStreak += 1;
-  const nextCsrf = getStored("refreshToken");
-  if (!nextCsrf) return false;
-  if (nextCsrf === csrfToken) return performRefreshOnce(nextCsrf);
-  refreshCsrfFailStreak = 0;
-  return performRefreshOnce(nextCsrf);
-}
-
-async function handleRefreshAuthFailure(
-  csrfToken: string,
-  primaryStatus: number,
-  retryStatus: number,
-): Promise<boolean> {
-  const authReject = [primaryStatus, retryStatus].some(
-    (status) => status === 401 || status === 403,
-  );
-  if (authReject && (await recoverSessionAfterRefreshReject(csrfToken))) {
-    return true;
-  }
-  refreshCsrfFailStreak += 1;
-  // Keep the browser signed in. A failed silent refresh must not log the user out.
-  scheduleProactiveRefreshRetry(60_000);
-  return false;
-}
-
 async function performRefreshOnce(csrfToken: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
@@ -687,14 +610,12 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
     if (!res.ok) {
       const currentToken = getStored("refreshToken");
       if (currentToken && currentToken !== csrfToken) {
-        refreshCsrfFailStreak = 0;
         return true;
       }
       if (res.status === 401 || res.status === 403) {
         await new Promise((resolve) => setTimeout(resolve, REFRESH_GRACE_RETRY_MS));
         const tokenAfterWait = getStored("refreshToken");
         if (tokenAfterWait && tokenAfterWait !== csrfToken) {
-          refreshCsrfFailStreak = 0;
           return true;
         }
         const retryRes = await fetch(`${API_BASE}/auth/refresh`, {
@@ -707,34 +628,46 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
           body: "{}",
         });
         if (retryRes.ok) {
-          applyRefreshResponse(
-            (await retryRes.json()) as {
-              csrfToken: string;
-              user?: { roles?: string[]; isGuest?: boolean };
-              expiresIn?: number;
-            },
-          );
+          const data = (await retryRes.json()) as {
+            accessToken?: string;
+            csrfToken: string;
+            user?: { roles?: string[]; isGuest?: boolean };
+            expiresIn?: number;
+          };
+          persistBrowserSession({
+            csrfToken: data.csrfToken,
+            roles: data.user?.roles,
+            isGuest: data.user?.isGuest,
+            expiresIn: data.expiresIn,
+          });
+          window.dispatchEvent(new Event("auth-change"));
+          scheduleProactiveRefresh();
           return true;
         }
         const tokenAfterRetry = getStored("refreshToken");
         if (tokenAfterRetry && tokenAfterRetry !== csrfToken) {
-          refreshCsrfFailStreak = 0;
           return true;
         }
-        return handleRefreshAuthFailure(csrfToken, res.status, retryRes.status);
+        clearTokens();
       }
       return false;
     }
-    applyRefreshResponse(
-      (await res.json()) as {
-        csrfToken: string;
-        user?: { roles?: string[]; isGuest?: boolean };
-        expiresIn?: number;
-      },
-    );
+    const data = (await res.json()) as {
+      accessToken?: string;
+      csrfToken: string;
+      user?: { roles?: string[]; isGuest?: boolean };
+      expiresIn?: number;
+    };
+    persistBrowserSession({
+      csrfToken: data.csrfToken,
+      roles: data.user?.roles,
+      isGuest: data.user?.isGuest,
+      expiresIn: data.expiresIn,
+    });
+    window.dispatchEvent(new Event("auth-change"));
+    scheduleProactiveRefresh();
     return true;
   } catch {
-    scheduleProactiveRefreshRetry(12_000);
     return false;
   }
 }
@@ -798,12 +731,8 @@ function scheduleProactiveRefresh(): void {
   const expiresAt = getAccessTokenExpiry();
   if (!expiresAt) return;
 
-  // Renew long-lived cookies at least every 12h. setTimeout cannot wait years.
-  const MAX_REFRESH_DELAY_MS = 12 * 60 * 60 * 1000;
-  const delay = Math.min(
-    expiresAt - Date.now() - 90_000,
-    MAX_REFRESH_DELAY_MS,
-  );
+  // Aim to refresh 90 s before expiry.
+  const delay = expiresAt - Date.now() - 90_000;
   if (delay <= 0) {
     // Already expired or about to — refresh immediately.
     void tryRefresh().then((ok) => {
@@ -970,17 +899,13 @@ async function fetchWithAuthRetry(
 
 // Kick off proactive refresh on page load if a valid token is already stored.
 if (typeof window !== "undefined") {
-  void (async () => {
-    // HttpOnly refresh cookie may survive a deploy reload even when CSRF was cleared.
-    if (!hasAuthSession()) {
-      await resyncCsrfFromCookie();
-    }
-    if (getStored("refreshToken") || hasAuthSession()) {
-      const ok = await tryRefresh();
+  if (getStored("refreshToken") && !hasAuthSession()) {
+    void tryRefresh().then((ok) => {
       if (ok) scheduleProactiveRefresh();
-      else if (getStored("refreshToken")) scheduleProactiveRefresh();
-    }
-  })();
+    });
+  } else {
+    scheduleProactiveRefresh();
+  }
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
@@ -1009,7 +934,6 @@ if (typeof window !== "undefined") {
       event.key === "authSession" ||
       event.key === "refreshToken"
     ) {
-      refreshCsrfFailStreak = 0;
       scheduleProactiveRefresh();
     }
   });
@@ -1052,188 +976,6 @@ export async function authRequest<T>(
     );
   }
   return authRequestRaw<T>(path, init);
-}
-
-/** Cloudflare proxied orange-cloud uploads are capped near 100MB regardless of nginx. */
-export const CLOUDFLARE_PROXY_UPLOAD_BYTES = 100 * 1024 * 1024;
-
-function largeUploadOrigin(): string | null {
-  const raw = process.env.NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN?.trim();
-  if (!raw) return null;
-  return raw.replace(/\/$/, "");
-}
-
-/** Samba upload URL: grey-cloud host → Nest directly; main site → Next stream route (Movie-Server pattern). */
-export function resolveSmbMediaUploadProxyUrl(serverId: string): string {
-  const direct = largeUploadOrigin();
-  if (direct) {
-    return `${direct}/api/admin/media-shares/${serverId}/upload`;
-  }
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  return `${origin.replace(/\/$/, "")}/api/smb-media-upload/${serverId}`;
-}
-
-function resolveAuthUploadUrl(path: string): string {
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  if (typeof window !== "undefined" && path.startsWith("/api/")) {
-    return `${window.location.origin}${path}`;
-  }
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE}${normalized}`;
-}
-
-export type AuthFormDataProgress = {
-  loaded: number;
-  total: number;
-  phase: "upload" | "processing";
-};
-
-export type AuthFormDataRequestOptions = {
-  onProgress?: (progress: AuthFormDataProgress) => void;
-};
-
-function xhrFormDataPost(
-  url: string,
-  form: FormData,
-  headers: Record<string, string> | undefined,
-  onProgress?: (progress: AuthFormDataProgress) => void,
-): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    xhr.withCredentials = true;
-    if (headers) {
-      for (const [key, value] of Object.entries(headers)) {
-        xhr.setRequestHeader(key, value);
-      }
-    }
-    xhr.upload.addEventListener("progress", (event) => {
-      if (!onProgress || !event.lengthComputable) return;
-      onProgress({ loaded: event.loaded, total: event.total, phase: "upload" });
-    });
-    xhr.upload.addEventListener("loadend", () => {
-      onProgress?.({ loaded: 1, total: 1, phase: "processing" });
-    });
-    xhr.addEventListener("load", () => {
-      resolve(
-        new Response(xhr.responseText, {
-          status: xhr.status,
-          statusText: xhr.statusText,
-          headers: { "Content-Type": xhr.getResponseHeader("Content-Type") ?? "application/json" },
-        }),
-      );
-    });
-    xhr.addEventListener("error", () =>
-      reject(
-        new ApiError(
-          url.includes("upload.") && typeof window !== "undefined" && !url.startsWith(window.location.origin)
-            ? "Upload network error. Check upload.uniqbd.com SSL and nginx (/api/smb-media-upload/ → port 3000, CORS from uniqbd.com)."
-            : "Upload network error. Keep this page open and ensure nginx allows large POSTs to /api/smb-media-upload/.",
-          0,
-        ),
-      ),
-    );
-    xhr.addEventListener("abort", () => reject(new ApiError("Upload cancelled.", 0)));
-    xhr.timeout = 0;
-    xhr.send(form);
-  });
-}
-
-async function formDataWithAuthRetry(
-  url: string,
-  form: FormData,
-  headers: Record<string, string> | undefined,
-  onProgress?: (progress: AuthFormDataProgress) => void,
-): Promise<Response> {
-  const run = () =>
-    onProgress
-      ? xhrFormDataPost(url, form, headers, onProgress)
-      : fetch(url, {
-          method: "POST",
-          body: form,
-          cache: "no-store",
-          credentials: "include",
-          headers,
-        });
-  let res = await run();
-  if (res.status === 401) {
-    const refreshed = await tryRefresh();
-    if (refreshed) {
-      res = await run();
-    } else if (getStored("refreshToken")) {
-      throw new ApiError(SESSION_REFRESH_FAILED_MSG, 503);
-    }
-  }
-  return res;
-}
-
-/** Multipart upload with cookie session + 401 refresh (do not set Content-Type). */
-export async function authFormDataRequest<T>(
-  path: string,
-  form: FormData,
-  options?: AuthFormDataRequestOptions,
-): Promise<T> {
-  const url = path.startsWith("http://") || path.startsWith("https://") ? path : resolveAuthUploadUrl(path);
-  const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
-  const csrf = getStored("refreshToken");
-  const headers = !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined;
-  let res: Response;
-  try {
-    res = await formDataWithAuthRetry(url, form, headers, options?.onProgress);
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(
-      sameOrigin
-        ? "Upload failed before the server responded. If the file is very large, wait and try again, or use Samba on the storage server directly."
-        : "Upload could not reach the API. Log out and log in again, or ask ops to set AUTH_COOKIE_DOMAIN=.uniqbd.com on the API.",
-      0,
-    );
-  }
-  if (!res.ok) {
-    if (res.status === 413) {
-      const cfHint = largeUploadOrigin()
-        ? ""
-        : " If the file is over ~100MB and Cloudflare is proxied (orange cloud), set NEXT_PUBLIC_LARGE_UPLOAD_ORIGIN to a grey-cloud host (see deploy docs) and rebuild web, or copy files via Samba on the storage LAN.";
-      throw new ApiError(
-        `Upload rejected (413 — body too large). On the VPS, merge repo nginx for uniqbd.com (client_max_body_size 25g and /api/admin/media-shares/ → port 4000), then nginx -t && reload.${cfHint}`,
-        413,
-      );
-    }
-    await throwApiError(res);
-  }
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
-}
-
-/** Samba video upload via Next streaming route (avoids API rewrite / CORS to Nest). */
-export async function authSmbMediaUpload<T>(
-  serverId: string,
-  form: FormData,
-  options?: AuthFormDataRequestOptions,
-): Promise<T> {
-  const url = resolveSmbMediaUploadProxyUrl(serverId);
-  // HttpOnly access cookie + credentials; avoid custom headers on upload host (fewer CORS preflights).
-  let res: Response;
-  try {
-    res = await formDataWithAuthRetry(url, form, undefined, options?.onProgress);
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(
-      "Upload failed before the server responded. If the file is very large, use upload.uniqbd.com (grey cloud) or copy via Samba on the storage LAN.",
-      0,
-    );
-  }
-  if (!res.ok) {
-    if (res.status === 413) {
-      throw new ApiError(
-        "File too large for the web proxy or Cloudflare. Use grey-cloud upload.uniqbd.com or Samba on the storage LAN.",
-        413,
-      );
-    }
-    await throwApiError(res);
-  }
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export function authFetch<T>(path: string): Promise<T> {

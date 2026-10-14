@@ -68,132 +68,22 @@
 
 .searchWrap {
   position: relative;
-  display: block;
-  flex: 1 1 16rem;
+  flex: 1 1 14rem;
   min-width: 12rem;
-  max-width: 26rem;
+  max-width: 22rem;
 }
 
 .searchIcon {
   pointer-events: none;
   position: absolute;
+  left: 0.75rem;
   top: 50%;
-  left: 0.72rem;
-  z-index: 1;
-  display: flex;
-  height: 1.15rem;
-  width: 1.15rem;
-  translate: 0 -50%;
-  color: rgb(38 191 176 / 0.85);
-  animation: catalogSearchIconFloat 2.8s ease-in-out infinite;
-}
-
-.searchIcon svg {
-  height: 100%;
-  width: 100%;
-}
-
-.searchWrap:focus-within .searchIconLens {
-  animation: catalogSearchLensPulse 1.6s ease-in-out infinite;
-}
-
-.searchWrap:focus-within .searchIconHandle {
-  animation: catalogSearchHandleNudge 1.6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .searchIcon {
-    animation: none;
-  }
-
-  .searchWrap:focus-within .searchIconLens,
-  .searchWrap:focus-within .searchIconHandle {
-    animation: none;
-  }
-}
-
-@keyframes catalogSearchIconFloat {
-  0%,
-  100% {
-    opacity: 0.72;
-    scale: 1;
-  }
-
-  50% {
-    opacity: 1;
-    scale: 1.08;
-  }
-}
-
-@keyframes catalogSearchLensPulse {
-  0%,
-  100% {
-    opacity: 0.75;
-    stroke-width: 2;
-  }
-
-  50% {
-    opacity: 1;
-    stroke-width: 2.35;
-  }
-}
-
-@keyframes catalogSearchHandleNudge {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-
-  50% {
-    transform: translate(1px, 1px);
-  }
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
 }
 
 .searchInput {
-  width: 100%;
-  min-height: 2.45rem;
-  border-radius: 0.45rem;
-  border: 1px solid rgb(var(--border) / 0.72);
-  background-color: rgb(var(--bg-elevated));
-  background-image: linear-gradient(165deg, rgb(var(--bg-muted)) 0%, rgb(var(--bg-elevated)) 100%);
-  padding: 0.38rem 2rem 0.38rem 2.15rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: rgb(var(--fg));
-}
-
-.searchInput::placeholder {
-  color: rgb(var(--fg-muted) / 0.65);
-}
-
-.searchInput:focus-visible {
-  outline: none;
-  border-color: rgb(38 191 176 / 0.55);
-  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.18);
-}
-
-.searchClear {
-  position: absolute;
-  top: 50%;
-  right: 0.35rem;
-  translate: 0 -50%;
-  display: flex;
-  height: 2rem;
-  width: 2rem;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  font-size: 1.25rem;
-  line-height: 1;
-  color: rgb(var(--fg-muted));
-  cursor: pointer;
-}
-
-.searchClear:hover {
-  color: rgb(var(--fg));
-  background: rgb(var(--bg-muted) / 0.6);
+  padding-left: 2.25rem !important;
 }
 
 .selectionChip {
@@ -338,11 +228,6 @@
   font-size: 0.72rem;
   font-weight: 500;
   color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
-}
-
-.titleFileLabel {
-  font-weight: 600;
-  color: var(--muted-foreground);
 }
 
 .titleFileMuted {

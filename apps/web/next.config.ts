@@ -207,10 +207,6 @@ const nextConfig: NextConfig = {
         destination: `${apiOrigin}/api/media/playback/:path*`,
       },
       {
-        source: "/api/admin/media-shares/:id/upload",
-        destination: `${apiOrigin}/api/admin/media-shares/:id/upload`,
-      },
-      {
         source: "/socket.io/:path*",
         destination: `${apiOrigin}/socket.io/:path*`,
       },

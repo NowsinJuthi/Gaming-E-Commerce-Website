@@ -156,7 +156,7 @@ export class AuthService {
     return { user: this.toPublic(user), ...tokens };
   }
 
-  private static readonly REFRESH_REUSE_RACE_WINDOW_MS = 60_000;
+  private static readonly REFRESH_REUSE_RACE_WINDOW_MS = 30_000;
 
   async refresh(
     dto: RefreshTokenDto,
@@ -217,26 +217,17 @@ export class AuthService {
     const likelyTabRace =
       rotatedAt > 0 &&
       Date.now() - rotatedAt <= AuthService.REFRESH_REUSE_RACE_WINDOW_MS;
-    if (likelyTabRace) return;
-
-    const recentReplacement = await this.sessionModel
-      .countDocuments({
-        userId: session.userId,
-        revoked: false,
-        createdAt: { $gte: new Date(Date.now() - 120_000) },
-      })
-      .exec();
-    if (recentReplacement > 0) return;
-
-    await this.sessionModel
-      .updateMany(
-        { userId: session.userId, revoked: false },
-        { $set: { revoked: true } },
-      )
-      .exec();
-    this.logger.warn(
-      'Refresh-token reuse detected; active sessions were revoked',
-    );
+    if (!likelyTabRace) {
+      await this.sessionModel
+        .updateMany(
+          { userId: session.userId, revoked: false },
+          { $set: { revoked: true } },
+        )
+        .exec();
+      this.logger.warn(
+        'Refresh-token reuse detected; active sessions were revoked',
+      );
+    }
   }
 
   async logout(dto: RefreshTokenDto): Promise<{ success: boolean }> {
@@ -265,27 +256,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
     return csrfToken;
-  }
-
-  /** Re-issue CSRF for a valid HttpOnly refresh cookie (localStorage out of sync). */
-  async resyncBrowserSession(refreshToken: string): Promise<{ csrfToken: string; user: PublicUser }> {
-    const tokenHash = this.crypto.hashToken(refreshToken);
-    const session = await this.sessionModel.findOne({ tokenHash, revoked: false }).exec();
-    if (!session || session.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    const user = await this.users.findById(session.userId);
-    if (!user) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    if (
-      user.status === UserStatus.Banned ||
-      user.status === UserStatus.Suspended
-    ) {
-      throw new UnauthorizedException('Account is not active');
-    }
-    const csrfToken = await this.protectBrowserSession(refreshToken);
-    return { csrfToken, user: this.toPublic(user) };
   }
 
   async assertBrowserCsrf(
@@ -571,17 +541,11 @@ export class AuthService {
     opts?: { accessTtlOverride?: number; refreshTtlOverride?: number },
   ): Promise<AuthTokens> {
     const accessSecret = this.config.getOrThrow<string>('jwt.accessSecret');
-    const configuredAccess =
-      this.config.get<number>('jwt.accessTtl') ?? LONG_SESSION_TTL_SECONDS;
+    const accessTtl = opts?.accessTtlOverride ?? (this.config.get<number>('jwt.accessTtl') ?? 900);
     const defaultRefreshTtl = user.isGuest
       ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86400)
       : (this.config.get<number>('jwt.refreshTtl') ??
         LONG_SESSION_TTL_SECONDS);
-    const accessTtl =
-      opts?.accessTtlOverride ??
-      (user.isGuest
-        ? Math.min(configuredAccess, defaultRefreshTtl)
-        : configuredAccess);
     const refreshTtl = opts?.refreshTtlOverride ?? defaultRefreshTtl;
 
     const payload: JwtPayload = {
