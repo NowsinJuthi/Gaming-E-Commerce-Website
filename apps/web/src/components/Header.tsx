@@ -494,7 +494,7 @@ export function Header({
         >
           {/* ── Left column ────────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
-            {/* Mobile nav + search — left side (admin: menu before refresh) */}
+            {/* Mobile nav (+ storefront search) — admin: menu, refresh; no search */}
             <button
               type="button"
               onClick={() => {
@@ -526,14 +526,16 @@ export function Header({
                 />
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setSearchOpen((o) => !o)}
-              className={`${iconBtn} lg:hidden`}
-              aria-label="Search"
-            >
-              <SearchIcon />
-            </button>
+            {!isAdminRoute ? (
+              <button
+                type="button"
+                onClick={() => setSearchOpen((o) => !o)}
+                className={`${iconBtn} lg:hidden`}
+                aria-label="Search"
+              >
+                <SearchIcon />
+              </button>
+            ) : null}
 
             {/* Logo — desktop only */}
             <div className="hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
@@ -733,8 +735,8 @@ export function Header({
           </div>
         </div>
 
-        {/* Search bar */}
-        {searchOpen && (
+        {/* Search bar — storefront only (admin mobile has no search in header) */}
+        {searchOpen && !isAdminRoute && (
           <form
             onSubmit={onSearch}
             className={`relative border-t border-border py-3 ${HOME_CONTAINER_CLS}`}
