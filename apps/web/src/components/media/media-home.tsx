@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
@@ -326,11 +326,58 @@ function RecentlyWatchedSlider({
   onSelect: (item: MediaCard) => void;
 }) {
   void progressRevision;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [canScrollBack, setCanScrollBack] = useState(false);
+  const [canScrollForward, setCanScrollForward] = useState(false);
+
+  const syncScrollButtons = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) {
+      setCanScrollBack(false);
+      setCanScrollForward(false);
+      return;
+    }
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    setCanScrollBack(track.scrollLeft > 4);
+    setCanScrollForward(maxScroll - track.scrollLeft > 4);
+  }, []);
+
+  useEffect(() => {
+    syncScrollButtons();
+    const track = trackRef.current;
+    if (!track) return;
+    track.addEventListener("scroll", syncScrollButtons, { passive: true });
+    window.addEventListener("resize", syncScrollButtons);
+    return () => {
+      track.removeEventListener("scroll", syncScrollButtons);
+      window.removeEventListener("resize", syncScrollButtons);
+    };
+  }, [items.length, syncScrollButtons]);
+
+  const scrollRecent = (direction: -1 | 1) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const step = Math.max(track.clientWidth * 0.82, 160);
+    track.scrollBy({ left: direction * step, behavior: "smooth" });
+  };
 
   return (
     <section className={styles.recentSection} aria-label="Recently Watched">
       <h2 className={styles.recentHeading}>Recently Watched</h2>
-      <div className={styles.recentTrack}>
+      <div className={styles.recentCarousel}>
+        {canScrollBack ? (
+          <button
+            type="button"
+            className={`${styles.recentNavBtn} ${styles.recentNavPrev}`}
+            aria-label="Scroll recently watched left"
+            onClick={() => scrollRecent(-1)}
+          >
+            <span className={styles.recentNavIcon} aria-hidden>
+              ‹
+            </span>
+          </button>
+        ) : null}
+        <div className={styles.recentTrack} ref={trackRef}>
         {items.map((item) => {
           const progress = watchProgressPercent(item.id, item.runtimeMinutes);
           return (
@@ -368,6 +415,19 @@ function RecentlyWatchedSlider({
             </article>
           );
         })}
+        </div>
+        {canScrollForward ? (
+          <button
+            type="button"
+            className={`${styles.recentNavBtn} ${styles.recentNavNext}`}
+            aria-label="Scroll recently watched right"
+            onClick={() => scrollRecent(1)}
+          >
+            <span className={styles.recentNavIcon} aria-hidden>
+              ›
+            </span>
+          </button>
+        ) : null}
       </div>
     </section>
   );

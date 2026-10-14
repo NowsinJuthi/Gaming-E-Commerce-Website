@@ -41,16 +41,86 @@
   }
 }
 
+.recentCarousel {
+  position: relative;
+  min-width: 0;
+}
+
 .recentTrack {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: calc((100% - 0.75rem) / 2);
   gap: 0.75rem;
   overflow-x: auto;
-  padding-bottom: 0.15rem;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.recentTrack::-webkit-scrollbar {
+  display: none;
+}
+
+.recentNavBtn {
+  position: absolute;
+  top: 34%;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  height: 2.35rem;
+  width: 2.35rem;
+  border-radius: 999px;
+  border: 1.5px solid rgb(255 255 255 / 0.38);
+  background: rgb(1 19 26 / 0.62);
+  color: rgb(248 250 252);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.recentNavBtn:hover {
+  border-color: rgb(38 191 176 / 0.75);
+  background: rgb(1 19 26 / 0.82);
+}
+
+.recentNavBtn:focus-visible {
+  outline: none;
+  border-color: rgb(38 191 176 / 0.85);
+  box-shadow: 0 0 0 2px rgb(38 191 176 / 0.28);
+}
+
+.recentNavPrev {
+  left: -0.15rem;
+}
+
+.recentNavNext {
+  right: -0.15rem;
+}
+
+.recentNavIcon {
+  font-size: 1.65rem;
+  line-height: 1;
+  font-weight: 300;
+  translate: 0 -0.06rem;
+}
+
+@media (min-width: 768px) {
+  .recentNavBtn {
+    height: 2.55rem;
+    width: 2.55rem;
+  }
+
+  .recentNavPrev {
+    left: -0.35rem;
+  }
+
+  .recentNavNext {
+    right: -0.35rem;
+  }
 }
 
 .recentCard {
