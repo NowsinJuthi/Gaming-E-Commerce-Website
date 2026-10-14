@@ -594,50 +594,26 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.message = '';
   }
 
+  /** Direct stream: never re-encode video. Audio becomes AAC only when it is not already AAC/MP3. */
   private codecArgs(
     session: Session,
     audioCodec: string,
   ): { args: string[]; copyVideo: boolean } {
-    const height = session.quality === '1080' ? 1080 : session.quality === '480' ? 480 : session.quality === '720' ? 720 : 0;
-    const copyVideo = session.videoCodec === 'h264' && height === 0;
-    const copyAudio = audioCodec === 'aac' || audioCodec === 'mp3';
-    if (copyVideo && copyAudio) {
-      return {
-        copyVideo: true,
-        args:
-          audioCodec === 'aac'
-            ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
-            : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy'],
-      };
-    }
-    if (copyVideo) {
-      return {
-        copyVideo: true,
-        args: ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000'],
-      };
-    }
-    const target = height || 720;
-    return {
-      copyVideo: false,
-      args: [
-        '-vf', `scale=-2:'min(ih,${target})'`,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '26',
-        '-pix_fmt', 'yuv420p',
-        '-profile:v', 'main',
-        '-g', '96',
-        '-keyint_min', '96',
-        '-sc_threshold', '0',
-        '-bf', '0',
-        '-refs', '1',
-        '-x264-params', 'rc-lookahead=0:sync-lookahead=0',
-        '-c:a', 'aac',
-        '-ac', '2',
-        '-b:a', '192k',
-        '-ar', '48000',
-      ],
-    };
+    const codec = session.videoCodec.toLowerCase();
+    const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
+    const h264 = codec === 'h264' || codec === 'avc' || codec === 'avc1';
+    const video = hevc
+      ? ['-c:v', 'copy', '-tag:v', 'hvc1']
+      : h264
+        ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
+        : ['-c:v', 'copy'];
+    const audio =
+      audioCodec === 'aac'
+        ? ['-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
+        : audioCodec === 'mp3'
+          ? ['-c:a', 'copy']
+          : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1:first_pts=0'];
+    return { copyVideo: true, args: [...video, ...audio] };
   }
 
   private async extractCaptions(session: Session, file: string, token: number) {
