@@ -106,6 +106,38 @@ class PasswordBody {
   password!: string;
 }
 
+class SmbPatchBody {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  host?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  port?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  domain?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  share?: string;
+}
+
 class AddShareLibraryBody {
   @IsString()
   serverId!: string;
@@ -184,6 +216,11 @@ export class MediaOpsController {
   @Post('admin/media-shares/:id/credentials')
   savePassword(@Param('id') id: string, @Body() body: PasswordBody) {
     return this.media.savePassword(id, body.password);
+  }
+
+  @Patch('admin/media-shares/:id')
+  patchServer(@Param('id') id: string, @Body() body: SmbPatchBody) {
+    return this.media.updateServer(id, body);
   }
 
   @Delete('admin/media-shares/:id')

@@ -12,6 +12,7 @@ import {
   listSmbServers,
   saveSmbPassword,
   testSmbServer,
+  updateSmbServer,
   uploadSmbMedia,
   type AdminSmbServer,
   type MediaLibraryKind,
@@ -59,6 +60,7 @@ export default function AdminFileManagerPage() {
   const [password, setPassword] = useState("");
   const [domain, setDomain] = useState("");
   const [updatePassword, setUpdatePassword] = useState("");
+  const [shareEdit, setShareEdit] = useState("");
   const [libraryName, setLibraryName] = useState("");
   const [libraryKind, setLibraryKind] = useState<MediaLibraryKind>("movies");
   const [pendingDir, setPendingDir] = useState<SmbBrowseEntry | null>(null);
@@ -86,6 +88,10 @@ export default function AdminFileManagerPage() {
   }, []);
 
   useEffect(() => () => clearSavingTimer(), [clearSavingTimer]);
+
+  useEffect(() => {
+    setShareEdit(selected?.share ?? "");
+  }, [selected?.share]);
 
   const setDisplayProgress = useCallback((next: number) => {
     uploadPctRef.current = next;
@@ -395,6 +401,48 @@ export default function AdminFileManagerPage() {
                     </button>
                   </div>
                 </header>
+
+                <div className={styles.credPanel}>
+                  <p className="mb-2 text-xs text-zinc-400">
+                    Share name from{" "}
+                    <code className="text-[0.68rem]">smbclient -L //host -U user</code> (e.g.{" "}
+                    <strong>Data-Storage</strong>), not a Windows label like 12TB-Storage.
+                  </p>
+                  <form
+                    className="flex flex-wrap items-end gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!selected || !shareEdit.trim()) return;
+                      setBusy(true);
+                      setUploadError(null);
+                      setError(null);
+                      void updateSmbServer(selected.id, { share: shareEdit.trim() })
+                        .then(async () => {
+                          await reload();
+                          const data = await loadBrowse(selected.id, browsePath);
+                          setEntries(data.entries);
+                        })
+                        .catch((err: unknown) =>
+                          setError(err instanceof Error ? err.message : "Could not update share name."),
+                        )
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    <label className="min-w-[12rem] flex-1 text-xs">
+                      Samba share name
+                      <input
+                        className={styles.inputLike}
+                        value={shareEdit}
+                        onChange={(event) => setShareEdit(event.target.value)}
+                        placeholder="Data-Storage"
+                        required
+                      />
+                    </label>
+                    <button type="submit" className={styles.toolBtn} disabled={busy || !shareEdit.trim()}>
+                      {busy ? "Saving…" : "Save share name"}
+                    </button>
+                  </form>
+                </div>
 
                 {showCredentials ? (
                   <div className={styles.credPanel}>

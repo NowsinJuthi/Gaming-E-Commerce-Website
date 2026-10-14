@@ -252,6 +252,35 @@ export class MediaOpsService {
     return serializeServer(server);
   }
 
+  async updateServer(
+    id: string,
+    patch: {
+      name?: string;
+      host?: string;
+      port?: number;
+      share?: string;
+      domain?: string;
+    },
+  ) {
+    const server = await this.requireServer(id);
+    if (patch.name !== undefined) server.name = patch.name.trim();
+    if (patch.host !== undefined) server.host = patch.host.trim();
+    if (patch.port !== undefined) server.port = patch.port;
+    if (patch.domain !== undefined) server.domain = patch.domain.trim() || 'WORKGROUP';
+    if (patch.share !== undefined) server.share = patch.share.trim();
+    server.lastError = null;
+    try {
+      await server.save();
+      await this.touchConnection(server);
+      return serializeServer(server);
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) {
+        throw new ConflictException('Another saved server already uses this host, share, and username.');
+      }
+      throw error;
+    }
+  }
+
   async removeServer(id: string) {
     const inUse = await this.libraries.countDocuments({ smbServerId: id }).exec();
     if (inUse > 0) {

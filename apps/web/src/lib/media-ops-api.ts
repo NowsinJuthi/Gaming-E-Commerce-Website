@@ -145,6 +145,16 @@ export function saveSmbPassword(id: string, password: string) {
   });
 }
 
+export function updateSmbServer(
+  id: string,
+  body: Partial<{ name: string; host: string; port: number; share: string; domain: string }>,
+) {
+  return authRequest<AdminSmbServer>(`/admin/media-shares/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 export function deleteSmbServer(id: string) {
   return authRequest<{ deleted: boolean }>(`/admin/media-shares/${id}`, {
     method: "DELETE",
