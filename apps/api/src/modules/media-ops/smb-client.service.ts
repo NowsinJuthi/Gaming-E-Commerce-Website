@@ -83,6 +83,29 @@ export class SmbClientService {
     }
   }
 
+  /**
+   * Map a saved connection share to the real Samba share name (e.g. Data-Storage, not 12TB-Storage).
+   */
+  async resolveEffectiveShare(auth: SmbAuth): Promise<string> {
+    const stored = auth.share.trim();
+    if (!stored || process.platform !== 'linux') return stored;
+
+    const shares = await this.listDiskShares(auth).catch(() => [] as string[]);
+    if (shares.length === 0) return stored;
+    if (shares.includes(stored)) return stored;
+
+    const caseMatch = shares.find((name) => name.toLowerCase() === stored.toLowerCase());
+    if (caseMatch) return caseMatch;
+    if (shares.length === 1) return shares[0];
+
+    if (/tb-storage/i.test(stored)) {
+      const dataStorage = shares.find((name) => name.toLowerCase() === 'data-storage');
+      if (dataStorage) return dataStorage;
+    }
+
+    return stored;
+  }
+
   /** Copy one share file onto the website server. The local path must already have a parent directory. */
   async downloadFile(auth: SmbAuth, remoteFile: string, localFile: string): Promise<void> {
     const remote = this.normalizeRemotePath(remoteFile);
@@ -212,7 +235,7 @@ export class SmbClientService {
   }
 
   /** Copy a local temp file onto the share at remoteRelativePath (e.g. Movies/Film.mkv). */
-  async uploadLocalFile(auth: SmbAuth, remoteRelativePath: string, localFilePath: string): Promise<void> {
+  async uploadLocalFile(auth: SmbAuth, remoteRelativePath: string, localFilePath: string): Promise<string> {
     const normalized = this.normalizeRemotePath(remoteRelativePath);
     if (!normalized) throw new Error('Remote path is required.');
     if (localFilePath.includes('"')) throw new Error('Local path is not allowed.');
@@ -222,10 +245,10 @@ export class SmbClientService {
     const dir = parts.join('/');
     if (dir) await this.ensureRemoteDir(auth, dir);
     if (process.platform === 'linux') {
-      await this.putFileLinux(auth, dir, localFilePath, fileName);
-      return;
+      return this.putFileLinux(auth, dir, localFilePath, fileName);
     }
     await this.putFileSmb2(auth, dir, localFilePath, fileName);
+    return auth.share.trim();
   }
 
   private async ensureRemoteDir(auth: SmbAuth, remoteDir: string): Promise<void> {
@@ -267,13 +290,13 @@ export class SmbClientService {
     remoteDir: string,
     localFilePath: string,
     remoteName: string,
-  ): Promise<void> {
+  ): Promise<string> {
     const attempts = this.authAttempts(auth);
     let lastError: unknown;
     for (const attempt of attempts) {
       try {
         await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB3');
-        return;
+        return attempt.share.trim();
       } catch (error) {
         lastError = error;
         const raw = this.execText(error);
@@ -281,7 +304,7 @@ export class SmbClientService {
         if (/protocol|CONNECTION_DISCONNECTED|INVALID_NETWORK_RESPONSE/i.test(raw)) {
           try {
             await this.spawnPut(attempt, remoteDir, localFilePath, remoteName, 'SMB2');
-            return;
+            return attempt.share.trim();
           } catch (smb2Error) {
             lastError = smb2Error;
           }
@@ -289,7 +312,30 @@ export class SmbClientService {
         if (!/LOGON_FAILURE|BAD_NETWORK_NAME|ACCESS_DENIED/i.test(raw)) break;
       }
     }
-    throw new Error(this.formatLinuxSmbError(lastError));
+
+    const baseAuth = attempts[0] ?? auth;
+    const shares = await this.listDiskShares(baseAuth).catch(() => [] as string[]);
+    const wanted = auth.share.trim();
+    const fallbackShares = [
+      ...(shares.length === 1 && shares[0]!.toLowerCase() !== wanted.toLowerCase() ? [shares[0]!] : []),
+      ...shares.filter((share) => share.toLowerCase() !== wanted.toLowerCase()),
+    ];
+    const seen = new Set<string>();
+    for (const share of fallbackShares) {
+      const key = share.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try {
+        await this.spawnPut({ ...baseAuth, share }, remoteDir, localFilePath, remoteName, 'SMB3');
+        return share;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const message = this.formatLinuxSmbError(lastError);
+    const shareHint = shares.length > 0 ? ` Shares on this server: ${shares.join(', ')}.` : '';
+    throw new Error(`${message}${shareHint}`);
   }
 
   private spawnPut(

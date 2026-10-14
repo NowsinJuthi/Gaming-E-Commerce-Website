@@ -303,7 +303,8 @@ export class MediaOpsService {
     const server = await this.requireServer(id);
     const password = this.openPassword(server);
     try {
-      const entries = await this.smb.list(this.auth(server, password), remotePath);
+      const auth = await this.syncResolvedShare(server, password);
+      const entries = await this.smb.list(auth, remotePath);
       server.lastOkAt = new Date();
       server.lastError = null;
       await server.save();
@@ -327,7 +328,7 @@ export class MediaOpsService {
     }
     const server = await this.requireServer(serverId);
     const password = this.openPassword(server);
-    const auth = this.auth(server, password);
+    let auth = await this.syncResolvedShare(server, password);
     const base = browsePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     let uploaded = 0;
     try {
@@ -337,7 +338,15 @@ export class MediaOpsService {
           throw new BadRequestException(`Unsupported video file: ${file.originalname || file.filename}`);
         }
         const remote = base ? `${base}/${rel}` : rel;
-        await this.smb.uploadLocalFile(auth, remote, file.path);
+        const shareUsed = await this.smb.uploadLocalFile(auth, remote, file.path);
+        if (shareUsed !== auth.share) {
+          server.share = shareUsed;
+          auth = { ...auth, share: shareUsed };
+          await server.save();
+          await this.libraries
+            .updateMany({ smbServerId: server._id }, { $set: { smbShare: shareUsed } })
+            .exec();
+        }
         uploaded += 1;
       }
       server.lastOkAt = new Date();
@@ -476,9 +485,23 @@ export class MediaOpsService {
     };
   }
 
+  private async syncResolvedShare(server: SmbServerDocument, password: string) {
+    const auth = this.auth(server, password);
+    const resolved = await this.smb.resolveEffectiveShare(auth);
+    if (resolved === server.share) return auth;
+    server.share = resolved;
+    await server.save();
+    await this.libraries
+      .updateMany({ smbServerId: server._id }, { $set: { smbShare: resolved } })
+      .exec();
+    return { ...auth, share: resolved };
+  }
+
   private async touchConnection(server: SmbServerDocument) {
     try {
-      await this.smb.test(this.auth(server, this.openPassword(server)));
+      const password = this.openPassword(server);
+      const auth = await this.syncResolvedShare(server, password);
+      await this.smb.test(auth);
       server.lastOkAt = new Date();
       server.lastError = null;
     } catch (error) {
