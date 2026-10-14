@@ -217,17 +217,26 @@ export class AuthService {
     const likelyTabRace =
       rotatedAt > 0 &&
       Date.now() - rotatedAt <= AuthService.REFRESH_REUSE_RACE_WINDOW_MS;
-    if (!likelyTabRace) {
-      await this.sessionModel
-        .updateMany(
-          { userId: session.userId, revoked: false },
-          { $set: { revoked: true } },
-        )
-        .exec();
-      this.logger.warn(
-        'Refresh-token reuse detected; active sessions were revoked',
-      );
-    }
+    if (likelyTabRace) return;
+
+    const recentReplacement = await this.sessionModel
+      .countDocuments({
+        userId: session.userId,
+        revoked: false,
+        createdAt: { $gte: new Date(Date.now() - 120_000) },
+      })
+      .exec();
+    if (recentReplacement > 0) return;
+
+    await this.sessionModel
+      .updateMany(
+        { userId: session.userId, revoked: false },
+        { $set: { revoked: true } },
+      )
+      .exec();
+    this.logger.warn(
+      'Refresh-token reuse detected; active sessions were revoked',
+    );
   }
 
   async logout(dto: RefreshTokenDto): Promise<{ success: boolean }> {

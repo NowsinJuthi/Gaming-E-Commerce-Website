@@ -643,26 +643,36 @@ function applyRefreshResponse(data: {
   scheduleProactiveRefresh();
 }
 
+async function recoverSessionAfterRefreshReject(
+  csrfToken: string,
+): Promise<boolean> {
+  if (refreshCsrfFailStreak >= MAX_CSRF_RECOVERY_ATTEMPTS) return false;
+  if (!(await resyncCsrfFromCookie())) return false;
+  refreshCsrfFailStreak += 1;
+  const nextCsrf = getStored("refreshToken");
+  if (!nextCsrf) return false;
+  if (nextCsrf === csrfToken) return performRefreshOnce(nextCsrf);
+  refreshCsrfFailStreak = 0;
+  return performRefreshOnce(nextCsrf);
+}
+
 async function handleRefreshAuthFailure(
   csrfToken: string,
   primaryStatus: number,
   retryStatus: number,
 ): Promise<boolean> {
-  if (primaryStatus !== 403 && retryStatus !== 403) {
-    clearTokens();
-    return false;
-  }
-  if (refreshCsrfFailStreak < MAX_CSRF_RECOVERY_ATTEMPTS && (await resyncCsrfFromCookie())) {
-    refreshCsrfFailStreak += 1;
-    const nextCsrf = getStored("refreshToken");
-    if (nextCsrf) return performRefreshOnce(nextCsrf);
+  const authReject = [primaryStatus, retryStatus].some(
+    (status) => status === 401 || status === 403,
+  );
+  if (authReject && (await recoverSessionAfterRefreshReject(csrfToken))) {
+    return true;
   }
   refreshCsrfFailStreak += 1;
   if (refreshCsrfFailStreak >= MAX_CSRF_RECOVERY_ATTEMPTS) {
     clearTokens();
     return false;
   }
-  scheduleProactiveRefreshRetry(20_000);
+  scheduleProactiveRefreshRetry(15_000);
   return false;
 }
 
@@ -727,6 +737,7 @@ async function performRefreshOnce(csrfToken: string): Promise<boolean> {
     );
     return true;
   } catch {
+    scheduleProactiveRefreshRetry(12_000);
     return false;
   }
 }
@@ -959,7 +970,8 @@ async function fetchWithAuthRetry(
 // Kick off proactive refresh on page load if a valid token is already stored.
 if (typeof window !== "undefined") {
   void (async () => {
-    if (!getStored("refreshToken") && !hasAuthSession()) {
+    // HttpOnly refresh cookie may survive a deploy reload even when CSRF was cleared.
+    if (!hasAuthSession()) {
       await resyncCsrfFromCookie();
     }
     if (getStored("refreshToken") || hasAuthSession()) {
