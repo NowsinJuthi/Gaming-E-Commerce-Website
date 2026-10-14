@@ -17,7 +17,15 @@ export type CatalogBulkAction =
   | 'feature'
   | 'trending';
 
-function catalogSortTimestamp(updatedAt?: Date | string, createdAt?: Date | string): number {
+function catalogSortTimestamp(
+  listedAt?: Date | string | null,
+  updatedAt?: Date | string,
+  createdAt?: Date | string,
+): number {
+  if (listedAt) {
+    const listed = new Date(listedAt).getTime();
+    if (Number.isFinite(listed)) return listed;
+  }
   const updated = updatedAt ? new Date(updatedAt).getTime() : 0;
   const created = createdAt ? new Date(createdAt).getTime() : 0;
   return Math.max(updated, created) || 0;
@@ -190,8 +198,10 @@ export class CatalogService {
     const libraries = await this.libraries.find({ enabled: true }).sort({ name: 1 }).select('name').exec();
     const catalog = await this.titles
       .find({ published: true, availability: 'available' })
-      .sort({ createdAt: -1, updatedAt: -1 })
-      .select('title year kind posterUrl featured trending seasonCount sourceKey createdAt updatedAt')
+      .sort({ listedAt: -1, createdAt: -1, updatedAt: -1 })
+      .select(
+        'title year kind posterUrl featured trending seasonCount sourceKey listedAt createdAt updatedAt',
+      )
       .lean()
       .exec();
     return {
@@ -211,7 +221,7 @@ export class CatalogService {
         trending: doc.trending,
         seasonCount: doc.seasonCount ?? null,
         libraryId: libraryIdFromSource(doc.sourceKey),
-        sortAt: catalogSortTimestamp(doc.updatedAt, doc.createdAt),
+        sortAt: catalogSortTimestamp(doc.listedAt, doc.updatedAt, doc.createdAt),
       })),
     };
   }

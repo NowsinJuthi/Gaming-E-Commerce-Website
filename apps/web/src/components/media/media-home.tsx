@@ -10,7 +10,7 @@ import {
   syncRecentFromLegacyWatchKeys,
   watchProgressPercent,
 } from "@/lib/media-recent-watched";
-import type { MediaCard, MediaHome } from "@/lib/media-home-api";
+import { parseMediaHome, type MediaCard, type MediaHome } from "@/lib/media-home-api";
 
 type MediaDetails = {
   title: string;
@@ -28,6 +28,7 @@ type MediaDetails = {
 };
 
 const ALL_LIBRARIES = "all";
+const RECENTLY_ADDED_LIMIT = 24;
 
 function sortByNewestFirst(items: MediaCard[]): MediaCard[] {
   return [...items].sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
@@ -45,7 +46,22 @@ function matchesSearch(title: string, query: string): boolean {
   return words.every((word) => hay.includes(word));
 }
 
-export function MediaHome({ home }: { home: MediaHome }) {
+export function MediaHome({ home: initialHome }: { home: MediaHome }) {
+  const [home, setHome] = useState(initialHome);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/media/home`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setHome(parseMediaHome(data));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const source = useMemo(() => {
     const raw = home.items.length > 0 ? home.items : home.rows.flatMap((row) => row.items);
     const seen = new Set<string>();
@@ -88,6 +104,8 @@ export function MediaHome({ home }: { home: MediaHome }) {
 
   const movies = useMemo(() => visible.filter((item) => item.kind === "movie"), [visible]);
   const series = useMemo(() => visible.filter((item) => item.kind === "series"), [visible]);
+
+  const recentlyAdded = useMemo(() => libraryItems.slice(0, RECENTLY_ADDED_LIMIT), [libraryItems]);
 
   const libraryHeading = useMemo(() => {
     if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
@@ -287,6 +305,10 @@ export function MediaHome({ home }: { home: MediaHome }) {
         <RecentlyWatchedSlider items={recentCards} progressRevision={recentRevision} onSelect={setInfo} />
       ) : null}
 
+      {!searchActive && recentlyAdded.length > 0 ? (
+        <RecentlyAddedSlider items={recentlyAdded} onSelect={setInfo} />
+      ) : null}
+
       {!searchActive && visible.length === 0 ? (
         <p className={styles.empty}>
           {home.libraries.length === 0
@@ -324,6 +346,112 @@ export function MediaHome({ home }: { home: MediaHome }) {
         />
       ) : null}
     </div>
+  );
+}
+
+function RecentlyAddedSlider({
+  items,
+  onSelect,
+}: {
+  items: MediaCard[];
+  onSelect: (item: MediaCard) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [canScrollBack, setCanScrollBack] = useState(false);
+  const [canScrollForward, setCanScrollForward] = useState(false);
+
+  const syncScrollButtons = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) {
+      setCanScrollBack(false);
+      setCanScrollForward(false);
+      return;
+    }
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    setCanScrollBack(track.scrollLeft > 4);
+    setCanScrollForward(maxScroll - track.scrollLeft > 4);
+  }, []);
+
+  useEffect(() => {
+    syncScrollButtons();
+    const track = trackRef.current;
+    if (!track) return;
+    track.addEventListener("scroll", syncScrollButtons, { passive: true });
+    window.addEventListener("resize", syncScrollButtons);
+    return () => {
+      track.removeEventListener("scroll", syncScrollButtons);
+      window.removeEventListener("resize", syncScrollButtons);
+    };
+  }, [items.length, syncScrollButtons]);
+
+  const scroll = (direction: -1 | 1) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const step = Math.max(track.clientWidth * 0.82, 160);
+    track.scrollBy({ left: direction * step, behavior: "smooth" });
+  };
+
+  return (
+    <section className={styles.recentSection} aria-label="Recently added">
+      <h2 className={styles.recentHeading}>Recently added</h2>
+      <div className={styles.recentCarousel}>
+        {canScrollBack ? (
+          <button
+            type="button"
+            className={`${styles.recentNavBtn} ${styles.recentNavPrev}`}
+            aria-label="Scroll recently added left"
+            onClick={() => scroll(-1)}
+          >
+            <span className={styles.recentNavIcon} aria-hidden>
+              ‹
+            </span>
+          </button>
+        ) : null}
+        <div className={styles.recentTrack} ref={trackRef}>
+          {items.map((item) => (
+            <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
+              <Link
+                className={styles.posterLink}
+                href={`/media/watch/${item.id}` as Route}
+                aria-label={`Play ${item.title}`}
+              >
+                <span className={styles.posterFrame}>
+                  {item.posterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
+                  )}
+                  <span className={styles.playOverlay} aria-hidden>
+                    <span className={styles.playButton} />
+                  </span>
+                </span>
+              </Link>
+              <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
+                {item.title}
+              </button>
+              <button type="button" className={styles.cardMeta} onClick={() => onSelect(item)}>
+                {[item.kind === "series" ? "Series" : "Movie", item.year ? String(item.year) : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </button>
+            </article>
+          ))}
+        </div>
+        {canScrollForward ? (
+          <button
+            type="button"
+            className={`${styles.recentNavBtn} ${styles.recentNavNext}`}
+            aria-label="Scroll recently added right"
+            onClick={() => scroll(1)}
+          >
+            <span className={styles.recentNavIcon} aria-hidden>
+              ›
+            </span>
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

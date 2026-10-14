@@ -108,7 +108,7 @@ export class LibraryIndexService {
           isDirectory: false,
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
-        if (await this.upsertFromFile(library, kind, entry, () => true)) matched += 1;
+        if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
         indexed += 1;
       }
     } else {
@@ -128,7 +128,7 @@ export class LibraryIndexService {
           isDirectory: false,
           sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : null,
         };
-        if (await this.upsertFromFile(library, kind, entry, () => true)) matched += 1;
+        if (await this.upsertFromFile(library, kind, entry, () => true, true)) matched += 1;
         indexed += 1;
       }
       for (const folderPath of folderPaths) {
@@ -139,7 +139,7 @@ export class LibraryIndexService {
           isDirectory: true,
           sizeBytes: null,
         };
-        if (await this.upsertFromFolder(library, kind, entry, () => true)) matched += 1;
+        if (await this.upsertFromFolder(library, kind, entry, () => true, true)) matched += 1;
         indexed += 1;
       }
     }
@@ -387,20 +387,26 @@ export class LibraryIndexService {
     kind: CatalogKind,
     file: SmbListedEntry,
     allowLookup: () => boolean,
+    bumpListedAt = false,
   ): Promise<boolean> {
     const parsed = this.parseTitle(file.name);
     const meta = (await this.needsPoster(library, file.path)) && allowLookup()
       ? await this.lookup(kind, parsed.title, parsed.year)
       : null;
-    await this.upsert(library, file.path, {
-      kind,
-      title: meta?.title || parsed.title,
-      year: meta?.year || parsed.year || new Date().getFullYear(),
-      videoFileName: file.name,
-      videoFileSizeBytes: file.sizeBytes,
-      posterUrl: meta?.posterUrl ?? null,
-      seasonCount: null,
-    });
+    await this.upsert(
+      library,
+      file.path,
+      {
+        kind,
+        title: meta?.title || parsed.title,
+        year: meta?.year || parsed.year || new Date().getFullYear(),
+        videoFileName: file.name,
+        videoFileSizeBytes: file.sizeBytes,
+        posterUrl: meta?.posterUrl ?? null,
+        seasonCount: null,
+      },
+      bumpListedAt,
+    );
     return Boolean(meta?.posterUrl);
   }
 
@@ -409,20 +415,26 @@ export class LibraryIndexService {
     kind: CatalogKind,
     folder: SmbListedEntry,
     allowLookup: () => boolean,
+    bumpListedAt = false,
   ): Promise<boolean> {
     const parsed = this.parseTitle(folder.name);
     const meta = (await this.needsPoster(library, folder.path)) && allowLookup()
       ? await this.lookup(kind, parsed.title, parsed.year)
       : null;
-    await this.upsert(library, folder.path, {
-      kind,
-      title: meta?.title || parsed.title,
-      year: meta?.year || parsed.year || new Date().getFullYear(),
-      videoFileName: folder.name,
-      videoFileSizeBytes: null,
-      posterUrl: meta?.posterUrl ?? null,
-      seasonCount: null,
-    });
+    await this.upsert(
+      library,
+      folder.path,
+      {
+        kind,
+        title: meta?.title || parsed.title,
+        year: meta?.year || parsed.year || new Date().getFullYear(),
+        videoFileName: folder.name,
+        videoFileSizeBytes: null,
+        posterUrl: meta?.posterUrl ?? null,
+        seasonCount: null,
+      },
+      bumpListedAt,
+    );
     return Boolean(meta?.posterUrl);
   }
 
@@ -456,12 +468,16 @@ export class LibraryIndexService {
       posterUrl: string | null;
       seasonCount: number | null;
     },
+    bumpListedAt = false,
   ) {
     const set: Record<string, unknown> = {
       kind: fields.kind,
       videoFileName: fields.videoFileName,
       videoFileSizeBytes: fields.videoFileSizeBytes,
     };
+    if (bumpListedAt) {
+      set.listedAt = new Date();
+    }
     const onInsert: Record<string, unknown> = {
       published: true,
       availability: 'available',

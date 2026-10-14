@@ -78,6 +78,10 @@ export class CatalogTitle {
   @Prop({ type: String })
   sourceKey?: string;
 
+  /** Bumped when a title is newly uploaded or re-listed (sorts /media catalog). */
+  @Prop({ type: Date, default: null, index: true })
+  listedAt?: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

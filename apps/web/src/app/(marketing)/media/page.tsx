@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Movies and series on UniQbd.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function MediaPage() {
   const home = await getMediaHome();
   return (
