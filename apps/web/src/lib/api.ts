@@ -978,16 +978,27 @@ export async function authRequest<T>(
   return authRequestRaw<T>(path, init);
 }
 
+function resolveAuthUploadUrl(path: string): string {
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  if (typeof window !== "undefined" && path.startsWith("/api/")) {
+    return `${window.location.origin}${path}`;
+  }
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${normalized}`;
+}
+
 /** Multipart upload with cookie session + 401 refresh (do not set Content-Type). */
 export async function authFormDataRequest<T>(path: string, form: FormData): Promise<T> {
+  const url = resolveAuthUploadUrl(path);
+  const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
   const csrf = getStored("refreshToken");
   const run = () =>
-    fetch(`${API_BASE}${path}`, {
+    fetch(url, {
       method: "POST",
       body: form,
       cache: "no-store",
       credentials: "include",
-      headers: csrf ? { "X-CSRF-Token": csrf } : undefined,
+      headers: !sameOrigin && csrf ? { "X-CSRF-Token": csrf } : undefined,
     });
   let res: Response;
   try {
@@ -995,7 +1006,9 @@ export async function authFormDataRequest<T>(path: string, form: FormData): Prom
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
-      "Upload could not reach the server. Check your connection, file size (Cloudflare may block uploads over ~100MB on the API domain), and try again.",
+      sameOrigin
+        ? "Upload failed before the server responded. If the file is very large, wait and try again, or use Samba on the storage server directly."
+        : "Upload could not reach the API. Log out and log in again, or ask ops to set AUTH_COOKIE_DOMAIN=.uniqbd.com on the API.",
       0,
     );
   }

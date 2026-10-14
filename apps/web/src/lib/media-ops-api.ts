@@ -200,5 +200,8 @@ export async function uploadSmbMedia(
     const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
     form.append("files", file, rel);
   }
-  return authFormDataRequest<SmbUploadResult>(`/admin/media-shares/${serverId}/upload`, form);
+  return authFormDataRequest<SmbUploadResult>(
+    `/api/admin/media-shares/${serverId}/upload`,
+    form,
+  );
 }

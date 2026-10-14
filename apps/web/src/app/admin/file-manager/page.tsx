@@ -27,6 +27,7 @@ export default function AdminFileManagerPage() {
   const [browsePath, setBrowsePath] = useState("");
   const [entries, setEntries] = useState<SmbBrowseEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [browsing, setBrowsing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -96,7 +97,7 @@ export default function AdminFileManagerPage() {
   const uncPath = selected
     ? `\\\\${selected.host}\\${selected.share}${browsePath ? `\\${browsePath.replace(/\//g, "\\")}` : ""}`
     : "";
-  const showCredentials = Boolean(selected && (selected.lastError || error));
+  const showCredentials = Boolean(selected && (selected.lastError || (error && !uploadError)));
 
   function openLibrary(entry: { name: string; path: string }) {
     setPendingDir({ name: entry.name, path: entry.path, isDirectory: true });
@@ -114,7 +115,7 @@ export default function AdminFileManagerPage() {
   async function startUpload() {
     if (!selected || pickedFiles.length === 0) return;
     setBusy(true);
-    setError(null);
+    setUploadError(null);
     setUploadNote("Uploading to Samba… Large files can take several minutes.");
     try {
       const result = await uploadSmbMedia(selected.id, browsePath, uploadKind, pickedFiles);
@@ -128,7 +129,7 @@ export default function AdminFileManagerPage() {
       await reload();
     } catch (err) {
       setUploadNote(null);
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setBusy(false);
     }
@@ -416,6 +417,12 @@ export default function AdminFileManagerPage() {
                     Library from current folder
                   </button>
                 </div>
+
+                {uploadError ? (
+                  <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                    {uploadError}
+                  </p>
+                ) : null}
 
                 <section className={styles.uploadPanel} aria-label="Upload video">
                   <div className={styles.uploadHead}>
