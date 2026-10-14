@@ -3043,7 +3043,6 @@
     z-index: 1000;
     isolation: isolate;
     pointer-events: auto;
-    transform: translateZ(0);
     border-bottom-color: rgb(var(--border) / 0.65);
     background: linear-gradient(
       180deg,
@@ -36380,11 +36379,6 @@ a:has(> .site-logo-img),
 .chrome-shell {
   overflow-x: hidden;
   min-width: 0;
-}
-
-/* Let fixed header receive taps above scroll/composited media layers (WebKit). */
-.chrome-shell .site-footer {
-  pointer-events: auto;
 }
 
 @media (max-width: 767px) {

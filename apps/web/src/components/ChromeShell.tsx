@@ -75,7 +75,7 @@ export function ChromeShell({
           <a href="#main-content" className="skip-link">
             Skip to content
           </a>
-          <div className="chrome-shell pointer-events-none flex min-h-screen min-w-0 flex-col">
+          <div className="chrome-shell flex min-h-screen min-w-0 flex-col">
             <SitePresenceTracker />
             <ReferralTracker />
             <SiteMenusProvider initialMenus={initialSiteMenus}>
@@ -87,7 +87,7 @@ export function ChromeShell({
                 <Header />
                 <div
                   id="main-content"
-                  className={`pointer-events-auto min-w-0 mt-14 sm:mt-16${isCompactStorefrontMain ? "" : " flex-1"}`}
+                  className={`min-w-0 mt-14 sm:mt-16${isCompactStorefrontMain ? "" : " flex-1"}`}
                 >
                   {children}
                 </div>

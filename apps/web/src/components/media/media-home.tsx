@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
@@ -626,11 +627,7 @@ function RecentlyWatchedSlider({
           const progress = watchProgressPercent(item.id, item.runtimeMinutes);
           return (
             <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
-              <Link
-                className={styles.posterLink}
-                href={`/media/watch/${item.id}` as Route}
-                aria-label={`Play ${item.title}`}
-              >
+              <PosterPlayLink id={item.id} title={item.title}>
                 <span className={styles.posterFrame}>
                   {item.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -647,7 +644,7 @@ function RecentlyWatchedSlider({
                     </span>
                   ) : null}
                 </span>
-              </Link>
+              </PosterPlayLink>
               <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
                 {item.title}
               </button>
@@ -700,11 +697,7 @@ function SearchHintSection({
           {items.map((item) => (
             <li key={item.id}>
               <div className={styles.searchHintCard}>
-                <Link
-                  className={styles.searchHintPosterLink}
-                  href={`/media/watch/${item.id}` as Route}
-                  aria-label={`Play ${item.title}`}
-                >
+                <PosterPlayLink id={item.id} title={item.title} className={styles.searchHintPosterLink}>
                   <span className={styles.searchHintPoster}>
                     {item.posterUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -713,7 +706,7 @@ function SearchHintSection({
                       <span className={styles.searchHintFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
                     )}
                   </span>
-                </Link>
+                </PosterPlayLink>
                 <button type="button" className={styles.searchHintMetaBtn} onClick={() => onSelect(item)}>
                   <span className={styles.searchHintName}>{item.title}</span>
                   {item.year ? <span className={styles.searchHintYear}>{item.year}</span> : null}
@@ -727,16 +720,40 @@ function SearchHintSection({
   );
 }
 
+function PosterPlayLink({
+  id,
+  title,
+  children,
+  className,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const router = useRouter();
+  const href = `/media/watch/${id}` as Route;
+  return (
+    <Link
+      className={className ? `${styles.posterLink} ${className}` : styles.posterLink}
+      href={href}
+      aria-label={`Play ${title}`}
+      onClick={(event) => {
+        event.preventDefault();
+        router.push(href);
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: MediaCard) => void }) {
   return (
     <div className={styles.grid}>
       {items.map((item) => (
         <article key={item.id} className={styles.card}>
-          <Link
-            className={styles.posterLink}
-            href={`/media/watch/${item.id}` as Route}
-            aria-label={`Play ${item.title}`}
-          >
+          <PosterPlayLink id={item.id} title={item.title}>
             <span className={styles.posterFrame}>
               {item.posterUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -755,7 +772,7 @@ function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: M
                 <span className={styles.playButton} />
               </span>
             </span>
-          </Link>
+          </PosterPlayLink>
           <button type="button" className={styles.cardTitle} onClick={() => onSelect(item)}>
             {item.title}
           </button>
