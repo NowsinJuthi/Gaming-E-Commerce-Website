@@ -469,6 +469,25 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
+  const [holdFrame, setHoldFrame] = useState<string | null>(null);
+  const captureHoldRef = useRef<() => void>(() => undefined);
+  captureHoldRef.current = () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || video.videoWidth < 2) return;
+    try {
+      const canvas = document.createElement("canvas");
+      const width = Math.min(video.videoWidth, 960);
+      const height = Math.max(1, Math.round((width * video.videoHeight) / video.videoWidth));
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      context.drawImage(video, 0, 0, width, height);
+      setHoldFrame(canvas.toDataURL("image/jpeg", 0.72));
+    } catch {
+      /* frame not readable yet */
+    }
+  };
   const [starting, setStarting] = useState(false);
   const startTimer = useRef<number | null>(null);
   const [needsGesture, setNeedsGesture] = useState(false);
@@ -576,6 +595,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     hlsRef.current = null;
     const video = videoRef.current;
     if (video) {
+      captureHoldRef.current();
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -596,6 +616,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
 
     hlsRef.current?.destroy();
     hlsRef.current = null;
+    captureHoldRef.current();
     video.removeAttribute("src");
     video.load();
 
@@ -909,10 +930,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       startTimer.current = null;
       setStarting(false);
     };
-    const onWaiting = () => setBuffering(true);
+    const onWaiting = () => {
+      captureHoldRef.current();
+      setBuffering(true);
+    };
     const onPlaying = () => {
       seekingRef.current = false;
       setBuffering(false);
+      setHoldFrame(null);
     };
     const onEnded = () => {
       const currentSession = sessionRef.current;
@@ -1308,6 +1333,13 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         controlsList="nodownload"
         {...({ "webkit-playsinline": "true", "x-webkit-airplay": "allow" } as Record<string, string>)}
       />
+      {(preparing || buffering) && !error && (holdFrame || details?.posterUrl) ? (
+        <img
+          className={`${styles.hold} ${holdFrame ? styles.holdFrame : styles.holdPoster} ${aspect === "fill" ? styles.videoFill : ""} ${aspect === "stretch" ? styles.videoStretch : ""}`}
+          src={holdFrame || details?.posterUrl || ""}
+          alt=""
+        />
+      ) : null}
 
       {mobile && !locked ? (
         <div className={styles.tapZones}>
@@ -1350,7 +1382,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         </button>
       ) : (
         <div className={`${styles.chrome} ${chrome ? "" : styles.hiddenChrome} ${mobile ? styles.mobileChrome : ""}`}>
-          <div className={styles.shade} />
+          <div className={`${styles.shade} ${(preparing || buffering) && !error ? styles.shadeOff : ""}`} />
           <header className={`${styles.top} ${styles.deskOnly}`}>
             <div className={styles.titleBlock}>
               <Link href="/media" className={`${styles.icon} ${styles.backLink}`} aria-label="Back">
