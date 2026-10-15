@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { join, resolve, sep } from 'path';
 import {
@@ -170,6 +170,20 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (!session) throw new NotFoundException('That playback session expired. Play the video again.');
     session.touchedAt = Date.now();
     return this.present(session);
+  }
+
+  /** Phone browsers play HLS. Only a few segments stay on disk, then they are deleted. */
+  async mobilePlaylist(sessionId: string): Promise<string> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.sourceFile || session.status !== 'ready') throw new NotFoundException();
+    session.touchedAt = Date.now();
+    if (!session.dir) session.dir = join(resolveUploadsRoot(), 'hls-pack', session.id);
+    await mkdir(session.dir, { recursive: true });
+    const playlist = join(session.dir, 'index.m3u8');
+    if (!session.ffmpeg && !existsSync(playlist)) {
+      await this.packMobile(session, session.sourceFile, session.token);
+    }
+    return this.playlistForServe(sessionId);
   }
 
   captionText(sessionId: string, name: string): string | null {
@@ -580,6 +594,58 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       });
   }
 
+  private async packMobile(session: Session, file: string, token: number) {
+    const playlist = join(session.dir, 'index.m3u8');
+    const segment = join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
+    const audio = session.audioTracks[session.audioIndex];
+    const mkv = this.isMatroskaPath(file);
+    const codec = this.codecArgs(session, audio?.codec ?? '');
+    const args = [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+      ...this.ffmpegInputArgs(file, false, session.startSeconds),
+      '-map', '0:v:0',
+      '-map', `0:a:${session.audioIndex}?`,
+      '-sn', '-dn',
+      '-muxdelay', '0',
+      '-muxpreload', '0',
+      ...(mkv ? ['-reset_timestamps', '1'] : []),
+      ...codec.args,
+      '-f', 'hls',
+      '-hls_time', '4',
+      '-hls_init_time', '2',
+      '-hls_list_size', '6',
+      '-start_number', '0',
+      '-hls_flags', 'delete_segments+omit_endlist+temp_file+split_by_time',
+      '-avoid_negative_ts', 'make_zero',
+      '-hls_segment_filename', segment,
+      playlist,
+    ];
+    const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    session.ffmpeg = child;
+    if (child.pid && process.platform === 'linux') {
+      spawn('renice', ['-n', '10', '-p', String(child.pid)], { stdio: 'ignore' }).on('error', () => undefined);
+    }
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
+    });
+    child.on('close', () => {
+      if (session.ffmpeg === child) session.ffmpeg = null;
+    });
+    child.on('error', (error) => {
+      if (session.token !== token) return;
+      if (session.ffmpeg === child) session.ffmpeg = null;
+      this.logger.warn(`mobile playback failed: ${error.message}`);
+    });
+    const ready = await this.waitForSegment(join(session.dir, `seg00000${HLS_SEGMENT_SUFFIX}`), child, 90_000);
+    if (session.token !== token) return;
+    if (!ready || !existsSync(playlist)) {
+      this.stopFfmpeg(session);
+      this.logger.warn(`mobile ffmpeg produced no segment: ${stderr.slice(0, 400)}`);
+      throw new Error(this.shortMediaError(stderr));
+    }
+  }
+
   private async pack(session: Session, file: string, token: number) {
     session.message = 'Starting playback…';
     session.complete = false;
@@ -664,11 +730,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const codec = session.videoCodec.toLowerCase();
     const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
     const h264 = codec === 'h264' || codec === 'avc' || codec === 'avc1';
-    const video = hevc
-      ? ['-c:v', 'copy', '-tag:v', 'hvc1']
-      : h264
-        ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
-        : ['-c:v', 'copy'];
+    const video = hevc || !h264
+      ? ['-c:v', 'copy']
+      : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb'];
     const audio =
       audioCodec === 'aac'
         ? ['-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
@@ -932,7 +996,18 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async removePlaybackPacks() {
-    await rm(join(resolveUploadsRoot(), 'hls-pack'), { recursive: true, force: true }).catch(() => undefined);
+    const root = join(resolveUploadsRoot(), 'hls-pack');
+    const live = new Set(
+      [...this.sessions.values()].map((session) => (session.dir ? resolve(session.dir) : '')).filter(Boolean),
+    );
+    const names = await readdir(root).catch(() => [] as string[]);
+    await Promise.all(
+      names.map(async (name) => {
+        const full = resolve(join(root, name));
+        if (live.has(full)) return;
+        await rm(full, { recursive: true, force: true }).catch(() => undefined);
+      }),
+    );
   }
 
   private async sweep() {

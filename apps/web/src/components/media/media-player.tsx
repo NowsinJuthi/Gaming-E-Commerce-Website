@@ -108,6 +108,13 @@ async function lockPlaybackLandscape() {
   await orientation.lock?.("landscape").catch(() => undefined);
 }
 
+function isPhonePlayback(): boolean {
+  if (typeof window === "undefined") return false;
+  if (appleMobile()) return true;
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
+  return window.matchMedia("(max-width: 768px) and (pointer: coarse)").matches;
+}
+
 function appleMobile(): boolean {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/i.test(ua)) return true;
@@ -582,7 +589,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const seq = ++attachSeqRef.current;
     const packStart = pack.startSeconds;
     const loadToken = ++loadTokenRef.current;
-    const playlist = hlsPlaylistSource(pack.playlistUrl, packStart, loadToken);
+    const playbackUrl = isPhonePlayback()
+      ? pack.playlistUrl.replace(/\/media\.mp4(?=$|\?)/i, "/index.m3u8")
+      : pack.playlistUrl;
+    const playlist = hlsPlaylistSource(playbackUrl, packStart, loadToken);
 
     hlsRef.current?.destroy();
     hlsRef.current = null;

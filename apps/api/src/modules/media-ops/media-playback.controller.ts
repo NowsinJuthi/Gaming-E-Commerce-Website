@@ -96,7 +96,7 @@ export class MediaPlaybackController {
         return;
       }
       if (baseFile === 'index.m3u8') {
-        const body = await this.playback.playlistForServe(sessionId);
+        const body = await this.playback.mobilePlaylist(sessionId);
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
         res.setHeader('Cache-Control', 'no-store');
         res.send(body);
