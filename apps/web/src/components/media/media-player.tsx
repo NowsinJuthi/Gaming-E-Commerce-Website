@@ -598,7 +598,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       captureHoldRef.current();
       video.pause();
       video.removeAttribute("src");
-      video.load();
+      if (!isPhonePlayback()) video.load();
     }
   }, []);
 
@@ -618,7 +618,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     hlsRef.current = null;
     captureHoldRef.current();
     video.removeAttribute("src");
-    video.load();
+    const phone = isPhonePlayback();
+    if (!phone) video.load();
 
     originRef.current = packStart;
     packRestartRef.current = true;
@@ -664,9 +665,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           finishAttach();
           resolve();
         };
+        let armed = false;
         video.addEventListener("loadedmetadata", onMeta);
-        video.addEventListener("error", () => reject(new Error("Playback failed.")), { once: true });
+        video.addEventListener("error", () => {
+          if (!armed) return;
+          reject(new Error("Playback failed."));
+        });
         video.src = playlist;
+        armed = true;
         video.load();
       });
       return;
@@ -685,9 +691,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           finishAttach();
           resolve();
         };
+        let armed = false;
         video.addEventListener("loadedmetadata", onMeta);
-        video.addEventListener("error", () => reject(new Error("Playback failed.")), { once: true });
+        video.addEventListener("error", () => {
+          if (!armed) return;
+          reject(new Error("Playback failed."));
+        });
         video.src = playlist;
+        armed = true;
         video.load();
       });
       return;

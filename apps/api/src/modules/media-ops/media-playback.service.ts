@@ -27,7 +27,7 @@ const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text',
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
 /** MPEG-TS HLS parts use .m2ts so nginx ".ts source file" deny rules cannot block playback. */
 const HLS_SEGMENT_SUFFIX = '.m2ts';
-const HLS_SEGMENT_NAME = /^seg\d{5}\.m2ts$/i;
+const HLS_SEGMENT_NAME = /^seg\d{5}\.(?:m2ts|ts|m4s)$/i;
 const QUALITIES = ['auto', '1080', '720', '480'] as const;
 
 export type PlaybackQuality = (typeof QUALITIES)[number];
@@ -248,6 +248,10 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const out: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
+      if (/^#EXT-X-MAP:/i.test(trimmed)) {
+        out.push(trimmed.replace(/init\.mp4/gi, `init.mp4?g=${gen}`));
+        continue;
+      }
       if (HLS_SEGMENT_NAME.test(trimmed)) {
         const full = join(dir, trimmed);
         if (!existsSync(full)) {
@@ -265,7 +269,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   openFile(sessionId: string, name: string): { path: string; type: string } {
     const baseName = decodeURIComponent(name.split('?')[0]?.split('#')[0] ?? name);
-    if (!/^(index\.m3u8|seg\d{5}\.(?:m2ts|ts)|captions-\d+\.vtt)$/.test(baseName)) throw new NotFoundException();
+    if (!/^(index\.m3u8|init\.mp4|seg\d{5}\.(?:m2ts|ts|m4s)|captions-\d+\.vtt)$/.test(baseName)) throw new NotFoundException();
     const resolved = this.resolvePack(sessionId);
     if (!resolved) throw new NotFoundException();
     const { session, dir } = resolved;
@@ -278,7 +282,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       ? 'application/vnd.apple.mpegurl'
       : baseName.endsWith('.vtt')
         ? 'text/vtt; charset=utf-8'
-        : 'video/MP2T';
+        : baseName.endsWith('.m4s') || baseName === 'init.mp4'
+          ? 'video/mp4'
+          : 'video/MP2T';
     return { path: full, type };
   }
 
@@ -612,10 +618,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private async packMobile(session: Session, file: string, token: number) {
     const playlist = join(session.dir, 'index.m3u8');
-    const segment = join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
+    const segment = join(session.dir, 'seg%05d.m4s');
     const audio = session.audioTracks[session.audioIndex];
     const mkv = this.isMatroskaPath(file);
-    const codec = this.codecArgs(session, audio?.codec ?? '');
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       ...this.ffmpegInputArgs(file, false, session.startSeconds),
@@ -625,13 +630,14 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-muxdelay', '0',
       '-muxpreload', '0',
       ...(mkv ? ['-reset_timestamps', '1'] : []),
-      ...codec.args,
+      ...this.progressiveArgs(session, audio?.codec ?? ''),
       '-f', 'hls',
       '-hls_time', '4',
-      '-hls_init_time', '2',
       '-hls_list_size', '6',
       '-start_number', '0',
-      '-hls_flags', 'delete_segments+omit_endlist+temp_file+split_by_time',
+      '-hls_segment_type', 'fmp4',
+      '-hls_fmp4_init_filename', 'init.mp4',
+      '-hls_flags', 'delete_segments+independent_segments+omit_endlist+temp_file',
       '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
@@ -653,7 +659,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (session.ffmpeg === child) session.ffmpeg = null;
       this.logger.warn(`mobile playback failed: ${error.message}`);
     });
-    const ready = await this.waitForSegment(join(session.dir, `seg00000${HLS_SEGMENT_SUFFIX}`), child, 90_000);
+    const initReady = await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
+    const ready = initReady && await this.waitForSegment(join(session.dir, 'seg00000.m4s'), child, 90_000);
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);
@@ -921,7 +928,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const files = await readdir(session.dir).catch(() => [] as string[]);
     await Promise.all(
       files
-        .filter((name) => name.endsWith('.m2ts') || name.endsWith('.ts') || name === 'index.m3u8')
+        .filter((name) => name.endsWith('.m2ts') || name.endsWith('.ts') || name.endsWith('.m4s') || name === 'init.mp4' || name === 'index.m3u8')
         .map((name) => unlink(join(session.dir, name)).catch(() => undefined)),
     );
   }
