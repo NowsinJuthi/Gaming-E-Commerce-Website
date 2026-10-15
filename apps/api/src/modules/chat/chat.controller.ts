@@ -111,7 +111,7 @@ export class ChatController {
       result.accessToken,
       accessCookieOptions({
         production,
-        maxAgeSeconds: this.config.get<number>('jwt.accessTtl') ?? 900,
+        maxAgeSeconds: result.expiresIn,
       }),
     );
     res.cookie(

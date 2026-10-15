@@ -55,7 +55,12 @@ import {
   AUTH_INVALID_CREDENTIALS_MESSAGE,
   AUTH_OTP_REQUEST_MESSAGE,
 } from './auth.constants';
-import { LONG_SESSION_TTL_SECONDS } from '../../config/session-ttl';
+import {
+  GUEST_SESSION_TTL_SECONDS,
+  LONG_SESSION_TTL_SECONDS,
+  resolveRegisteredAccessTtl,
+  resolveRegisteredRefreshTtl,
+} from '../../config/session-ttl';
 import { isEphemeralGuestUser } from '../../common/utils/guest-user';
 
 const EMAIL_VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes for 6-digit code
@@ -571,12 +576,19 @@ export class AuthService {
     opts?: { accessTtlOverride?: number; refreshTtlOverride?: number },
   ): Promise<AuthTokens> {
     const accessSecret = this.config.getOrThrow<string>('jwt.accessSecret');
-    const accessTtl = opts?.accessTtlOverride ?? (this.config.get<number>('jwt.accessTtl') ?? 900);
-    const defaultRefreshTtl = user.isGuest
-      ? (this.config.get<number>('jwt.guestRefreshTtl') ?? 86400)
-      : (this.config.get<number>('jwt.refreshTtl') ??
-        LONG_SESSION_TTL_SECONDS);
-    const refreshTtl = opts?.refreshTtlOverride ?? defaultRefreshTtl;
+    const configuredAccess = this.config.get<number>('jwt.accessTtl') ?? 900;
+    const guestRefresh =
+      this.config.get<number>('jwt.guestRefreshTtl') ?? GUEST_SESSION_TTL_SECONDS;
+    const configuredRefresh =
+      this.config.get<number>('jwt.refreshTtl') ?? LONG_SESSION_TTL_SECONDS;
+    const accessTtl =
+      opts?.accessTtlOverride ??
+      (user.isGuest
+        ? Math.min(configuredAccess, guestRefresh)
+        : resolveRegisteredAccessTtl(configuredAccess));
+    const refreshTtl =
+      opts?.refreshTtlOverride ??
+      (user.isGuest ? guestRefresh : resolveRegisteredRefreshTtl(configuredRefresh));
 
     const payload: JwtPayload = {
       sub: String(user._id),
