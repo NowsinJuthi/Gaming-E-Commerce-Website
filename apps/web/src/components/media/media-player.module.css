@@ -81,10 +81,6 @@
   background: transparent;
 }
 
-.holdPoster {
-  object-fit: cover;
-}
-
 .holdFrame {
   object-fit: contain;
 }

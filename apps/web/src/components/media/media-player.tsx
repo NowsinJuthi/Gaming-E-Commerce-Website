@@ -1333,10 +1333,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         controlsList="nodownload"
         {...({ "webkit-playsinline": "true", "x-webkit-airplay": "allow" } as Record<string, string>)}
       />
-      {(preparing || buffering) && !error && (holdFrame || details?.posterUrl) ? (
+      {(preparing || buffering) && !error && holdFrame ? (
         <img
-          className={`${styles.hold} ${holdFrame ? styles.holdFrame : styles.holdPoster} ${aspect === "fill" ? styles.videoFill : ""} ${aspect === "stretch" ? styles.videoStretch : ""}`}
-          src={holdFrame || details?.posterUrl || ""}
+          className={`${styles.hold} ${styles.holdFrame} ${aspect === "fill" ? styles.videoFill : ""} ${aspect === "stretch" ? styles.videoStretch : ""}`}
+          src={holdFrame}
           alt=""
         />
       ) : null}
