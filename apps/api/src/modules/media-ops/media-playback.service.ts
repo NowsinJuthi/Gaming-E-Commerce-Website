@@ -618,9 +618,11 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private async packMobile(session: Session, file: string, token: number) {
     const playlist = join(session.dir, 'index.m3u8');
-    const segment = join(session.dir, 'seg%05d.m4s');
     const audio = session.audioTracks[session.audioIndex];
     const mkv = this.isMatroskaPath(file);
+    const codec = session.videoCodec.toLowerCase();
+    const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
+    const segment = hevc ? join(session.dir, 'seg%05d.m4s') : join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       ...this.ffmpegInputArgs(file, false, session.startSeconds),
@@ -629,15 +631,17 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-sn', '-dn',
       '-muxdelay', '0',
       '-muxpreload', '0',
+      '-max_delay', '5000000',
       ...(mkv ? ['-reset_timestamps', '1'] : []),
-      ...this.progressiveArgs(session, audio?.codec ?? ''),
+      ...(hevc ? this.progressiveArgs(session, audio?.codec ?? '') : this.codecArgs(session, audio?.codec ?? '').args),
       '-f', 'hls',
       '-hls_time', '4',
-      '-hls_list_size', '6',
+      '-hls_init_time', '2',
+      '-hls_list_size', '0',
       '-start_number', '0',
-      '-hls_segment_type', 'fmp4',
-      '-hls_fmp4_init_filename', 'init.mp4',
-      '-hls_flags', 'delete_segments+independent_segments+omit_endlist+temp_file',
+      '-hls_playlist_type', 'event',
+      '-hls_flags', 'independent_segments+omit_endlist+temp_file',
+      ...(hevc ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
       '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
@@ -659,8 +663,13 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (session.ffmpeg === child) session.ffmpeg = null;
       this.logger.warn(`mobile playback failed: ${error.message}`);
     });
-    const initReady = await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
-    const ready = initReady && await this.waitForSegment(join(session.dir, 'seg00000.m4s'), child, 90_000);
+    const codecName = session.videoCodec.toLowerCase();
+    const hevcPack = codecName === 'hevc' || codecName === 'h265' || codecName === 'hev1' || codecName === 'hvc1';
+    const initReady = hevcPack
+      ? await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000)
+      : true;
+    const firstSegment = hevcPack ? 'seg00000.m4s' : `seg00000${HLS_SEGMENT_SUFFIX}`;
+    const ready = initReady && await this.waitForSegment(join(session.dir, firstSegment), child, 90_000);
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);

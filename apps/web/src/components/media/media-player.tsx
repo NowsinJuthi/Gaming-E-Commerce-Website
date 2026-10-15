@@ -108,11 +108,10 @@ async function lockPlaybackLandscape() {
   await orientation.lock?.("landscape").catch(() => undefined);
 }
 
+/** iPhone/iPad play native HLS. Android uses the same direct stream as desktop. */
 function isPhonePlayback(): boolean {
   if (typeof window === "undefined") return false;
-  if (appleMobile()) return true;
-  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
-  return window.matchMedia("(max-width: 768px) and (pointer: coarse)").matches;
+  return appleMobile();
 }
 
 function appleMobile(): boolean {
