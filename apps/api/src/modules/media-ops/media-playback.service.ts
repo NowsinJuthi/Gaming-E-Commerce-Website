@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
+import { tmpdir } from 'os';
 import { join, resolve, sep } from 'path';
 import {
   Injectable,
@@ -172,12 +173,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return this.present(session);
   }
 
-  /** Phone browsers play HLS. Only a few segments stay on disk, then they are deleted. */
+  /** Phone HLS lives in RAM, not under uploads, and is removed when playback stops. */
   async mobilePlaylist(sessionId: string): Promise<string> {
     const session = this.sessions.get(sessionId);
     if (!session?.sourceFile || session.status !== 'ready') throw new NotFoundException();
     session.touchedAt = Date.now();
-    if (!session.dir) session.dir = join(resolveUploadsRoot(), 'hls-pack', session.id);
+    if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
     const playlist = join(session.dir, 'index.m3u8');
     if (!session.ffmpeg && !existsSync(playlist)) {
@@ -281,14 +282,29 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return { path: full, type };
   }
 
-  /** In-memory session or on-disk pack dir (same id) so segment GETs survive brief API restarts. */
+  /** Phone pieces stay in RAM. They are not written into the website uploads folder. */
+  private mobilePackDir(sessionId: string): string {
+    const ram = '/dev/shm';
+    const root = existsSync(ram) ? join(ram, 'uniqbd-mobile-hls') : join(tmpdir(), 'uniqbd-mobile-hls');
+    return join(root, sessionId);
+  }
+
+  private packRoots(): string[] {
+    const roots = [resolve(join(resolveUploadsRoot(), 'hls-pack'))];
+    const ram = '/dev/shm';
+    if (existsSync(ram)) roots.push(resolve(join(ram, 'uniqbd-mobile-hls')));
+    roots.push(resolve(join(tmpdir(), 'uniqbd-mobile-hls')));
+    return roots;
+  }
+
+  /** In-memory session or pack dir (same id) so segment GETs survive brief API restarts. */
   private resolvePack(sessionId: string): { session: Session | null; dir: string } | null {
     if (!/^[a-f0-9]{32}$/.test(sessionId)) return null;
     const session = this.sessions.get(sessionId) ?? null;
     const dir = session?.dir ?? join(resolveUploadsRoot(), 'hls-pack', sessionId);
-    const root = resolve(join(resolveUploadsRoot(), 'hls-pack'));
     const resolved = resolve(dir);
-    if (resolved !== root && !resolved.startsWith(root + sep)) return null;
+    const allowed = this.packRoots().some((root) => resolved === root || resolved.startsWith(root + sep));
+    if (!allowed) return null;
     if (!existsSync(resolved)) return null;
     return { session, dir: resolved };
   }
@@ -996,18 +1012,19 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async removePlaybackPacks() {
-    const root = join(resolveUploadsRoot(), 'hls-pack');
     const live = new Set(
       [...this.sessions.values()].map((session) => (session.dir ? resolve(session.dir) : '')).filter(Boolean),
     );
-    const names = await readdir(root).catch(() => [] as string[]);
-    await Promise.all(
-      names.map(async (name) => {
-        const full = resolve(join(root, name));
-        if (live.has(full)) return;
-        await rm(full, { recursive: true, force: true }).catch(() => undefined);
-      }),
-    );
+    for (const root of this.packRoots()) {
+      const names = await readdir(root).catch(() => [] as string[]);
+      await Promise.all(
+        names.map(async (name) => {
+          const full = resolve(join(root, name));
+          if (live.has(full)) return;
+          await rm(full, { recursive: true, force: true }).catch(() => undefined);
+        }),
+      );
+    }
   }
 
   private async sweep() {
