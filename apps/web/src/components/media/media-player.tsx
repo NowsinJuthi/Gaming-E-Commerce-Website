@@ -619,9 +619,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     hlsRef.current?.destroy();
     hlsRef.current = null;
     captureHoldRef.current();
-    video.removeAttribute("src");
     const phone = isPhonePlayback();
-    if (!phone) video.load();
+    if (!phone) {
+      video.removeAttribute("src");
+      video.load();
+    }
 
     originRef.current = packStart;
     packRestartRef.current = true;
@@ -641,6 +643,21 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const mobilePlay =
         mobileRef.current ||
         window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
+      if (apple && mobileAutoplayRef.current && navigator.userActivation?.isActive !== true) {
+        element.muted = true;
+        try {
+          await element.play();
+          startedMutedRef.current = true;
+          wantAudibleRef.current = false;
+          setMuted(true);
+          setNeedsGesture(false);
+        } catch {
+          startedMutedRef.current = true;
+          setMuted(true);
+          setNeedsGesture(true);
+        }
+        return;
+      }
       try {
         element.muted = false;
         await element.play();
@@ -686,6 +703,58 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       }
     };
 
+    const waitForPhonePlaylist = (element: HTMLVideoElement, source: string, attachSeq: number) =>
+      new Promise<void>((resolve, reject) => {
+        let settled = false;
+        let attempt = 0;
+        let timer = 0;
+        let ignoreUntil = 0;
+        const cleanup = () => {
+          element.removeEventListener("loadedmetadata", onReady);
+          element.removeEventListener("error", onErr);
+          window.clearTimeout(timer);
+        };
+        const finish = (fn: () => void) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(giveUp);
+          cleanup();
+          fn();
+        };
+        const giveUp = window.setTimeout(
+          () => finish(() => reject(new Error("Playback timed out. Try again."))),
+          90_000,
+        );
+        const onReady = () => {
+          if (attachSeq !== attachSeqRef.current) {
+            finish(() => reject(new Error("Playback cancelled.")));
+            return;
+          }
+          finish(resolve);
+        };
+        const onErr = () => {
+          if (Date.now() < ignoreUntil) return;
+          if (attempt >= 6) {
+            finish(() => reject(new Error("Playback failed.")));
+            return;
+          }
+          attempt += 1;
+          window.clearTimeout(timer);
+          timer = window.setTimeout(arm, 1000);
+        };
+        const arm = () => {
+          if (settled || attachSeq !== attachSeqRef.current) return;
+          element.removeEventListener("loadedmetadata", onReady);
+          element.removeEventListener("error", onErr);
+          element.addEventListener("loadedmetadata", onReady);
+          element.addEventListener("error", onErr);
+          ignoreUntil = Date.now() + 600;
+          const joiner = source.includes("?") ? "&" : "?";
+          element.src = attempt === 0 ? source : `${source}${joiner}retry=${attempt}`;
+        };
+        arm();
+      });
+
     const waitForAttach = (bind: (resolve: () => void, reject: (error: Error) => void) => void) =>
       new Promise<void>((resolve, reject) => {
         let settled = false;
@@ -704,6 +773,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           (error) => finish(() => reject(error)),
         );
       });
+
+    if (phone) {
+      await waitForPhonePlaylist(video, playlist, seq);
+      if (seq !== attachSeqRef.current) throw new Error("Playback cancelled.");
+      setCurrent(packStart);
+      seekingRef.current = false;
+      setBuffering(false);
+      video.playbackRate = rateRef.current;
+      void startAttachedPlayback(video);
+      return;
+    }
 
     const progressive = /\/media\.mp4(?:\?|$)/i.test(playlist);
     if (progressive || nativeHls(video)) {
