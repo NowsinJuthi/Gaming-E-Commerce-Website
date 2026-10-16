@@ -28,6 +28,8 @@ const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
 /** Desktop leftover packer. iPhone uses fMP4 (.m4s), which Safari plays and nginx does not block. */
 const HLS_SEGMENT_SUFFIX = '.m2ts';
 const HLS_SEGMENT_NAME = /^seg\d{5}\.(?:m2ts|ts|m4s)$/i;
+/** Jellyfin default direct-stream segment length (ms → seconds). */
+const MOBILE_VOD_SEGMENT_SECONDS = 6;
 const QUALITIES = ['auto', '1080', '720', '480'] as const;
 
 export type PlaybackQuality = (typeof QUALITIES)[number];
@@ -91,6 +93,8 @@ type Session = {
 export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MediaPlaybackService.name);
   private readonly sessions = new Map<string, Session>();
+  /** One ffmpeg job per segment index (Jellyfin-style on-demand HLS). */
+  private readonly mobileSegmentLocks = new Map<string, Promise<void>>();
   private sweepTimer: NodeJS.Timeout | null = null;
   private mediaServer: Server | null = null;
   private mediaPort = 0;
@@ -154,23 +158,21 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       session.durationSeconds = 0;
       session.videoCodec = '';
     }
-    session.status = 'preparing';
-    session.message = 'Starting playback…';
-    session.complete = false;
-    session.touchedAt = Date.now();
     session.token += 1;
     this.stopFfmpeg(session);
     await this.clearSegments(session);
     if (episodeChanged) await this.clearCaptions(session);
+    session.touchedAt = Date.now();
+    session.complete = false;
     // A seek already knows the file. Probing it again is what makes every drag buffer.
     if (!episodeChanged && session.sourceFile) {
       session.startSeconds = this.clampStart(session.startSeconds, session.durationSeconds);
       session.status = 'ready';
       session.message = '';
-      session.complete = false;
-      session.touchedAt = Date.now();
       return this.present(session);
     }
+    session.status = 'preparing';
+    session.message = 'Starting playback…';
     void this.materialize(session);
     return this.present(session);
   }
@@ -189,6 +191,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.touchedAt = Date.now();
     if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
+    if (session.durationSeconds > 0) {
+      return this.mobileVodPlaylist(session);
+    }
     const playlist = join(session.dir, 'index.m3u8');
     if (!existsSync(playlist)) {
       if (!session.ffmpeg) {
@@ -281,12 +286,22 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return out.join('\n');
   }
 
-  openFile(sessionId: string, name: string): { path: string; type: string } {
+  async ensurePlaybackFile(sessionId: string, name: string): Promise<{ path: string; type: string }> {
     const baseName = decodeURIComponent(name.split('?')[0]?.split('#')[0] ?? name);
-    if (!/^(index\.m3u8|init\.mp4|seg\d{5}\.(?:m2ts|ts|m4s)|captions-\d+\.vtt)$/.test(baseName)) throw new NotFoundException();
+    if (!/^(index\.m3u8|init\.mp4|seg\d{5}\.(?:m2ts|ts|m4s)|captions-\d+\.vtt)$/.test(baseName)) {
+      throw new NotFoundException();
+    }
     const resolved = this.resolvePack(sessionId);
     if (!resolved) throw new NotFoundException();
     const { session, dir } = resolved;
+    if (session?.sourceFile && session.durationSeconds > 0) {
+      if (baseName === 'init.mp4') {
+        await this.ensureMobileInit(session);
+      } else {
+        const index = this.parseMobileSegmentIndex(baseName);
+        if (index != null) await this.ensureMobileSegmentOnDemand(session, index);
+      }
+    }
     const full = join(dir, baseName);
     const root = resolve(dir);
     if (!full.startsWith(root + sep) && full !== root) throw new NotFoundException();
@@ -777,6 +792,214 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       return ['-c:a', 'copy'];
     }
     return ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1:first_pts=0'];
+  }
+
+  private mobileUsesFmp4(session: Session): boolean {
+    const codec = session.videoCodec.toLowerCase();
+    return codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
+  }
+
+  private mobileVideoArgs(session: Session): string[] {
+    const codec = session.videoCodec.toLowerCase();
+    const hevc = this.mobileUsesFmp4(session);
+    const h264 = codec === 'h264' || codec === 'avc' || codec === 'avc1';
+    if (hevc) return ['-c:v', 'copy', '-tag:v', 'hvc1'];
+    if (h264) return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb'];
+    return ['-c:v', 'copy'];
+  }
+
+  private parseMobileSegmentIndex(baseName: string): number | null {
+    const match = /^seg(\d{5})\.(?:m2ts|ts|m4s)$/i.exec(baseName);
+    if (!match) return null;
+    return Number.parseInt(match[1], 10);
+  }
+
+  /** Jellyfin-style VOD manifest: full timeline, segments generated on first GET. */
+  private mobileVodPlaylist(session: Session): string {
+    const duration = session.durationSeconds;
+    const segLen = MOBILE_VOD_SEGMENT_SECONDS;
+    const count = Math.max(1, Math.ceil(duration / segLen));
+    const fmp4 = this.mobileUsesFmp4(session);
+    const ext = fmp4 ? 'm4s' : 'ts';
+    const gen = session.token;
+    const lines: string[] = [
+      '#EXTM3U',
+      '#EXT-X-PLAYLIST-TYPE:VOD',
+      `#EXT-X-VERSION:${fmp4 ? 7 : 3}`,
+      `#EXT-X-TARGETDURATION:${Math.ceil(segLen)}`,
+      '#EXT-X-MEDIA-SEQUENCE:0',
+    ];
+    if (fmp4) lines.push(`#EXT-X-MAP:URI="init.mp4?g=${gen}"`);
+    for (let index = 0; index < count; index += 1) {
+      const remaining = duration - index * segLen;
+      const piece = Math.min(segLen, remaining);
+      lines.push(`#EXTINF:${piece.toFixed(6)},`);
+      lines.push(`seg${String(index).padStart(5, '0')}.${ext}?g=${gen}`);
+    }
+    lines.push('#EXT-X-ENDLIST');
+    return `${lines.join('\n')}\n`;
+  }
+
+  private async withMobileSegmentLock(key: string, work: () => Promise<void>): Promise<void> {
+    while (this.mobileSegmentLocks.has(key)) {
+      await this.mobileSegmentLocks.get(key);
+    }
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.mobileSegmentLocks.set(key, gate);
+    try {
+      await work();
+    } finally {
+      this.mobileSegmentLocks.delete(key);
+      release();
+    }
+  }
+
+  private async ensureMobileInit(session: Session): Promise<void> {
+    const init = join(session.dir, 'init.mp4');
+    if (existsSync(init)) {
+      const info = await stat(init).catch(() => null);
+      if (info && info.size > 64) return;
+    }
+    await this.ensureMobileSegmentOnDemand(session, 0);
+  }
+
+  private async ensureMobileSegmentOnDemand(session: Session, index: number): Promise<void> {
+    const fmp4 = this.mobileUsesFmp4(session);
+    const ext = fmp4 ? 'm4s' : 'ts';
+    const name = `seg${String(index).padStart(5, '0')}.${ext}`;
+    const full = join(session.dir, name);
+    if (existsSync(full)) {
+      const info = await stat(full).catch(() => null);
+      const minSize = fmp4 ? 64 : 188;
+      if (info && info.size >= minSize) return;
+    }
+    const lockKey = `${session.id}:${index}:${session.token}`;
+    await this.withMobileSegmentLock(lockKey, async () => {
+      if (existsSync(full)) {
+        const info = await stat(full).catch(() => null);
+        const minSize = fmp4 ? 64 : 188;
+        if (info && info.size >= minSize) return;
+      }
+      if (fmp4 && index > 0) await this.ensureMobileInit(session);
+      await this.renderMobileVodSegment(session, index, full, fmp4);
+    });
+  }
+
+  private async renderMobileVodSegment(
+    session: Session,
+    index: number,
+    outputPath: string,
+    fmp4: boolean,
+  ): Promise<void> {
+    const file = session.sourceFile;
+    if (!file) throw new NotFoundException();
+    const start = index * MOBILE_VOD_SEGMENT_SECONDS;
+    const duration = Math.min(
+      MOBILE_VOD_SEGMENT_SECONDS,
+      Math.max(0.25, session.durationSeconds - start),
+    );
+    if (start >= session.durationSeconds) throw new NotFoundException();
+    const audio = session.audioTracks[session.audioIndex];
+    const token = session.token;
+
+    if (fmp4 && index === 0) {
+      const playlist = join(session.dir, '_bootstrap.m3u8');
+      const segmentPattern = join(session.dir, 'seg%05d.m4s');
+      const args = [
+        '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+        ...this.ffmpegInputArgs(file, false, start, true),
+        '-t', duration.toFixed(3),
+        '-map', '0:v:0',
+        '-map', `0:a:${session.audioIndex}?`,
+        '-sn', '-dn',
+        '-muxdelay', '0',
+        '-muxpreload', '0',
+        ...this.mobileVideoArgs(session),
+        ...this.mobileAudioArgs(audio?.codec ?? ''),
+        '-max_muxing_queue_size', '9999',
+        '-f', 'hls',
+        '-hls_segment_type', 'fmp4',
+        '-hls_fmp4_init_filename', 'init.mp4',
+        '-hls_time', duration.toFixed(3),
+        '-hls_playlist_type', 'vod',
+        '-hls_list_size', '0',
+        '-start_number', '0',
+        '-hls_flags', 'temp_file',
+        '-hls_segment_filename', segmentPattern,
+        playlist,
+      ];
+      await this.runFfmpegOutput(args, outputPath, 120_000);
+      if (session.token !== token) return;
+      await unlink(playlist).catch(() => undefined);
+      return;
+    }
+
+    const formatArgs = fmp4
+      ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
+      : ['-f', 'mpegts'];
+    const args = [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+      ...this.ffmpegInputArgs(file, false, start, true),
+      '-t', duration.toFixed(3),
+      '-map', '0:v:0',
+      '-map', `0:a:${session.audioIndex}?`,
+      '-sn', '-dn',
+      '-muxdelay', '0',
+      '-muxpreload', '0',
+      ...this.mobileVideoArgs(session),
+      ...this.mobileAudioArgs(audio?.codec ?? ''),
+      '-max_muxing_queue_size', '9999',
+      ...formatArgs,
+      outputPath,
+    ];
+    await this.runFfmpegOutput(args, outputPath, 120_000);
+  }
+
+  private runFfmpegOutput(args: string[], outputPath: string, timeoutMs: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
+      let stderr = '';
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
+      });
+      const timer = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('Segment packaging timed out.'));
+      }, timeoutMs);
+      const waitFile = setInterval(() => {
+        if (existsSync(outputPath)) {
+          void stat(outputPath).then((info) => {
+            if (info.size > 64) {
+              clearInterval(waitFile);
+              clearTimeout(timer);
+              if (child.exitCode == null && !child.killed) child.kill('SIGTERM');
+              resolve();
+            }
+          }).catch(() => undefined);
+        }
+      }, 150);
+      child.on('close', (code) => {
+        clearInterval(waitFile);
+        clearTimeout(timer);
+        if (existsSync(outputPath)) {
+          resolve();
+          return;
+        }
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(this.shortMediaError(stderr)));
+      });
+      child.on('error', (error) => {
+        clearInterval(waitFile);
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
   }
 
   /** In-memory remux. Video is copied. Audio is AAC only when it is not already AAC/MP3. */

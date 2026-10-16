@@ -102,7 +102,7 @@ export class MediaPlaybackController {
         res.send(body);
         return;
       }
-      const opened = this.playback.openFile(sessionId, baseFile);
+      const opened = await this.playback.ensurePlaybackFile(sessionId, baseFile);
       res.setHeader('Content-Type', opened.type);
       res.setHeader('Cache-Control', 'no-store');
       res.sendFile(opened.path);

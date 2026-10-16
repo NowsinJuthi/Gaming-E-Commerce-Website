@@ -52,6 +52,46 @@ export function isLocalTimeInPack(
   return false;
 }
 
+/** Seek with HLS seekable-range clamping — iOS native HLS ignores out-of-range seeks. */
+export function seekVideoTo(
+  video: HTMLVideoElement,
+  localSeconds: number,
+  packDurationSeconds = 0,
+): void {
+  let target = Math.max(0, localSeconds);
+  if (packDurationSeconds > 0) target = Math.min(target, packDurationSeconds);
+
+  if (video.seekable.length > 0) {
+    for (let i = 0; i < video.seekable.length; i += 1) {
+      const start = video.seekable.start(i);
+      const end = video.seekable.end(i);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+      if (target >= start && target <= end) {
+        applyVideoSeek(video, target);
+        return;
+      }
+      if (target <= end) {
+        applyVideoSeek(video, Math.max(start, target));
+        return;
+      }
+    }
+  }
+
+  applyVideoSeek(video, target);
+}
+
+function applyVideoSeek(video: HTMLVideoElement, target: number): void {
+  if (typeof video.fastSeek === "function") {
+    try {
+      video.fastSeek(target);
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  video.currentTime = target;
+}
+
 /** While ffmpeg is still packaging (EVENT HLS), only seek inside buffered data. */
 export function canSeekWithinCurrentPack(
   video: HTMLVideoElement,
