@@ -55,7 +55,7 @@ type MediaDetails = {
 const ALL_LIBRARIES = "all";
 
 type RecentWatchCard = MediaCard & {
-  runtimeMinutes?: number | null;
+  runtimeMinutes: number | null;
 };
 
 function snapshotToRecentCard(snap: RecentCardSnapshot): RecentWatchCard {
@@ -357,17 +357,18 @@ export function MediaHome({
         entries.map(async (entry) => {
           const cached = catalogByIdRef.current.get(entry.id);
           if (cached) {
-            return {
+            const card: RecentWatchCard = {
               ...cached,
               runtimeMinutes:
-                seeded.find((card) => card.id === entry.id)?.runtimeMinutes ?? null,
-            } satisfies RecentWatchCard;
+                seeded.find((item) => item.id === entry.id)?.runtimeMinutes ?? null,
+            };
+            return card;
           }
           try {
             const response = await fetch(`${API_BASE}/media/titles/${entry.id}`);
             if (!response.ok) return null;
             const data = (await response.json()) as MediaDetails;
-            return {
+            const card: RecentWatchCard = {
               id: entry.id,
               title: data.title,
               year: data.year,
@@ -376,15 +377,16 @@ export function MediaHome({
               featured: false,
               trending: false,
               seasonCount: null,
-              runtimeMinutes: data.runtimeMinutes,
-            } satisfies RecentWatchCard;
+              runtimeMinutes: data.runtimeMinutes ?? null,
+            };
+            return card;
           } catch {
             return null;
           }
         }),
       );
       if (cancelled) return;
-      const next = cards.filter((card): card is RecentWatchCard => card != null);
+      const next = cards.filter((card) => card != null);
       for (const card of next) persistRecentSnapshot(recentCardSnapshot(card));
       setRecentCards((prev) => (sameRecentCards(prev, next) ? prev : next));
     })();
