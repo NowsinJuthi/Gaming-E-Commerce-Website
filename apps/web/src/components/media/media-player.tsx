@@ -490,6 +490,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [starting, setStarting] = useState(false);
   const startTimer = useRef<number | null>(null);
   const [needsGesture, setNeedsGesture] = useState(false);
+  const mobileAutoplayRef = useRef(false);
+  const startedMutedRef = useRef(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [scrub, setScrub] = useState<number | null>(null);
@@ -630,7 +632,38 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       seekingRef.current = false;
       setBuffering(false);
       video.playbackRate = rateRef.current;
-      void video.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
+      void startAttachedPlayback(video);
+    };
+
+    const startAttachedPlayback = async (element: HTMLVideoElement) => {
+      const mobilePlay =
+        mobileRef.current ||
+        window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
+      try {
+        element.muted = false;
+        await element.play();
+        startedMutedRef.current = false;
+        setMuted(false);
+        setNeedsGesture(false);
+        return;
+      } catch {
+        if (!mobilePlay || !mobileAutoplayRef.current) {
+          setNeedsGesture(true);
+          return;
+        }
+      }
+      try {
+        element.muted = true;
+        await element.play();
+        startedMutedRef.current = true;
+        setMuted(true);
+        setNeedsGesture(false);
+      } catch {
+        element.muted = false;
+        startedMutedRef.current = false;
+        setMuted(false);
+        setNeedsGesture(true);
+      }
     };
 
     const waitForAttach = (bind: (resolve: () => void, reject: (error: Error) => void) => void) =>
@@ -799,6 +832,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     },
     [attachPlaybackPack, post, stopActivePlayback, waitForSessionReady],
   );
+
+  useEffect(() => {
+    const coarse = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
+    const params = new URLSearchParams(window.location.search);
+    const raw = sessionStorage.getItem("uniqbd-mobile-autoplay");
+    sessionStorage.removeItem("uniqbd-mobile-autoplay");
+    const age = raw ? Date.now() - Number(raw) : Number.POSITIVE_INFINITY;
+    mobileAutoplayRef.current =
+      coarse && (params.get("autoplay") === "1" || (age >= 0 && age <= 20_000));
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)");
@@ -1053,9 +1096,24 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  function unmuteStartedPlayback(video: HTMLVideoElement) {
+    if (!startedMutedRef.current) return false;
+    startedMutedRef.current = false;
+    video.muted = false;
+    setMuted(false);
+    if (video.paused) {
+      void video.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
+    }
+    return true;
+  }
+
   function togglePlay() {
     const video = videoRef.current;
     if (!video) return;
+    if (unmuteStartedPlayback(video)) {
+      reveal();
+      return;
+    }
     if (video.paused) {
       if (startTimer.current) window.clearTimeout(startTimer.current);
       setStarting(true);
@@ -1264,6 +1322,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   }
 
   function onZone(zone: "left" | "middle" | "right") {
+    const video = videoRef.current;
+    if (video && unmuteStartedPlayback(video)) {
+      reveal();
+      return;
+    }
     const now = Date.now();
     const previous = lastTap.current;
     lastTap.current = { zone, at: now };

@@ -732,7 +732,14 @@ function mediaWatchPath(id: string): string {
 
 /** Full navigation — reliable on mobile/WebKit when client router or Link taps fail. */
 function navigateToWatch(id: string) {
-  window.location.assign(mediaWatchPath(id));
+  const path = mediaWatchPath(id);
+  const mobile = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
+  if (mobile) {
+    sessionStorage.setItem("uniqbd-mobile-autoplay", String(Date.now()));
+    window.location.assign(`${path}?autoplay=1`);
+    return;
+  }
+  window.location.assign(path);
 }
 
 function PosterPlayLink({
