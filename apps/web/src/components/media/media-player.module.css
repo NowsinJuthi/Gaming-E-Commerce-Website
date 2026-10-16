@@ -137,14 +137,15 @@
 
 .mobileChrome .mTop,
 .mobileChrome .mDock,
-.mobileChrome .bottom {
+.mobileChrome .bottom,
+.mobileChrome .mTools {
   pointer-events: auto;
 }
 
 .chrome {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -898,7 +899,8 @@
 .tapZones {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  /* Below .chrome so back/seek stay clickable; chrome uses pointer-events: none except controls. */
+  z-index: 2;
   display: flex;
   touch-action: manipulation;
 }
