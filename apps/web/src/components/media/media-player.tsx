@@ -813,10 +813,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     portraitMedia.addEventListener("change", syncPortrait);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.classList.add("media-player-open");
     return () => {
       media.removeEventListener("change", sync);
       portraitMedia.removeEventListener("change", syncPortrait);
       document.body.style.overflow = previous;
+      document.documentElement.classList.remove("media-player-open");
       unlockPlaybackOrientation();
     };
   }, []);

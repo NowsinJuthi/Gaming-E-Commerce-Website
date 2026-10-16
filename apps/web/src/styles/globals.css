@@ -3039,6 +3039,10 @@
   }
 
   /* Storefront chrome â€” 3D depth (colors unchanged) */
+  html.media-player-open .site-header {
+    display: none;
+  }
+
   .site-header {
     z-index: 10000;
     pointer-events: auto;

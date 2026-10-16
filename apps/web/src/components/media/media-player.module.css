@@ -40,24 +40,36 @@
   .landscapeEmulate {
     position: fixed;
     inset: auto;
-    top: 50%;
-    left: 50%;
+    top: 0;
+    left: 100vw;
+    left: 100dvw;
     z-index: 2147483646;
     width: 100vh;
     height: 100vw;
-    width: 100svh;
-    height: 100svw;
+    width: 100dvh;
+    height: 100dvw;
     max-width: none;
     max-height: none;
-    transform: translate(-50%, -50%) rotate(90deg);
-    transform-origin: center center;
+    transform: rotate(90deg);
+    transform-origin: top left;
   }
 
   .landscapeEmulate .chrome {
-    padding-top: 0.75rem;
-    padding-right: max(0.85rem, env(safe-area-inset-bottom));
-    padding-bottom: 0.85rem;
-    padding-left: max(0.85rem, env(safe-area-inset-top));
+    padding-top: 0.5rem;
+    padding-right: max(0.65rem, env(safe-area-inset-bottom));
+    padding-bottom: 0.5rem;
+    padding-left: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .landscapeEmulate .mTop {
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: 100%;
+  }
+
+  .landscapeEmulate .mBack {
+    align-self: center;
   }
 }
 
