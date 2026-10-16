@@ -178,10 +178,12 @@ function seekInsidePack(video: HTMLVideoElement, localTarget: number): number | 
   const forward = localTarget >= previous - 0.05;
   const ranges = video.seekable.length > 0 ? video.seekable : video.buffered;
   let toward: number | null = null;
+  let sawFinite = false;
   for (let i = 0; i < ranges.length; i += 1) {
     const start = ranges.start(i);
     const end = ranges.end(i);
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    sawFinite = true;
     if (localTarget >= start - 0.05 && localTarget <= end + 0.05) {
       const landed = Math.min(end, Math.max(start, localTarget));
       const sameWay = forward ? landed + 0.2 >= previous : landed - 0.2 <= previous;
@@ -192,6 +194,11 @@ function seekInsidePack(video: HTMLVideoElement, localTarget: number): number | 
     }
     if (forward && end > previous && end <= localTarget + 0.05 && (toward == null || end > toward)) toward = end;
     if (!forward && start < previous && start >= localTarget - 0.05 && (toward == null || start < toward)) toward = start;
+  }
+  if (!sawFinite) {
+    const landed = Math.max(0, localTarget);
+    video.currentTime = landed;
+    return landed;
   }
   if (toward == null) return null;
   video.currentTime = toward;
@@ -487,6 +494,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const packRestartRef = useRef(false);
   const scrubbingRef = useRef(false);
   const seekLockRef = useRef(false);
+  const quietSeekUntil = useRef(0);
   const loadTokenRef = useRef(0);
   const attachSeqRef = useRef(0);
   const attachedPackRef = useRef("");
@@ -1124,6 +1132,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setStarting(false);
     };
     const onWaiting = () => {
+      if (Date.now() < quietSeekUntil.current) return;
       if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.seeking) return;
       captureHoldRef.current();
       setBuffering(true);
@@ -1400,9 +1409,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     remember(absolute);
 
     if (isPhonePlayback() && targetIsInCurrentPack) {
+      const displayed = displayTimelineSeconds(video.currentTime, origin, movie);
+      const jump = absolute - displayed;
       const landed = seekInsidePack(video, localTarget);
       if (landed != null) {
+        quietSeekUntil.current = Date.now() + 1800;
         setCurrent(displayTimelineSeconds(landed, origin, movie));
+        return;
+      }
+      // Rebuilding the pack blanks the picture and buffers. A normal drag stays put.
+      if (Math.abs(jump) <= 120) {
+        setCurrent(displayed);
         return;
       }
     } else if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
