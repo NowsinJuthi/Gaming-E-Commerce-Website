@@ -25,7 +25,7 @@ import { SmbMountService } from './smb-mount.service';
 const VIDEO_EXT = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.mpg', '.mpeg']);
 const TEXT_SUBS = new Set(['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text', 'srt']);
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024 * 1024;
-/** MPEG-TS HLS parts use .m2ts so nginx ".ts source file" deny rules cannot block playback. */
+/** Desktop leftover packer. iPhone uses fMP4 (.m4s), which Safari plays and nginx does not block. */
 const HLS_SEGMENT_SUFFIX = '.m2ts';
 const HLS_SEGMENT_NAME = /^seg\d{5}\.(?:m2ts|ts|m4s)$/i;
 const QUALITIES = ['auto', '1080', '720', '480'] as const;
@@ -181,8 +181,13 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
     const playlist = join(session.dir, 'index.m3u8');
-    if (!session.ffmpeg && !existsSync(playlist)) {
-      await this.packMobile(session, session.sourceFile, session.token);
+    if (!existsSync(playlist)) {
+      if (!session.ffmpeg) {
+        await this.packMobile(session, session.sourceFile, session.token);
+      } else {
+        const ready = await this.waitForSegment(playlist, session.ffmpeg, 90_000);
+        if (!ready) throw new NotFoundException();
+      }
     }
     return this.playlistForServe(sessionId);
   }
@@ -620,9 +625,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const playlist = join(session.dir, 'index.m3u8');
     const audio = session.audioTracks[session.audioIndex];
     const mkv = this.isMatroskaPath(file);
-    const codec = session.videoCodec.toLowerCase();
-    const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
-    const segment = hevc ? join(session.dir, 'seg%05d.m4s') : join(session.dir, `seg%05d${HLS_SEGMENT_SUFFIX}`);
+    const segment = join(session.dir, 'seg%05d.m4s');
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       ...this.ffmpegInputArgs(file, false, session.startSeconds),
@@ -633,7 +636,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-muxpreload', '0',
       '-max_delay', '5000000',
       ...(mkv ? ['-reset_timestamps', '1'] : []),
-      ...(hevc ? this.progressiveArgs(session, audio?.codec ?? '') : this.codecArgs(session, audio?.codec ?? '').args),
+      ...this.progressiveArgs(session, audio?.codec ?? ''),
       '-f', 'hls',
       '-hls_time', '4',
       '-hls_init_time', '2',
@@ -641,7 +644,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-start_number', '0',
       '-hls_playlist_type', 'event',
       '-hls_flags', 'independent_segments+omit_endlist+temp_file',
-      ...(hevc ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
+      '-hls_segment_type', 'fmp4',
+      '-hls_fmp4_init_filename', 'init.mp4',
       '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
@@ -663,13 +667,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (session.ffmpeg === child) session.ffmpeg = null;
       this.logger.warn(`mobile playback failed: ${error.message}`);
     });
-    const codecName = session.videoCodec.toLowerCase();
-    const hevcPack = codecName === 'hevc' || codecName === 'h265' || codecName === 'hev1' || codecName === 'hvc1';
-    const initReady = hevcPack
-      ? await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000)
-      : true;
-    const firstSegment = hevcPack ? 'seg00000.m4s' : `seg00000${HLS_SEGMENT_SUFFIX}`;
-    const ready = initReady && await this.waitForSegment(join(session.dir, firstSegment), child, 90_000);
+    const initReady = await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
+    const ready = initReady && await this.waitForSegment(join(session.dir, 'seg00000.m4s'), child, 90_000);
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);
@@ -746,7 +745,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private progressiveArgs(session: Session, audioCodec: string): string[] {
     const codec = session.videoCodec.toLowerCase();
     const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
-    const video = hevc ? ['-c:v', 'copy', '-tag:v', 'hvc1'] : ['-c:v', 'copy'];
+    const h264 = codec === 'h264' || codec === 'avc' || codec === 'avc1';
+    const video = hevc
+      ? ['-c:v', 'copy', '-tag:v', 'hvc1']
+      : h264
+        ? ['-c:v', 'copy', '-tag:v', 'avc1']
+        : ['-c:v', 'copy'];
     const audio =
       audioCodec === 'aac' || audioCodec === 'mp3'
         ? ['-c:a', 'copy']
