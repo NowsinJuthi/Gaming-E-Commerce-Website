@@ -162,6 +162,15 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     this.stopFfmpeg(session);
     await this.clearSegments(session);
     if (episodeChanged) await this.clearCaptions(session);
+    // A seek already knows the file. Probing it again is what makes every drag buffer.
+    if (!episodeChanged && session.sourceFile) {
+      session.startSeconds = this.clampStart(session.startSeconds, session.durationSeconds);
+      session.status = 'ready';
+      session.message = '';
+      session.complete = false;
+      session.touchedAt = Date.now();
+      return this.present(session);
+    }
     void this.materialize(session);
     return this.present(session);
   }
@@ -683,8 +692,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     });
     const ext = fmp4 ? 'm4s' : 'ts';
     const initReady = !fmp4 || await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
-    // A seek needs two segments so playback starts behind the live edge instead of buffering on it.
-    const segmentCount = seekPack ? 2 : 1;
+    const segmentCount = 1;
     let ready = initReady;
     for (let index = 0; ready && index < segmentCount; index += 1) {
       const name = `seg${String(index).padStart(5, '0')}.${ext}`;

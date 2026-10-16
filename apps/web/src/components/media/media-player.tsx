@@ -195,12 +195,7 @@ function seekInsidePack(video: HTMLVideoElement, localTarget: number): number | 
     if (forward && end > previous && end <= localTarget + 0.05 && (toward == null || end > toward)) toward = end;
     if (!forward && start < previous && start >= localTarget - 0.05 && (toward == null || start < toward)) toward = start;
   }
-  if (!sawFinite) {
-    const landed = Math.max(0, localTarget);
-    video.currentTime = landed;
-    return landed;
-  }
-  if (toward == null) return null;
+  if (!sawFinite || toward == null) return null;
   video.currentTime = toward;
   return toward;
 }
@@ -1409,17 +1404,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     remember(absolute);
 
     if (isPhonePlayback() && targetIsInCurrentPack) {
-      const displayed = displayTimelineSeconds(video.currentTime, origin, movie);
-      const jump = absolute - displayed;
       const landed = seekInsidePack(video, localTarget);
       if (landed != null) {
         quietSeekUntil.current = Date.now() + 1800;
         setCurrent(displayTimelineSeconds(landed, origin, movie));
-        return;
-      }
-      // Rebuilding the pack blanks the picture and buffers. A normal drag stays put.
-      if (Math.abs(jump) <= 120) {
-        setCurrent(displayed);
         return;
       }
     } else if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
