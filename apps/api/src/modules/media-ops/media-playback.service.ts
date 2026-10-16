@@ -548,9 +548,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return /\.(mkv|webm)$/i.test((file.split('?')[0] ?? '').split(/[/\\]/).pop() ?? '');
   }
 
-  private ffmpegInputArgs(file: string, streaming: boolean, startSeconds: number): string[] {
+  private ffmpegInputArgs(file: string, streaming: boolean, startSeconds: number, fast = false): string[] {
     const remote = file.startsWith('http://');
-    const mkv = !streaming && this.isMatroskaPath(file);
+    const mkv = !streaming && !fast && this.isMatroskaPath(file);
     return [
       ...(!streaming && startSeconds > 0.5 ? ['-ss', startSeconds.toFixed(3)] : []),
       ...(remote ? ['-seekable', '1'] : []),
@@ -624,21 +624,32 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
   private async packMobile(session: Session, file: string, token: number) {
     const playlist = join(session.dir, 'index.m3u8');
     const audio = session.audioTracks[session.audioIndex];
-    const mkv = this.isMatroskaPath(file);
-    const segment = join(session.dir, 'seg%05d.m4s');
+    const codec = session.videoCodec.toLowerCase();
+    const hevc = codec === 'hevc' || codec === 'h265' || codec === 'hev1' || codec === 'hvc1';
+    const h264 = codec === 'h264' || codec === 'avc' || codec === 'avc1';
+    // H.264 matches Movie-Server: MPEG-TS. Safari seeks that without rebuilding the pack.
+    // HEVC stays fMP4 because iPhone will not play HEVC inside MPEG-TS.
+    const fmp4 = hevc;
+    const segment = join(session.dir, fmp4 ? 'seg%05d.m4s' : 'seg%05d.ts');
     const seekPack = session.startSeconds > 0.5;
     const segmentSeconds = seekPack ? 2 : 4;
+    const videoArgs = hevc
+      ? ['-c:v', 'copy', '-tag:v', 'hvc1']
+      : h264
+        ? ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
+        : ['-c:v', 'copy'];
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-      ...this.ffmpegInputArgs(file, false, session.startSeconds),
+      ...this.ffmpegInputArgs(file, false, session.startSeconds, true),
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
       '-sn', '-dn',
       '-muxdelay', '0',
       '-muxpreload', '0',
       '-max_delay', '5000000',
-      ...(mkv ? ['-reset_timestamps', '1'] : []),
-      ...this.progressiveArgs(session, audio?.codec ?? ''),
+      ...videoArgs,
+      ...this.mobileAudioArgs(audio?.codec ?? ''),
+      '-max_muxing_queue_size', '9999',
       '-f', 'hls',
       '-hls_time', String(segmentSeconds),
       '-hls_init_time', String(Math.min(2, segmentSeconds)),
@@ -646,8 +657,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-start_number', '0',
       '-hls_playlist_type', 'event',
       '-hls_flags', 'independent_segments+omit_endlist+temp_file',
-      '-hls_segment_type', 'fmp4',
-      '-hls_fmp4_init_filename', 'init.mp4',
+      ...(fmp4 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
       '-avoid_negative_ts', 'make_zero',
       '-hls_segment_filename', segment,
       playlist,
@@ -669,8 +679,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (session.ffmpeg === child) session.ffmpeg = null;
       this.logger.warn(`mobile playback failed: ${error.message}`);
     });
-    const initReady = await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
-    const ready = initReady && await this.waitForSegment(join(session.dir, 'seg00000.m4s'), child, 90_000);
+    const initReady = !fmp4 || await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
+    const firstSegment = fmp4 ? 'seg00000.m4s' : 'seg00000.ts';
+    const ready = initReady && await this.waitForSegment(join(session.dir, firstSegment), child, 90_000);
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);
@@ -741,6 +752,15 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     }
     session.status = 'ready';
     session.message = '';
+  }
+
+  /** iPhone can play AAC, MP3, AC-3, and E-AC-3 in HLS. Only other codecs become AAC. */
+  private mobileAudioArgs(audioCodec: string): string[] {
+    const codec = audioCodec.toLowerCase();
+    if (codec === 'aac' || codec === 'mp3' || codec === 'ac3' || codec === 'eac3') {
+      return ['-c:a', 'copy'];
+    }
+    return ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1:first_pts=0'];
   }
 
   /** In-memory remux. Video is copied. Audio is AAC only when it is not already AAC/MP3. */

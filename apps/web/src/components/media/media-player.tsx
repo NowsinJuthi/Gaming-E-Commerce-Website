@@ -8,6 +8,7 @@ import {
   displayTimelineSeconds,
   isLocalTimeInPack,
   localTimelineSeconds,
+  packEdgeSeconds,
 } from "@/lib/media-playback-timeline";
 import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
 import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
@@ -1371,6 +1372,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;
+    }
+
+    // A short iPhone scrub used to kill ffmpeg and buffer from scratch.
+    // Stay on this pack when the target is only a little past what Safari already has.
+    if (isPhonePlayback() && targetIsInCurrentPack) {
+      const edge = packEdgeSeconds(video);
+      if (edge > 0 && localTarget <= edge + 30) {
+        applyVideoSeek(video, Math.min(localTarget, Math.max(0, edge - 0.05)));
+        setCurrent(absolute);
+        return;
+      }
     }
 
     await restartPlaybackAt(absolute, beforeSeek, previousOrigin);

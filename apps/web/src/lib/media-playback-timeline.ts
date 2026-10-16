@@ -52,6 +52,25 @@ export function isLocalTimeInPack(
   return false;
 }
 
+/** Furthest finite time the element can already represent (buffered or seekable). */
+export function packEdgeSeconds(video: HTMLVideoElement): number {
+  let edge = 0;
+  const scan = (ranges: TimeRanges) => {
+    for (let i = 0; i < ranges.length; i += 1) {
+      const end = ranges.end(i);
+      if (Number.isFinite(end) && end > edge) edge = end;
+    }
+  };
+  try {
+    scan(video.buffered);
+    scan(video.seekable);
+  } catch {
+    /* element detached */
+  }
+  if (Number.isFinite(video.currentTime) && video.currentTime > edge) edge = video.currentTime;
+  return edge;
+}
+
 /** While ffmpeg is still packaging (EVENT HLS), only seek inside buffered data. */
 export function canSeekWithinCurrentPack(
   video: HTMLVideoElement,
