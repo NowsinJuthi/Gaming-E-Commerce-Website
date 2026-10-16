@@ -22,10 +22,11 @@ import {
 } from "@/components/admin/saved-reply-form-panel";
 import {
   getChatQuickReplies,
+  getMe,
   updateChatQuickReplies,
   type ChatQuickReply,
 } from "@/lib/api";
-import { hasStrictAdminRole } from "@/lib/auth-roles";
+import { isChatStaffFromRoles } from "@/lib/chat-roles";
 
 const PAGE_SIZE = 10;
 
@@ -162,20 +163,23 @@ export default function AdminSavedRepliesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const sync = () => {
-      setAllowed(hasStrictAdminRole());
-      setAuthChecked(true);
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (!cancelled) setAllowed(isChatStaffFromRoles(me.roles ?? []));
+      })
+      .catch(() => {
+        if (!cancelled) setAllowed(false);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthChecked(true);
+      });
+    return () => {
+      cancelled = true;
     };
-    sync();
-    window.addEventListener("auth-change", sync);
-    return () => window.removeEventListener("auth-change", sync);
   }, []);
 
   const load = useCallback(() => {
-    if (!hasStrictAdminRole()) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setLoadError(null);
     getChatQuickReplies()
@@ -424,8 +428,8 @@ export default function AdminSavedRepliesPage() {
         backLabel="Live chat"
       >
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          Admin access required. Saved replies can only be managed by admin
-          accounts.
+          Live chat staff access required. Saved replies can only be managed
+          by admin or support accounts.
         </div>
       </AdminPageLayout>
     );

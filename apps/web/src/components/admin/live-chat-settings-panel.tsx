@@ -9,10 +9,12 @@ import {
   getChatWelcomeAutoReply,
   getChatQuickReplies,
   getCustomerPanelAdminSettings,
+  getMe,
   updateChatWelcomeAutoReply,
   updateCustomerPanelSettings,
 } from "@/lib/api";
 import { hasStrictAdminRole } from "@/lib/auth-roles";
+import { isChatStaffFromRoles } from "@/lib/chat-roles";
 import { resolveNavItemEnabled } from "@/lib/customer-panel";
 
 const DEFAULT_WELCOME_AUTO_REPLY =
@@ -69,6 +71,7 @@ export function LiveChatSettingsPanel() {
   const [savingChatNav, setSavingChatNav] = useState(false);
   const [savingResponseTime, setSavingResponseTime] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canManageReplies, setCanManageReplies] = useState(false);
   const [quickReplyCount, setQuickReplyCount] = useState<number | null>(null);
   const [quickReplyEnabled, setQuickReplyEnabled] = useState<number | null>(null);
   const [welcomeEnabled, setWelcomeEnabled] = useState(false);
@@ -87,6 +90,20 @@ export function LiveChatSettingsPanel() {
     sync();
     window.addEventListener("auth-change", sync);
     return () => window.removeEventListener("auth-change", sync);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (!cancelled) setCanManageReplies(isChatStaffFromRoles(me.roles ?? []));
+      })
+      .catch(() => {
+        if (!cancelled) setCanManageReplies(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -121,7 +138,7 @@ export function LiveChatSettingsPanel() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageReplies) {
       setQuickReplyCount(null);
       setQuickReplyEnabled(null);
       return;
@@ -143,7 +160,7 @@ export function LiveChatSettingsPanel() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin]);
+  }, [canManageReplies]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -465,7 +482,7 @@ export function LiveChatSettingsPanel() {
         subtitle="Quick replies for staff in the live chat composer"
         className="w-full"
       >
-        {isAdmin ? (
+        {canManageReplies ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-foreground-muted">
               {quickReplyCount != null

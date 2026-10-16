@@ -243,7 +243,6 @@ export const ADMIN_NAV: NavSection[] = [
             href: "/admin/saved-replies",
             label: "Saved replies",
             icon: MailIcon,
-            adminOnly: true,
           },
           { href: "/admin/tickets", label: "Tickets", icon: ReceiptIcon },
           {

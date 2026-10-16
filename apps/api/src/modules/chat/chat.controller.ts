@@ -271,14 +271,14 @@ export class ChatController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(...CHAT_STAFF_ROLES)
   @Get('admin/quick-replies')
   listQuickReplies() {
     return this.chatSettings.getQuickReplies();
   }
 
   @UseGuards(RolesGuard, LicenseFeatureGuard)
-  @Roles(Role.Admin)
+  @Roles(...CHAT_STAFF_ROLES)
   @Put('admin/quick-replies')
   @RequiresLicenseFeature('liveChat')
   updateQuickReplies(@Body() dto: UpdateChatQuickRepliesDto) {
