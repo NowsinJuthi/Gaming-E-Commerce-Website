@@ -492,6 +492,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [needsGesture, setNeedsGesture] = useState(false);
   const mobileAutoplayRef = useRef(false);
   const startedMutedRef = useRef(false);
+  const wantAudibleRef = useRef(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [scrub, setScrub] = useState<number | null>(null);
@@ -653,10 +654,18 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         }
       }
       try {
+        wantAudibleRef.current = true;
+        element.volume = 1;
         element.muted = true;
         await element.play();
-        startedMutedRef.current = true;
-        setMuted(true);
+        element.muted = false;
+        setVolume(1);
+        setMuted(false);
+        startedMutedRef.current = false;
+        if (element.paused) {
+          element.muted = false;
+          await element.play();
+        }
         setNeedsGesture(false);
       } catch {
         element.muted = false;
@@ -993,6 +1002,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       seekingRef.current = false;
       setBuffering(false);
       setHoldFrame(null);
+      if (wantAudibleRef.current) {
+        wantAudibleRef.current = false;
+        video.volume = 1;
+        video.muted = false;
+        startedMutedRef.current = false;
+        setVolume(1);
+        setMuted(false);
+      }
     };
     const onEnded = () => {
       const currentSession = sessionRef.current;
