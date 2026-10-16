@@ -8,7 +8,6 @@ import {
   displayTimelineSeconds,
   isLocalTimeInPack,
   localTimelineSeconds,
-  packEdgeSeconds,
 } from "@/lib/media-playback-timeline";
 import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
 import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
@@ -171,6 +170,32 @@ function applyVideoSeek(video: HTMLVideoElement, target: number) {
     }
   }
   video.currentTime = target;
+}
+
+/** Move only toward the finger. A forward drag must not snap backward, or the reverse. */
+function seekInsidePack(video: HTMLVideoElement, localTarget: number): number | null {
+  const previous = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+  const forward = localTarget >= previous - 0.05;
+  const ranges = video.seekable.length > 0 ? video.seekable : video.buffered;
+  let toward: number | null = null;
+  for (let i = 0; i < ranges.length; i += 1) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (localTarget >= start - 0.05 && localTarget <= end + 0.05) {
+      const landed = Math.min(end, Math.max(start, localTarget));
+      const sameWay = forward ? landed + 0.2 >= previous : landed - 0.2 <= previous;
+      if (sameWay) {
+        video.currentTime = landed;
+        return landed;
+      }
+    }
+    if (forward && end > previous && end <= localTarget + 0.05 && (toward == null || end > toward)) toward = end;
+    if (!forward && start < previous && start >= localTarget - 0.05 && (toward == null || start < toward)) toward = start;
+  }
+  if (toward == null) return null;
+  video.currentTime = toward;
+  return toward;
 }
 
 function SeekTrack({
@@ -1374,23 +1399,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setCurrent(absolute);
     remember(absolute);
 
-    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
-      if (isPhonePlayback()) video.currentTime = localTarget;
-      else applyVideoSeek(video, localTarget);
-      setCurrent(absolute);
-      return;
-    }
-
-    // Stay a few seconds behind the published edge. Seeking onto the edge makes
-    // iPhone wait for the next segment and the buffer spinner never stops.
     if (isPhonePlayback() && targetIsInCurrentPack) {
-      const edge = packEdgeSeconds(video);
-      const cushion = edge - 3;
-      if (cushion > video.currentTime + 0.5) {
-        video.currentTime = Math.min(localTarget, cushion);
-        setCurrent(absolute);
+      const landed = seekInsidePack(video, localTarget);
+      if (landed != null) {
+        setCurrent(displayTimelineSeconds(landed, origin, movie));
         return;
       }
+    } else if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
+      applyVideoSeek(video, localTarget);
+      setCurrent(absolute);
+      return;
     }
 
     await restartPlaybackAt(absolute, beforeSeek, previousOrigin);
