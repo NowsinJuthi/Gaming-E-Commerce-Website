@@ -1928,6 +1928,17 @@ export function ChatPanel({
               </div>
               {useChatPro || messenger ? (
                 <div className="admin-chat-header-end">
+                  {mobileThread ? (
+                    <button
+                      type="button"
+                      className="admin-chat-messenger-back-btn"
+                      onClick={clearActiveRoom}
+                      aria-label="Back to messages"
+                    >
+                      <ArrowLeftIcon className="h-4 w-4" aria-hidden />
+                      <span className="admin-chat-messenger-back-label">Back</span>
+                    </button>
+                  ) : null}
                   <div
                     className="admin-chat-toolbar"
                     role="toolbar"
@@ -2012,17 +2023,6 @@ export function ChatPanel({
                       ) : null}
                     </div>
                   </div>
-                  {mobileThread ? (
-                    <button
-                      type="button"
-                      className="admin-chat-messenger-back-btn admin-chat-messenger-back-btn--end"
-                      onClick={clearActiveRoom}
-                      aria-label="Back to messages"
-                    >
-                      <ArrowLeftIcon className="h-4 w-4" aria-hidden />
-                      <span className="admin-chat-messenger-back-label">Back</span>
-                    </button>
-                  ) : null}
                 </div>
               ) : !isAdmin ? (
                 <div className="flex items-center gap-2">
