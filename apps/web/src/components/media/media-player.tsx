@@ -139,7 +139,12 @@ function volumeReadOnly(): boolean {
 }
 
 /** 0 at the start of the bar, 1 at the end, including a CSS-rotated phone player. */
-function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number): number {
+function sliderRatioFromClient(
+  el: HTMLElement,
+  clientX: number,
+  clientY: number,
+  flip = false,
+): number {
   let angle = 0;
   if (typeof DOMMatrixReadOnly === "function") {
     for (let node: HTMLElement | null = el; node; node = node.parentElement) {
@@ -158,7 +163,9 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
   const dy = clientY - (rect.top + rect.height / 2);
   const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
   const width = el.offsetWidth || 1;
-  return Math.min(1, Math.max(0, localX / width + 0.5));
+  let ratio = localX / width + 0.5;
+  if (flip) ratio = 1 - ratio;
+  return Math.min(1, Math.max(0, ratio));
 }
 
 function applyVideoSeek(video: HTMLVideoElement, target: number) {
@@ -177,12 +184,15 @@ function SeekTrack({
   value,
   max,
   teal = false,
+  flip = false,
   onScrub,
   onCommit,
 }: {
   value: number;
   max: number;
   teal?: boolean;
+  /** Portrait immersive shell uses top-left 90deg rotation — drag direction is mirrored. */
+  flip?: boolean;
   onScrub: (seconds: number) => void;
   onCommit: (ratio: number) => void;
 }) {
@@ -211,7 +221,7 @@ function SeekTrack({
       if (dragId.current == null || event.pointerId !== dragId.current) return;
       const el = trackRef.current;
       if (!el) return;
-      const ratio = sliderRatioFromClient(el, event.clientX, event.clientY);
+      const ratio = sliderRatioFromClient(el, event.clientX, event.clientY, flip);
       previewRatioRef.current = ratio;
       onScrubRef.current(Math.round(ratio * Math.max(max, 1)));
     };
@@ -229,12 +239,12 @@ function SeekTrack({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, endScrub, max]);
+  }, [dragging, endScrub, flip, max]);
 
   function pointAt(clientX: number, clientY: number) {
     const el = trackRef.current;
     if (!el) return;
-    const ratio = sliderRatioFromClient(el, clientX, clientY);
+    const ratio = sliderRatioFromClient(el, clientX, clientY, flip);
     previewRatioRef.current = ratio;
     onScrubRef.current(Math.round(ratio * Math.max(max, 1)));
   }
@@ -1524,6 +1534,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   }
 
   const shown = scrub ?? current;
+  const flipSeekSlider = mobile && immersive && portrait;
 
   function commitSeek(ratio: number) {
     setScrub(null);
@@ -1745,6 +1756,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
               <SeekTrack
                 value={shown}
                 max={duration}
+                flip={flipSeekSlider}
                 onScrub={(seconds) => {
                   reveal();
                   setScrub(seconds);
@@ -1840,6 +1852,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
                 teal
                 value={shown}
                 max={duration}
+                flip={flipSeekSlider}
                 onScrub={(seconds) => {
                   reveal();
                   setScrub(seconds);
