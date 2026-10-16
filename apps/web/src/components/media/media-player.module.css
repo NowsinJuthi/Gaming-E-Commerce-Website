@@ -114,6 +114,16 @@
   opacity: 0;
 }
 
+.mobileChrome {
+  pointer-events: none;
+}
+
+.mobileChrome .mTop,
+.mobileChrome .mDock,
+.mobileChrome .bottom {
+  pointer-events: auto;
+}
+
 .chrome {
   position: absolute;
   inset: 0;
@@ -329,6 +339,11 @@
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.mobileChrome .skin {
+  pointer-events: none;
+  cursor: default;
 }
 
 .titleRow {
@@ -579,10 +594,48 @@
   cursor: pointer;
 }
 
+.skipRipple {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  width: 42%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.skipRippleLeft {
+  left: 0;
+}
+
+.skipRippleRight {
+  right: 0;
+}
+
+.skipRipple::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(72vw, 16rem);
+  height: min(72vw, 16rem);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  transform: translate(-50%, -50%) scale(0.35);
+  animation: skipRipplePulse 0.55s ease-out forwards;
+}
+
+@keyframes skipRipplePulse {
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
 .skipFlash {
   position: absolute;
   top: 50%;
-  z-index: 4;
+  z-index: 6;
   transform: translateY(-50%);
   padding: 0.7rem 1rem;
   border-radius: 999px;
@@ -828,8 +881,9 @@
 .tapZones {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 4;
   display: flex;
+  touch-action: manipulation;
 }
 
 .tapZones button {
@@ -839,7 +893,7 @@
 }
 
 .tapZones .side {
-  width: 34%;
+  width: 40%;
 }
 
 .tapZones .middle {

@@ -453,8 +453,10 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const hlsRef = useRef<Hls | null>(null);
   const sessionRef = useRef<PlaybackSession | null>(null);
   const hideTimer = useRef<number | null>(null);
-  const lastTap = useRef<{ zone: string; at: number } | null>(null);
+  const lastTap = useRef<{ zone: "left" | "middle" | "right"; at: number; burst?: boolean } | null>(null);
   const zoneTimer = useRef<number | null>(null);
+  const zonePointerDownRef = useRef<"left" | "middle" | "right" | null>(null);
+  const skipFlashTimer = useRef<number | null>(null);
   const skipAt = useRef<number | null>(null);
   const seekingRef = useRef(false);
   const pendingSeekRef = useRef<number | null>(null);
@@ -522,7 +524,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const [locked, setLocked] = useState(false);
   const statsOn = false;
   const [notice, setNotice] = useState("");
-  const [skipFlash, setSkipFlash] = useState<"back" | "forward" | null>(null);
+  const [skipFlash, setSkipFlash] = useState<{ side: "back" | "forward"; seconds: number } | null>(null);
+  const [skipRipple, setSkipRipple] = useState<"back" | "forward" | null>(null);
   const [mobile, setMobile] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [immersive, setImmersive] = useState(false);
@@ -1087,6 +1090,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     };
   }, []);
 
+  useEffect(
+    () => () => {
+      if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+      if (skipFlashTimer.current) window.clearTimeout(skipFlashTimer.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -1308,8 +1319,18 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const video = videoRef.current;
     const currentSession = sessionRef.current;
     if (!video || !currentSession) return;
-    setSkipFlash(delta < 0 ? "back" : "forward");
-    window.setTimeout(() => setSkipFlash(null), 700);
+    const side = delta < 0 ? "back" : "forward";
+    const step = Math.abs(delta);
+    setSkipRipple(side);
+    window.setTimeout(() => setSkipRipple(null), 560);
+    setSkipFlash((prev) =>
+      prev && prev.side === side ? { side, seconds: prev.seconds + step } : { side, seconds: step },
+    );
+    if (skipFlashTimer.current) window.clearTimeout(skipFlashTimer.current);
+    skipFlashTimer.current = window.setTimeout(() => {
+      skipFlashTimer.current = null;
+      setSkipFlash(null);
+    }, 900);
     const movieLen = currentSession.durationSeconds;
     const display =
       skipAt.current ??
@@ -1323,6 +1344,54 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     }, 500);
     void seekTo(next);
     reveal();
+  }
+
+  function onZone(zone: "left" | "middle" | "right") {
+    const video = videoRef.current;
+    if (video && unmuteStartedPlayback(video)) {
+      reveal();
+      return;
+    }
+    const now = performance.now();
+    const previous = lastTap.current;
+    if (zone === "left" || zone === "right") {
+      if (previous && previous.zone === zone) {
+        if (!previous.burst && now - previous.at < 320) {
+          if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+          zoneTimer.current = null;
+          lastTap.current = { zone, at: now, burst: true };
+          skip(zone === "left" ? -10 : 10);
+          return;
+        }
+        if (previous.burst && now - previous.at < 520) {
+          lastTap.current = { zone, at: now, burst: true };
+          skip(zone === "left" ? -10 : 10);
+          return;
+        }
+      }
+      lastTap.current = { zone, at: now };
+      if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+      zoneTimer.current = window.setTimeout(() => {
+        zoneTimer.current = null;
+        if (needsGesture) togglePlay();
+        else setChrome((value) => !value);
+      }, 320);
+      return;
+    }
+    lastTap.current = null;
+    if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
+    zoneTimer.current = null;
+    if (needsGesture) togglePlay();
+    else setChrome((value) => !value);
+  }
+
+  function onMobileZoneTap(zone: "left" | "middle" | "right", event: React.PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (zonePointerDownRef.current !== zone) return;
+    zonePointerDownRef.current = null;
+    event.preventDefault();
+    event.stopPropagation();
+    onZone(zone);
   }
 
   async function restartPlaybackAt(absolute: number, beforeSeek: number, previousOrigin: number) {
@@ -1477,50 +1546,18 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     window.setTimeout(() => setNotice(""), 2800);
   }
 
-  function onZone(zone: "left" | "middle" | "right") {
-    const video = videoRef.current;
-    if (video && unmuteStartedPlayback(video)) {
-      reveal();
-      return;
-    }
-    const now = Date.now();
-    const previous = lastTap.current;
-    lastTap.current = { zone, at: now };
-    if (zone === "left" || zone === "right") {
-      if (previous && previous.zone === zone && now - previous.at < 450) {
-        if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
-        zoneTimer.current = null;
-        skip(zone === "left" ? -10 : 10);
-        return;
-      }
-      if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
-      zoneTimer.current = window.setTimeout(() => {
-        zoneTimer.current = null;
-        if (needsGesture) togglePlay();
-        else setChrome((value) => !value);
-      }, 450);
-      return;
-    }
-    if (zoneTimer.current) window.clearTimeout(zoneTimer.current);
-    zoneTimer.current = null;
-    if (needsGesture) togglePlay();
-    else setChrome((value) => !value);
-  }
-
   function onShellPointerUp(event: React.PointerEvent<HTMLElement>) {
-    if (!mobile || locked || sheet) return;
+    if (mobile || locked || sheet) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("a, input, textarea, select")) return;
     const control = target?.closest("button");
     const skinClass = styles.skin ?? "";
-    const zoneClass = styles.tapZones ?? "";
-    const inTapZone = zoneClass.length > 0 && Boolean(control?.closest(`.${zoneClass}`));
-    if (control && !control.classList.contains(skinClass) && !inTapZone) return;
+    if (control && !control.classList.contains(skinClass)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width < 8) return;
     const x = (event.clientX - rect.left) / rect.width;
-    onZone(x < 0.3 ? "left" : x > 0.7 ? "right" : "middle");
+    onZone(x < 0.34 ? "left" : x > 0.66 ? "right" : "middle");
   }
 
   const shown = scrub ?? current;
@@ -1572,15 +1609,64 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         />
       ) : null}
 
-      {mobile && !locked ? (
-        <div className={styles.tapZones}>
-          <button type="button" className={styles.side} aria-label="Rewind 10 seconds" tabIndex={-1} />
-          <button type="button" className={styles.middle} aria-label="Show controls" tabIndex={-1} />
-          <button type="button" className={styles.side} aria-label="Forward 10 seconds" tabIndex={-1} />
+      {mobile && !locked && !sheet ? (
+        <div className={styles.tapZones} aria-hidden={false}>
+          <button
+            type="button"
+            className={styles.side}
+            aria-label="Double-tap to rewind 10 seconds"
+            tabIndex={-1}
+            onPointerDown={() => {
+              zonePointerDownRef.current = "left";
+            }}
+            onPointerUp={(event) => onMobileZoneTap("left", event)}
+            onPointerCancel={() => {
+              if (zonePointerDownRef.current === "left") zonePointerDownRef.current = null;
+            }}
+            onClick={(event) => event.preventDefault()}
+          />
+          <button
+            type="button"
+            className={styles.middle}
+            aria-label="Show or hide controls"
+            tabIndex={-1}
+            onPointerDown={() => {
+              zonePointerDownRef.current = "middle";
+            }}
+            onPointerUp={(event) => onMobileZoneTap("middle", event)}
+            onPointerCancel={() => {
+              if (zonePointerDownRef.current === "middle") zonePointerDownRef.current = null;
+            }}
+            onClick={(event) => event.preventDefault()}
+          />
+          <button
+            type="button"
+            className={styles.side}
+            aria-label="Double-tap to skip forward 10 seconds"
+            tabIndex={-1}
+            onPointerDown={() => {
+              zonePointerDownRef.current = "right";
+            }}
+            onPointerUp={(event) => onMobileZoneTap("right", event)}
+            onPointerCancel={() => {
+              if (zonePointerDownRef.current === "right") zonePointerDownRef.current = null;
+            }}
+            onClick={(event) => event.preventDefault()}
+          />
         </div>
       ) : null}
 
-      {skipFlash ? <div className={`${styles.skipFlash} ${skipFlash === "back" ? styles.skipLeft : styles.skipRight}`}>{skipFlash === "back" ? "-10s" : "+10s"}</div> : null}
+      {skipRipple ? (
+        <div
+          className={`${styles.skipRipple} ${skipRipple === "back" ? styles.skipRippleLeft : styles.skipRippleRight}`}
+          aria-hidden
+        />
+      ) : null}
+      {skipFlash ? (
+        <div className={`${styles.skipFlash} ${skipFlash.side === "back" ? styles.skipLeft : styles.skipRight}`}>
+          {skipFlash.side === "back" ? `-${skipFlash.seconds}s` : `+${skipFlash.seconds}s`}
+        </div>
+      ) : null}
 
       {!mobile && (preparing || (buffering && !error)) ? (
         <div className={styles.busy} role="status" aria-live="polite" aria-label={preparing ? "Loading" : "Buffering"}>
