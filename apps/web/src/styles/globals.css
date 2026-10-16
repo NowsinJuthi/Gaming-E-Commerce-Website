@@ -17952,25 +17952,35 @@
       justify-content: center;
     }
 
-    /* Thread header: Back stays on the left; the action box stays inside the header. */
-    .admin-chat-header--messenger-thread {
+    /* Thread header: name row, then the full action box inside the header. */
+    .admin-chat-shell--messenger-thread .admin-chat-header--messenger-thread {
+      position: relative;
+      z-index: 20;
+      height: auto;
+      max-height: none;
       overflow: visible;
       flex-shrink: 0;
     }
 
+    .admin-chat-shell--messenger-thread .admin-chat-messages,
+    .admin-chat-shell--messenger-thread .chat-messages-3d,
+    .admin-chat-shell--messenger-thread .chat-3d-messages {
+      position: relative;
+      z-index: 1;
+    }
+
     .admin-chat-header--messenger-thread .admin-chat-header-row {
-      flex-direction: column;
-      flex-wrap: nowrap;
-      align-items: stretch;
-      row-gap: 0.625rem;
-      overflow: visible;
-      padding-bottom: 0.75rem;
+      display: contents;
     }
 
     .admin-chat-header--messenger-thread .admin-chat-header-main {
+      display: flex;
       flex: 0 0 auto;
+      align-items: center;
       width: 100%;
       max-width: 100%;
+      padding: 0.625rem 0.75rem 0.35rem;
+      padding-top: max(0.625rem, env(safe-area-inset-top, 0px));
     }
 
     .admin-chat-header--messenger-thread .admin-chat-header-end {
@@ -17982,16 +17992,22 @@
       gap: 0.5rem;
       width: 100%;
       min-width: 0;
+      height: auto;
+      min-height: 3.25rem;
+      padding: 0.15rem 0.75rem 0.85rem;
       overflow: visible;
+      box-sizing: border-box;
     }
 
     .admin-chat-header--messenger-thread .admin-chat-toolbar {
       display: flex;
       flex: 1 1 auto;
+      align-items: center;
       width: auto;
       min-width: 0;
       max-width: 100%;
-      min-height: 2.5rem;
+      height: auto;
+      min-height: 2.75rem;
       overflow: hidden;
       box-shadow: none;
     }
