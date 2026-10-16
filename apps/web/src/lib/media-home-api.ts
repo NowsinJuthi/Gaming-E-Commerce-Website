@@ -102,6 +102,8 @@ export function parseMediaBrowse(data: unknown): MediaBrowseResult {
 export type MediaBrowseParams = {
   libraryId?: string;
   year?: string;
+  genre?: string;
+  minRating?: string;
   q?: string;
   offset?: number;
   limit?: number;
@@ -113,6 +115,8 @@ function browseQuery(params: MediaBrowseParams): string {
     search.set("libraryId", params.libraryId);
   }
   if (params.year?.trim()) search.set("year", params.year.trim());
+  if (params.genre?.trim()) search.set("genre", params.genre.trim());
+  if (params.minRating?.trim()) search.set("minRating", params.minRating.trim());
   if (params.q?.trim()) search.set("q", params.q.trim());
   search.set("offset", String(Math.max(0, params.offset ?? 0)));
   search.set("limit", String(params.limit ?? MEDIA_PAGE_SIZE_DESKTOP));
@@ -142,6 +146,23 @@ export async function getMediaYears(libraryId: string): Promise<number[]> {
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data.filter((y) => typeof y === "number" && y > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getMediaGenres(libraryId: string): Promise<string[]> {
+  try {
+    const q =
+      libraryId && libraryId !== "all"
+        ? `?libraryId=${encodeURIComponent(libraryId)}`
+        : "";
+    const res = await fetch(`${resolveMediaApiBase()}/media/genres${q}`, mediaFetchInit());
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data)
+      ? data.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : [];
   } catch {
     return [];
   }

@@ -154,16 +154,24 @@ export class CatalogController {
   browse(
     @Query('libraryId') libraryId?: string,
     @Query('year') year?: string,
+    @Query('genre') genre?: string,
+    @Query('minRating') minRating?: string,
     @Query('q') q?: string,
     @Query('offset') offset?: string,
     @Query('limit') limit?: string,
   ) {
     const parsedYear = year?.trim() ? Number(year) : undefined;
+    const parsedMinRating = minRating?.trim() ? Number(minRating) : undefined;
     const parsedOffset = offset?.trim() ? Number(offset) : 0;
     const parsedLimit = limit?.trim() ? Number(limit) : 24;
     return this.catalog.publicBrowse({
       libraryId,
       year: parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
+      genre: genre?.trim() || undefined,
+      minRating:
+        parsedMinRating != null && Number.isFinite(parsedMinRating) && parsedMinRating > 0
+          ? parsedMinRating
+          : undefined,
       q,
       offset: Number.isFinite(parsedOffset) ? parsedOffset : 0,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : 24,
@@ -175,6 +183,13 @@ export class CatalogController {
   @Get('media/years')
   years(@Query('libraryId') libraryId?: string) {
     return this.catalog.publicYears(libraryId);
+  }
+
+  @Public()
+  @Roles()
+  @Get('media/genres')
+  genres(@Query('libraryId') libraryId?: string) {
+    return this.catalog.publicGenres(libraryId);
   }
 
   @Public()

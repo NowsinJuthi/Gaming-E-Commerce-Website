@@ -27,6 +27,7 @@ import {
 import { useLgScreen } from "@/hooks/useLgScreen";
 import {
   getMediaBrowse,
+  getMediaGenres,
   getMediaYears,
   MEDIA_PAGE_SIZE_DESKTOP,
   MEDIA_PAGE_SIZE_MOBILE,
@@ -115,7 +116,10 @@ export function MediaHome({
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [year, setYear] = useState("");
+  const [genre, setGenre] = useState("");
+  const [minRating, setMinRating] = useState("");
   const [years, setYears] = useState<number[]>(home.years ?? []);
+  const [genres, setGenres] = useState<string[]>([]);
   const [catalogItems, setCatalogItems] = useState<MediaCard[]>(initialBrowse?.items ?? []);
   const [catalogTotal, setCatalogTotal] = useState(initialBrowse?.total ?? 0);
   const [hasMore, setHasMore] = useState(initialBrowse?.hasMore ?? false);
@@ -176,8 +180,18 @@ export function MediaHome({
   }, [home.years, libraryId]);
 
   useEffect(() => {
+    let cancelled = false;
+    void getMediaGenres(libraryId).then((values) => {
+      if (!cancelled) setGenres(values);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryId]);
+
+  useEffect(() => {
     if (searchActive) return;
-    const filterKey = `${libraryId}|${year}`;
+    const filterKey = `${libraryId}|${year}|${genre}|${minRating}`;
     if (lastBrowseFilterKeyRef.current === filterKey) return;
     lastBrowseFilterKeyRef.current = filterKey;
     let cancelled = false;
@@ -187,6 +201,8 @@ export function MediaHome({
     void getMediaBrowse({
       libraryId,
       year,
+      genre,
+      minRating,
       offset: 0,
       limit: pageSize,
     }).then((result) => {
@@ -201,7 +217,7 @@ export function MediaHome({
     };
     // pageSize intentionally omitted — desktop growth uses append effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [libraryId, year, searchActive]);
+  }, [genre, libraryId, minRating, year, searchActive]);
 
   useEffect(() => {
     if (!searchActive) {
@@ -214,6 +230,8 @@ export function MediaHome({
     void getMediaBrowse({
       libraryId,
       year,
+      genre,
+      minRating,
       q: debouncedSearch,
       offset: 0,
       limit: MEDIA_SEARCH_LIMIT,
@@ -225,7 +243,7 @@ export function MediaHome({
     return () => {
       cancelled = true;
     };
-  }, [libraryId, year, debouncedSearch, searchActive]);
+  }, [debouncedSearch, genre, libraryId, minRating, searchActive, year]);
 
   useEffect(() => {
     if (searchActive || browseLoading || loadingMore || !hasMore) return;
@@ -242,6 +260,8 @@ export function MediaHome({
         void getMediaBrowse({
           libraryId,
           year,
+          genre,
+          minRating,
           offset,
           limit: pageSize,
         })
@@ -272,8 +292,10 @@ export function MediaHome({
     browseLoading,
     catalogItems.length,
     hasMore,
+    genre,
     libraryId,
     loadingMore,
+    minRating,
     pageSize,
     searchActive,
     year,
@@ -286,6 +308,8 @@ export function MediaHome({
     void getMediaBrowse({
       libraryId,
       year,
+      genre,
+      minRating,
       offset: catalogItems.length,
       limit: pageSize - catalogItems.length,
     }).then((result) => {
@@ -309,8 +333,10 @@ export function MediaHome({
   }, [
     browseLoading,
     catalogItems.length,
+    genre,
     hasMore,
     libraryId,
+    minRating,
     pageSize,
     searchActive,
     year,
@@ -486,6 +512,8 @@ export function MediaHome({
                 onChange={(event) => {
                   setLibraryId(event.target.value);
                   setYear("");
+                  setGenre("");
+                  setMinRating("");
                 }}
               >
                 <option value={ALL_LIBRARIES}>All Movies & Series</option>
@@ -500,8 +528,18 @@ export function MediaHome({
           <label className={styles.field}>
             <span className="sr-only">Genre</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="" aria-label="Genre">
+              <select
+                className={styles.control}
+                value={genre}
+                aria-label="Genre"
+                onChange={(event) => setGenre(event.target.value)}
+              >
                 <option value="">Genres</option>
+                {genres.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
               </select>
             </span>
           </label>
@@ -528,8 +566,17 @@ export function MediaHome({
           <label className={styles.field}>
             <span className="sr-only">Min rating</span>
             <span className={styles.selectWrap}>
-              <select className={styles.control} defaultValue="" aria-label="Minimum rating">
+              <select
+                className={styles.control}
+                value={minRating}
+                aria-label="Minimum rating"
+                onChange={(event) => setMinRating(event.target.value)}
+              >
                 <option value="">Rating</option>
+                <option value="6">6.0+</option>
+                <option value="7">7.0+</option>
+                <option value="8">8.0+</option>
+                <option value="9">9.0+</option>
               </select>
             </span>
           </label>

@@ -46,6 +46,8 @@ function escapeRegex(value: string): string {
 function publicCatalogFilter(options: {
   libraryId?: string;
   year?: number;
+  genre?: string;
+  minRating?: number;
   q?: string;
 }): Record<string, unknown> {
   const filter: Record<string, unknown> = {
@@ -58,6 +60,13 @@ function publicCatalogFilter(options: {
   }
   if (options.year && options.year > 0) {
     filter.year = options.year;
+  }
+  const genre = options.genre?.trim();
+  if (genre) {
+    filter.genres = genre;
+  }
+  if (options.minRating != null && options.minRating > 0) {
+    filter.rating = { $gte: options.minRating };
   }
   const words = options.q?.trim().toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   if (words.length > 0) {
@@ -292,9 +301,19 @@ export class CatalogService {
       .sort((a, b) => b - a);
   }
 
+  async publicGenres(libraryId?: string) {
+    const filter = publicCatalogFilter({ libraryId: libraryId?.trim() || 'all' });
+    const values = await this.titles.distinct('genres', filter).exec();
+    return values
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
   async publicBrowse(options: {
     libraryId?: string;
     year?: number;
+    genre?: string;
+    minRating?: number;
     q?: string;
     offset?: number;
     limit?: number;
