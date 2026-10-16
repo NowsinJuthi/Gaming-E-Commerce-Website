@@ -302,7 +302,6 @@ export function ChatPanel({
   pro = false,
   messenger = false,
   onMessengerMobileViewChange,
-  onMessengerClose,
   embedded = false,
   overview: overviewProp,
   initialRoomId,
@@ -1829,17 +1828,6 @@ export function ChatPanel({
                     : "flex min-w-0 items-center gap-3"
                 }
               >
-                {mobileThread ? (
-                  <button
-                    type="button"
-                    className="admin-chat-messenger-back-btn"
-                    onClick={clearActiveRoom}
-                    aria-label="Back to messages"
-                  >
-                    <ArrowLeftIcon className="h-5 w-5" aria-hidden />
-                    <span className="admin-chat-messenger-back-label">Back</span>
-                  </button>
-                ) : null}
                 {useCustomerPro ? (
                   <SupportTeamAvatar
                     online={supportAgents.length > 0}
@@ -2024,15 +2012,15 @@ export function ChatPanel({
                       ) : null}
                     </div>
                   </div>
-                  {mobileThread && onMessengerClose ? (
+                  {mobileThread ? (
                     <button
                       type="button"
-                      className="admin-chat-messenger-close admin-chat-messenger-close--thread"
-                      onClick={onMessengerClose}
-                      aria-label="Close chat"
-                      title="Close chat"
+                      className="admin-chat-messenger-back-btn admin-chat-messenger-back-btn--end"
+                      onClick={clearActiveRoom}
+                      aria-label="Back to messages"
                     >
-                      <CloseIcon className="h-5 w-5" aria-hidden />
+                      <ArrowLeftIcon className="h-4 w-4" aria-hidden />
+                      <span className="admin-chat-messenger-back-label">Back</span>
                     </button>
                   ) : null}
                 </div>
