@@ -26,6 +26,7 @@ import {
   inventoryManagedPackages,
   isAutoDeliveryStockProduct,
   packageHasInventory,
+  UNASSIGNED_INVENTORY_SCOPE,
 } from "@/lib/inventory-packages";
 import type { ProductVariation } from "@/components/admin/product-variations";
 
@@ -167,6 +168,7 @@ export default function AdminStockPage() {
     sold: number;
   } | null>(null);
   const [purgingUnassigned, setPurgingUnassigned] = useState(false);
+  const [showUnassignedCodes, setShowUnassignedCodes] = useState(false);
   const [stock, setStock] = useState<{
     available: number;
     reserved: number;
@@ -315,6 +317,7 @@ export default function AdminStockPage() {
       setSelectedPackageId(null);
       setPackageStocks([]);
       setUnassignedStock(null);
+      setShowUnassignedCodes(false);
     }
   }, [autoDeliveryProducts, selected]);
 
@@ -324,6 +327,7 @@ export default function AdminStockPage() {
     setSelectedPackageId(null);
     setPackageStocks([]);
     setUnassignedStock(null);
+    setShowUnassignedCodes(false);
     setValues("");
     setCost("");
   }
@@ -403,6 +407,7 @@ export default function AdminStockPage() {
     setStock(null);
     setPackageStocks([]);
     setUnassignedStock(null);
+    setShowUnassignedCodes(false);
     setValues("");
     setCost("");
     setError(null);
@@ -423,8 +428,25 @@ export default function AdminStockPage() {
     }
   }, [loadStockForSelection]);
 
+  function revealUnassignedCodes() {
+    setShowUnassignedCodes(true);
+    setInventoryStatusFilter("available");
+    setInventoryRefreshKey((key) => key + 1);
+    requestAnimationFrame(() => {
+      inventoryCodesRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   async function selectPackage(packageId: string) {
-    if (!selected || packageId === selectedPackageId) return;
+    if (!selected) return;
+    if (packageId === selectedPackageId) {
+      setShowUnassignedCodes(false);
+      return;
+    }
+    setShowUnassignedCodes(false);
     setSelectedPackageId(packageId);
     setInventoryStatusFilter("available");
     setValues("");
@@ -1086,14 +1108,24 @@ export default function AdminStockPage() {
                         were added without selecting a package. They do not
                         appear in any package tab.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => void purgeUnassignedCodes()}
-                        disabled={purgingUnassigned || stockLoading}
-                        className="dashboard-pro-btn-ghost text-xs text-danger disabled:opacity-50"
-                      >
-                        {purgingUnassigned ? "Deleting…" : "Delete old codes"}
-                      </button>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={revealUnassignedCodes}
+                          disabled={stockLoading}
+                          className="dashboard-pro-btn-ghost text-xs disabled:opacity-50"
+                        >
+                          {showUnassignedCodes ? "Showing below" : "Show old code"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void purgeUnassignedCodes()}
+                          disabled={purgingUnassigned || stockLoading}
+                          className="dashboard-pro-btn-ghost text-xs text-danger disabled:opacity-50"
+                        >
+                          {purgingUnassigned ? "Deleting…" : "Delete old codes"}
+                        </button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -1330,17 +1362,19 @@ export default function AdminStockPage() {
                         Inventory codes
                       </h3>
                       <p className="mt-0.5 text-xs text-subtle">
-                        {activePackage && "name" in activePackage
-                          ? inventoryStatusFilter === "sold"
-                            ? `Sold codes for ${activePackage.name}`
-                            : inventoryStatusFilter === "reserved"
-                              ? `Reserved codes for ${activePackage.name}`
-                              : `Codes for ${activePackage.name} only`
-                          : "View, edit, or remove deliverables"}
+                        {showUnassignedCodes
+                          ? "Old codes that are not in any package. Copy the value, then add it to the right package."
+                          : activePackage && "name" in activePackage
+                            ? inventoryStatusFilter === "sold"
+                              ? `Sold codes for ${activePackage.name}`
+                              : inventoryStatusFilter === "reserved"
+                                ? `Reserved codes for ${activePackage.name}`
+                                : `Codes for ${activePackage.name} only`
+                            : "View, edit, or remove deliverables"}
                       </p>
                     </div>
                     <div className="mt-4">
-                      {!packageSelectionReady ? (
+                      {!packageSelectionReady && !showUnassignedCodes ? (
                         <p className="ui-surface-item ui-surface-item--dashed px-3 py-4 text-xs text-subtle">
                           Select a package above to view its inventory codes.
                         </p>
@@ -1348,21 +1382,35 @@ export default function AdminStockPage() {
                         <p className="text-xs text-subtle">Loading package codes…</p>
                       ) : (
                         <InventoryCodeList
-                          key={`${selected._id}-${selectedPackageId}-${inventoryRefreshKey}`}
+                          key={`${selected._id}-${showUnassignedCodes ? UNASSIGNED_INVENTORY_SCOPE : selectedPackageId}-${inventoryRefreshKey}`}
                           productId={selected._id}
-                          variationValueId={selectedPackageId ?? undefined}
+                          variationValueId={
+                            showUnassignedCodes
+                              ? UNASSIGNED_INVENTORY_SCOPE
+                              : selectedPackageId ?? undefined
+                          }
                           embedded
                           statusFilter={inventoryStatusFilter}
                           onStatusFilterChange={setInventoryStatusFilter}
-                          statusCounts={{
-                            available: stock?.available ?? 0,
-                            reserved: stock?.reserved ?? 0,
-                            sold: stock?.sold ?? 0,
-                          }}
+                          statusCounts={
+                            showUnassignedCodes
+                              ? {
+                                  available: unassignedStock?.available ?? 0,
+                                  reserved: unassignedStock?.reserved ?? 0,
+                                  sold: unassignedStock?.sold ?? 0,
+                                }
+                              : {
+                                  available: stock?.available ?? 0,
+                                  reserved: stock?.reserved ?? 0,
+                                  sold: stock?.sold ?? 0,
+                                }
+                          }
                           packageName={
-                            activePackage && "name" in activePackage
-                              ? activePackage.name
-                              : selected.title
+                            showUnassignedCodes
+                              ? "old-codes"
+                              : activePackage && "name" in activePackage
+                                ? activePackage.name
+                                : selected.title
                           }
                           onChanged={() => void refreshSelectedStock()}
                         />
