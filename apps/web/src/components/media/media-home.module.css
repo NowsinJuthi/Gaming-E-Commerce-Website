@@ -24,6 +24,7 @@
 .recentSection {
   min-width: 0;
   margin-bottom: 0.85rem;
+  contain: layout style;
 }
 
 .recentHeading {

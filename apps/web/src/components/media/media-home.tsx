@@ -6,18 +6,23 @@ import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
+import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
 import {
+  hydrateRecentCards,
+  persistRecentSnapshot,
   readRecentWatched,
   syncRecentFromLegacyWatchKeys,
   watchProgressPercent,
+  type RecentCardSnapshot,
 } from "@/lib/media-recent-watched";
 import { useLgScreen } from "@/hooks/useLgScreen";
 import {
@@ -53,14 +58,40 @@ type RecentWatchCard = MediaCard & {
   runtimeMinutes?: number | null;
 };
 
+function snapshotToRecentCard(snap: RecentCardSnapshot): RecentWatchCard {
+  return {
+    id: snap.id,
+    title: snap.title,
+    year: snap.year,
+    kind: snap.kind,
+    posterUrl: snap.posterUrl,
+    featured: false,
+    trending: false,
+    seasonCount: null,
+    runtimeMinutes: snap.runtimeMinutes ?? null,
+  };
+}
+
 function sameRecentCards(prev: RecentWatchCard[], next: RecentWatchCard[]): boolean {
   if (prev.length !== next.length) return false;
   return prev.every(
     (card, index) =>
       card.id === next[index]?.id &&
       card.title === next[index]?.title &&
-      card.posterUrl === next[index]?.posterUrl,
+      card.posterUrl === next[index]?.posterUrl &&
+      card.year === next[index]?.year,
   );
+}
+
+function recentCardSnapshot(card: RecentWatchCard): RecentCardSnapshot {
+  return {
+    id: card.id,
+    title: card.title,
+    year: card.year,
+    kind: card.kind,
+    posterUrl: card.posterUrl,
+    runtimeMinutes: card.runtimeMinutes ?? null,
+  };
 }
 
 export function MediaHome({
@@ -70,6 +101,7 @@ export function MediaHome({
   home: MediaHome;
   initialBrowse?: MediaBrowseResult;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const isLgScreen = useLgScreen();
   const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
@@ -284,11 +316,19 @@ export function MediaHome({
     year,
   ]);
 
+  useLayoutEffect(() => {
+    syncRecentFromLegacyWatchKeys();
+    const entries = readRecentWatched();
+    if (entries.length === 0) return;
+    const catalog = new Map(catalogByIdRef.current);
+    for (const item of initialBrowse?.items ?? []) catalog.set(item.id, item);
+    const hydrated = hydrateRecentCards(entries, catalog).map(snapshotToRecentCard);
+    setRecentCards((prev) => (sameRecentCards(prev, hydrated) ? prev : hydrated));
+  }, [initialBrowse]);
+
   useEffect(() => {
     const refreshList = () => setRecentRevision((value) => value + 1);
     const refreshProgress = () => setProgressTick((value) => value + 1);
-    syncRecentFromLegacyWatchKeys();
-    refreshList();
     window.addEventListener("uniqbd-media-recent-changed", refreshList);
     window.addEventListener("storage", refreshList);
     window.addEventListener("focus", refreshProgress);
@@ -309,41 +349,56 @@ export function MediaHome({
       return;
     }
 
+    const seeded = hydrateRecentCards(entries, catalogByIdRef.current).map(snapshotToRecentCard);
+    setRecentCards((prev) => (sameRecentCards(prev, seeded) ? prev : seeded));
+
     void (async () => {
-      const cards: RecentWatchCard[] = [];
-      for (const entry of entries) {
-        const cached = catalogByIdRef.current.get(entry.id);
-        if (cached) {
-          cards.push({ ...cached, runtimeMinutes: null });
-          continue;
-        }
-        try {
-          const response = await fetch(`${API_BASE}/media/titles/${entry.id}`);
-          if (!response.ok) continue;
-          const data = (await response.json()) as MediaDetails;
-          cards.push({
-            id: entry.id,
-            title: data.title,
-            year: data.year,
-            kind: data.kind,
-            posterUrl: data.posterUrl,
-            featured: false,
-            trending: false,
-            seasonCount: null,
-            runtimeMinutes: data.runtimeMinutes,
-          });
-        } catch {
-          /* skip unavailable titles */
-        }
-      }
+      const cards = await Promise.all(
+        entries.map(async (entry) => {
+          const cached = catalogByIdRef.current.get(entry.id);
+          if (cached) {
+            return {
+              ...cached,
+              runtimeMinutes:
+                seeded.find((card) => card.id === entry.id)?.runtimeMinutes ?? null,
+            } satisfies RecentWatchCard;
+          }
+          try {
+            const response = await fetch(`${API_BASE}/media/titles/${entry.id}`);
+            if (!response.ok) return null;
+            const data = (await response.json()) as MediaDetails;
+            return {
+              id: entry.id,
+              title: data.title,
+              year: data.year,
+              kind: data.kind,
+              posterUrl: data.posterUrl,
+              featured: false,
+              trending: false,
+              seasonCount: null,
+              runtimeMinutes: data.runtimeMinutes,
+            } satisfies RecentWatchCard;
+          } catch {
+            return null;
+          }
+        }),
+      );
       if (cancelled) return;
-      setRecentCards((prev) => (sameRecentCards(prev, cards) ? prev : cards));
+      const next = cards.filter((card): card is RecentWatchCard => card != null);
+      for (const card of next) persistRecentSnapshot(recentCardSnapshot(card));
+      setRecentCards((prev) => (sameRecentCards(prev, next) ? prev : next));
     })();
 
     return () => {
       cancelled = true;
     };
   }, [recentRevision]);
+
+  useEffect(() => {
+    for (const card of recentCards.slice(0, 6)) {
+      router.prefetch(mediaWatchPath(card.id) as Route);
+    }
+  }, [recentCards, router]);
 
   useEffect(() => {
     setInfo(null);
@@ -518,7 +573,7 @@ export function MediaHome({
       </section>
       </div>
 
-      {!searchActive && recentCards.length > 0 ? (
+      {!searchActive && recentCards.some((card) => card.title.trim() || card.posterUrl) ? (
         <RecentlyWatchedSlider items={recentCards} progressRevision={progressTick} onSelect={setInfo} />
       ) : null}
 
@@ -629,15 +684,24 @@ function RecentlyWatchedSlider({
           </button>
         ) : null}
         <div className={styles.recentTrack} ref={trackRef}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const progress = watchProgressPercent(item.id, item.runtimeMinutes);
+          if (!item.title.trim() && !item.posterUrl) return null;
           return (
             <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
-              <PosterPlayLink id={item.id} title={item.title}>
+              <PosterPlayLink id={item.id} title={item.title || "video"}>
                 <span className={styles.posterFrame}>
                   {item.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img className={styles.posterImage} src={item.posterUrl} alt="" referrerPolicy="no-referrer" />
+                    <img
+                      className={styles.posterImage}
+                      src={item.posterUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      decoding="async"
+                      loading={index < 4 ? "eager" : "lazy"}
+                      fetchPriority={index < 2 ? "high" : "auto"}
+                    />
                   ) : (
                     <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
                   )}
@@ -730,16 +794,21 @@ function mediaWatchPath(id: string): string {
   return `/media/watch/${encodeURIComponent(id)}`;
 }
 
-/** Full navigation — reliable on mobile/WebKit when client router or Link taps fail. */
-function navigateToWatch(id: string) {
-  const path = mediaWatchPath(id);
-  const mobile = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
-  if (mobile) {
-    sessionStorage.setItem("uniqbd-mobile-autoplay", String(Date.now()));
-    window.location.assign(`${path}?autoplay=1`);
-    return;
-  }
-  window.location.assign(path);
+function useNavigateToWatch() {
+  const router = useRouter();
+  return useCallback(
+    (id: string) => {
+      const path = mediaWatchPath(id);
+      const mobile = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
+      if (mobile) {
+        sessionStorage.setItem("uniqbd-mobile-autoplay", String(Date.now()));
+        router.push(`${path}?autoplay=1` as Route);
+        return;
+      }
+      router.push(path as Route);
+    },
+    [router],
+  );
 }
 
 function PosterPlayLink({
@@ -753,6 +822,7 @@ function PosterPlayLink({
   children: ReactNode;
   className?: string;
 }) {
+  const navigateToWatch = useNavigateToWatch();
   const linkClass = className ? `${styles.posterLink} ${className}` : styles.posterLink;
 
   return (
@@ -778,6 +848,7 @@ function WatchPlayButton({
   children: ReactNode;
   onBeforeNavigate?: () => void;
 }) {
+  const navigateToWatch = useNavigateToWatch();
   return (
     <button
       type="button"

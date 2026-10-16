@@ -1,8 +1,96 @@
 const STORAGE_KEY = "uniqbd-media-recent";
+const SNAPSHOT_KEY = "uniqbd-media-recent-snapshots";
 const LEGACY_PREFIX = "uniqbd-watch:";
 const DURATION_PREFIX = "uniqbd-watch-dur:";
 const MAX_ENTRIES = 32;
 const MIN_RESUME_SECONDS = 8;
+
+export type RecentCardSnapshot = {
+  id: string;
+  title: string;
+  year: number | null;
+  kind: "movie" | "series";
+  posterUrl: string | null;
+  runtimeMinutes?: number | null;
+};
+
+function readSnapshotRecord(): Record<string, RecentCardSnapshot> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as unknown;
+    if (!data || typeof data !== "object") return {};
+    const out: Record<string, RecentCardSnapshot> = {};
+    for (const [id, entry] of Object.entries(data)) {
+      if (!entry || typeof entry !== "object") continue;
+      const snap = entry as Partial<RecentCardSnapshot>;
+      if (typeof snap.title !== "string" || !id) continue;
+      out[id] = {
+        id,
+        title: snap.title,
+        year: typeof snap.year === "number" ? snap.year : null,
+        kind: snap.kind === "series" ? "series" : "movie",
+        posterUrl: typeof snap.posterUrl === "string" ? snap.posterUrl : null,
+        runtimeMinutes:
+          typeof snap.runtimeMinutes === "number" && snap.runtimeMinutes > 0 ? snap.runtimeMinutes : null,
+      };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeSnapshotRecord(next: Record<string, RecentCardSnapshot>): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
+}
+
+/** Keep poster/title in localStorage so Recently Watched can paint without waiting on the API. */
+export function persistRecentSnapshot(snapshot: RecentCardSnapshot): void {
+  if (typeof window === "undefined" || !snapshot.id || !snapshot.title.trim()) return;
+  const recentIds = new Set(readRecentWatched().map((entry) => entry.id));
+  if (!recentIds.has(snapshot.id)) return;
+  const record = readSnapshotRecord();
+  record[snapshot.id] = snapshot;
+  const trimmed: Record<string, RecentCardSnapshot> = {};
+  for (const id of recentIds) {
+    if (record[id]) trimmed[id] = record[id];
+  }
+  writeSnapshotRecord(trimmed);
+}
+
+export function hydrateRecentCards(
+  entries: RecentWatchEntry[],
+  catalog?: Map<string, { id: string; title: string; year: number | null; kind: "movie" | "series"; posterUrl: string | null }>,
+): RecentCardSnapshot[] {
+  const snapshots = readSnapshotRecord();
+  return entries.map((entry) => {
+    const fromCatalog = catalog?.get(entry.id);
+    const snap = snapshots[entry.id];
+    const runtimeMinutes = snap?.runtimeMinutes ?? null;
+    if (fromCatalog) {
+      return {
+        id: fromCatalog.id,
+        title: fromCatalog.title,
+        year: fromCatalog.year,
+        kind: fromCatalog.kind,
+        posterUrl: fromCatalog.posterUrl,
+        runtimeMinutes,
+      };
+    }
+    if (snap) return { ...snap, runtimeMinutes };
+    return {
+      id: entry.id,
+      title: "",
+      year: null,
+      kind: "movie" as const,
+      posterUrl: null,
+      runtimeMinutes: null,
+    };
+  });
+}
 
 export function readWatchPositionSeconds(titleId: string): number {
   if (typeof window === "undefined" || !titleId) return 0;

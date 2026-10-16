@@ -11,7 +11,11 @@ import {
   seekVideoTo,
 } from "@/lib/media-playback-timeline";
 import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
-import { persistWatchProgress, touchRecentWatched } from "@/lib/media-recent-watched";
+import {
+  persistRecentSnapshot,
+  persistWatchProgress,
+  touchRecentWatched,
+} from "@/lib/media-recent-watched";
 import styles from "./media-player.module.css";
 
 /** Bust CDN/browser cache when ffmpeg starts a new pack (Movie Server uses t= + g=). */
@@ -558,6 +562,25 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       cancelled = true;
     };
   }, [titleId]);
+
+  useEffect(() => {
+    if (!session?.title.trim()) return;
+    persistRecentSnapshot({
+      id: titleId,
+      title: session.title,
+      year: session.year > 0 ? session.year : null,
+      kind: session.kind,
+      posterUrl: details?.posterUrl ?? null,
+      runtimeMinutes: details?.runtimeMinutes ?? null,
+    });
+  }, [
+    details?.posterUrl,
+    details?.runtimeMinutes,
+    session?.kind,
+    session?.title,
+    session?.year,
+    titleId,
+  ]);
 
   const reveal = useCallback(() => {
     setChrome(true);
