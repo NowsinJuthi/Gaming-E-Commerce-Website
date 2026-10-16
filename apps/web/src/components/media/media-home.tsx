@@ -53,6 +53,16 @@ type RecentWatchCard = MediaCard & {
   runtimeMinutes?: number | null;
 };
 
+function sameRecentCards(prev: RecentWatchCard[], next: RecentWatchCard[]): boolean {
+  if (prev.length !== next.length) return false;
+  return prev.every(
+    (card, index) =>
+      card.id === next[index]?.id &&
+      card.title === next[index]?.title &&
+      card.posterUrl === next[index]?.posterUrl,
+  );
+}
+
 export function MediaHome({
   home,
   initialBrowse,
@@ -84,16 +94,19 @@ export function MediaHome({
   const [info, setInfo] = useState<MediaCard | null>(null);
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [recentRevision, setRecentRevision] = useState(0);
+  const [progressTick, setProgressTick] = useState(0);
   const [recentCards, setRecentCards] = useState<RecentWatchCard[]>([]);
   const castRow = useRef<HTMLDivElement>(null);
   const detailsCacheRef = useRef<Map<string, MediaDetails>>(new Map());
   const catalogById = useMemo(() => {
     const map = new Map<string, MediaCard>();
-    for (const item of [...catalogItems, ...searchItems, ...recentCards]) {
+    for (const item of [...catalogItems, ...searchItems]) {
       map.set(item.id, item);
     }
     return map;
-  }, [catalogItems, searchItems, recentCards]);
+  }, [catalogItems, searchItems]);
+  const catalogByIdRef = useRef(catalogById);
+  catalogByIdRef.current = catalogById;
 
   const libraryHeading = useMemo(() => {
     if (libraryId === ALL_LIBRARIES) return "All Movies & Series";
@@ -272,16 +285,17 @@ export function MediaHome({
   ]);
 
   useEffect(() => {
-    const refresh = () => setRecentRevision((value) => value + 1);
+    const refreshList = () => setRecentRevision((value) => value + 1);
+    const refreshProgress = () => setProgressTick((value) => value + 1);
     syncRecentFromLegacyWatchKeys();
-    refresh();
-    window.addEventListener("uniqbd-media-recent-changed", refresh);
-    window.addEventListener("storage", refresh);
-    window.addEventListener("focus", refresh);
+    refreshList();
+    window.addEventListener("uniqbd-media-recent-changed", refreshList);
+    window.addEventListener("storage", refreshList);
+    window.addEventListener("focus", refreshProgress);
     return () => {
-      window.removeEventListener("uniqbd-media-recent-changed", refresh);
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("focus", refresh);
+      window.removeEventListener("uniqbd-media-recent-changed", refreshList);
+      window.removeEventListener("storage", refreshList);
+      window.removeEventListener("focus", refreshProgress);
     };
   }, []);
 
@@ -291,14 +305,14 @@ export function MediaHome({
 
     const entries = readRecentWatched();
     if (entries.length === 0) {
-      setRecentCards([]);
+      setRecentCards((prev) => (prev.length === 0 ? prev : []));
       return;
     }
 
     void (async () => {
       const cards: RecentWatchCard[] = [];
       for (const entry of entries) {
-        const cached = catalogById.get(entry.id);
+        const cached = catalogByIdRef.current.get(entry.id);
         if (cached) {
           cards.push({ ...cached, runtimeMinutes: null });
           continue;
@@ -322,19 +336,21 @@ export function MediaHome({
           /* skip unavailable titles */
         }
       }
-      if (!cancelled) setRecentCards(cards);
+      if (cancelled) return;
+      setRecentCards((prev) => (sameRecentCards(prev, cards) ? prev : cards));
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [catalogById, recentRevision]);
+  }, [recentRevision]);
 
   useEffect(() => {
     setInfo(null);
   }, [pathname]);
 
   useEffect(() => {
+    document.body.style.overflow = "";
     return () => {
       document.body.style.overflow = "";
     };
@@ -503,7 +519,7 @@ export function MediaHome({
       </div>
 
       {!searchActive && recentCards.length > 0 ? (
-        <RecentlyWatchedSlider items={recentCards} progressRevision={recentRevision} onSelect={setInfo} />
+        <RecentlyWatchedSlider items={recentCards} progressRevision={progressTick} onSelect={setInfo} />
       ) : null}
 
       {!searchActive && browseLoading && catalogItems.length === 0 ? (
