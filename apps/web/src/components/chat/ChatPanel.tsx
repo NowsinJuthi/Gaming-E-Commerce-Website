@@ -1837,6 +1837,7 @@ export function ChatPanel({
                     aria-label="Back to messages"
                   >
                     <ArrowLeftIcon className="h-5 w-5" aria-hidden />
+                    <span className="admin-chat-messenger-back-label">Back</span>
                   </button>
                 ) : null}
                 {useCustomerPro ? (
