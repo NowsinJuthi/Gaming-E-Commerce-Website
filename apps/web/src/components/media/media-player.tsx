@@ -172,34 +172,6 @@ function applyVideoSeek(video: HTMLVideoElement, target: number) {
   video.currentTime = target;
 }
 
-/** Move only toward the finger. A forward drag must not snap backward, or the reverse. */
-function seekInsidePack(video: HTMLVideoElement, localTarget: number): number | null {
-  const previous = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-  const forward = localTarget >= previous - 0.05;
-  const ranges = video.seekable.length > 0 ? video.seekable : video.buffered;
-  let toward: number | null = null;
-  let sawFinite = false;
-  for (let i = 0; i < ranges.length; i += 1) {
-    const start = ranges.start(i);
-    const end = ranges.end(i);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-    sawFinite = true;
-    if (localTarget >= start - 0.05 && localTarget <= end + 0.05) {
-      const landed = Math.min(end, Math.max(start, localTarget));
-      const sameWay = forward ? landed + 0.2 >= previous : landed - 0.2 <= previous;
-      if (sameWay) {
-        video.currentTime = landed;
-        return landed;
-      }
-    }
-    if (forward && end > previous && end <= localTarget + 0.05 && (toward == null || end > toward)) toward = end;
-    if (!forward && start < previous && start >= localTarget - 0.05 && (toward == null || start < toward)) toward = start;
-  }
-  if (!sawFinite || toward == null) return null;
-  video.currentTime = toward;
-  return toward;
-}
-
 function SeekTrack({
   value,
   max,
@@ -704,7 +676,9 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         setNeedsGesture(false);
         return;
       } catch {
-        if (!mobilePlay || !mobileAutoplayRef.current) {
+        // A seek drag ends before the new picture is ready. iPhone must still resume,
+        // muted if sound is not allowed yet.
+        if (!apple && (!mobilePlay || !mobileAutoplayRef.current)) {
           setNeedsGesture(true);
           return;
         }
@@ -1403,14 +1377,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setCurrent(absolute);
     remember(absolute);
 
-    if (isPhonePlayback() && targetIsInCurrentPack) {
-      const landed = seekInsidePack(video, localTarget);
-      if (landed != null) {
-        quietSeekUntil.current = Date.now() + 1800;
-        setCurrent(displayTimelineSeconds(landed, origin, movie));
-        return;
-      }
-    } else if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
+    const wasPlaying = !video.paused;
+    if (isPhonePlayback() && targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
+      quietSeekUntil.current = Date.now() + 1800;
+      video.currentTime = localTarget;
+      setCurrent(absolute);
+      if (wasPlaying) void video.play().catch(() => undefined);
+      return;
+    }
+    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;
