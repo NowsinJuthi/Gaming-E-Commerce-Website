@@ -62,7 +62,7 @@ function snapshotToRecentCard(snap: RecentCardSnapshot): RecentWatchCard {
   return {
     id: snap.id,
     title: snap.title,
-    year: snap.year,
+    year: snap.year ?? 0,
     kind: snap.kind,
     posterUrl: snap.posterUrl,
     featured: false,
@@ -87,7 +87,7 @@ function recentCardSnapshot(card: RecentWatchCard): RecentCardSnapshot {
   return {
     id: card.id,
     title: card.title,
-    year: card.year,
+    year: card.year > 0 ? card.year : null,
     kind: card.kind,
     posterUrl: card.posterUrl,
     runtimeMinutes: card.runtimeMinutes ?? null,
