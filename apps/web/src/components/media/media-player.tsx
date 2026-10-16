@@ -996,9 +996,16 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.documentElement.classList.add("media-player-open");
+    const blockSelect = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      event.preventDefault();
+    };
+    document.addEventListener("selectstart", blockSelect);
     return () => {
       media.removeEventListener("change", sync);
       portraitMedia.removeEventListener("change", syncPortrait);
+      document.removeEventListener("selectstart", blockSelect);
       document.body.style.overflow = previous;
       document.documentElement.classList.remove("media-player-open");
       unlockPlaybackOrientation();
@@ -1592,12 +1599,14 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         if (!locked) reveal();
       }}
       onPointerUp={onShellPointerUp}
+      onContextMenu={(event) => event.preventDefault()}
     >
       <video
         ref={videoRef}
         className={`${styles.video} ${aspect === "fill" ? styles.videoFill : ""} ${aspect === "stretch" ? styles.videoStretch : ""}`}
         playsInline
         preload="auto"
+        draggable={false}
         controlsList="nodownload"
         {...({ "webkit-playsinline": "true", "x-webkit-airplay": "allow" } as Record<string, string>)}
       />
