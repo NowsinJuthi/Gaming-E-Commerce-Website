@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
-  canSeekWithinCurrentPack,
   displayTimelineSeconds,
+  isLocalTimeInPack,
   localTimelineSeconds,
 } from "@/lib/media-playback-timeline";
 import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
@@ -161,6 +161,14 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
 }
 
 function applyVideoSeek(video: HTMLVideoElement, target: number) {
+  if (typeof video.fastSeek === "function") {
+    try {
+      video.fastSeek(target);
+      return;
+    } catch {
+      /* fall through to currentTime */
+    }
+  }
   video.currentTime = target;
 }
 
@@ -1359,11 +1367,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     setCurrent(absolute);
     remember(absolute);
 
-    const packComplete = currentSession.complete;
-    if (
-      targetIsInCurrentPack &&
-      canSeekWithinCurrentPack(video, localTarget, packComplete)
-    ) {
+    if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;

@@ -626,6 +626,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const audio = session.audioTracks[session.audioIndex];
     const mkv = this.isMatroskaPath(file);
     const segment = join(session.dir, 'seg%05d.m4s');
+    const seekPack = session.startSeconds > 0.5;
+    const segmentSeconds = seekPack ? 2 : 4;
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
       ...this.ffmpegInputArgs(file, false, session.startSeconds),
@@ -638,8 +640,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       ...(mkv ? ['-reset_timestamps', '1'] : []),
       ...this.progressiveArgs(session, audio?.codec ?? ''),
       '-f', 'hls',
-      '-hls_time', '4',
-      '-hls_init_time', '2',
+      '-hls_time', String(segmentSeconds),
+      '-hls_init_time', String(Math.min(2, segmentSeconds)),
       '-hls_list_size', '0',
       '-start_number', '0',
       '-hls_playlist_type', 'event',
