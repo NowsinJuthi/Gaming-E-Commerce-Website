@@ -647,6 +647,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-muxdelay', '0',
       '-muxpreload', '0',
       '-max_delay', '5000000',
+      '-max_interleave_delta', '0',
+      '-flush_packets', '1',
       ...videoArgs,
       ...this.mobileAudioArgs(audio?.codec ?? ''),
       '-max_muxing_queue_size', '9999',
@@ -679,9 +681,15 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       if (session.ffmpeg === child) session.ffmpeg = null;
       this.logger.warn(`mobile playback failed: ${error.message}`);
     });
+    const ext = fmp4 ? 'm4s' : 'ts';
     const initReady = !fmp4 || await this.waitForSegment(join(session.dir, 'init.mp4'), child, 90_000);
-    const firstSegment = fmp4 ? 'seg00000.m4s' : 'seg00000.ts';
-    const ready = initReady && await this.waitForSegment(join(session.dir, firstSegment), child, 90_000);
+    // A seek needs two segments so playback starts behind the live edge instead of buffering on it.
+    const segmentCount = seekPack ? 2 : 1;
+    let ready = initReady;
+    for (let index = 0; ready && index < segmentCount; index += 1) {
+      const name = `seg${String(index).padStart(5, '0')}.${ext}`;
+      ready = await this.waitForSegment(join(session.dir, name), child, 90_000);
+    }
     if (session.token !== token) return;
     if (!ready || !existsSync(playlist)) {
       this.stopFfmpeg(session);

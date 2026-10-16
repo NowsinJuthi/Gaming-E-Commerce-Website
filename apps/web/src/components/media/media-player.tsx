@@ -1099,8 +1099,12 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setStarting(false);
     };
     const onWaiting = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.seeking) return;
       captureHoldRef.current();
       setBuffering(true);
+    };
+    const onSeeked = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) setBuffering(false);
     };
     const onPlaying = () => {
       seekingRef.current = false;
@@ -1137,6 +1141,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWaiting);
+    video.addEventListener("seeked", onSeeked);
     video.addEventListener("playing", onPlaying);
     video.addEventListener("ended", onEnded);
     return () => {
@@ -1144,6 +1149,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("ended", onEnded);
     };
@@ -1369,17 +1375,19 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     remember(absolute);
 
     if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
-      applyVideoSeek(video, localTarget);
+      if (isPhonePlayback()) video.currentTime = localTarget;
+      else applyVideoSeek(video, localTarget);
       setCurrent(absolute);
       return;
     }
 
-    // A short iPhone scrub used to kill ffmpeg and buffer from scratch.
-    // Stay on this pack when the target is only a little past what Safari already has.
+    // Stay a few seconds behind the published edge. Seeking onto the edge makes
+    // iPhone wait for the next segment and the buffer spinner never stops.
     if (isPhonePlayback() && targetIsInCurrentPack) {
       const edge = packEdgeSeconds(video);
-      if (edge > 0 && localTarget <= edge + 30) {
-        applyVideoSeek(video, Math.min(localTarget, Math.max(0, edge - 0.05)));
+      const cushion = edge - 3;
+      if (cushion > video.currentTime + 0.5) {
+        video.currentTime = Math.min(localTarget, cushion);
         setCurrent(absolute);
         return;
       }
