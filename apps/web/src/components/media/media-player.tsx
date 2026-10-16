@@ -637,6 +637,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     };
 
     const startAttachedPlayback = async (element: HTMLVideoElement) => {
+      const apple = appleMobile();
       const mobilePlay =
         mobileRef.current ||
         window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
@@ -644,6 +645,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         element.muted = false;
         await element.play();
         startedMutedRef.current = false;
+        wantAudibleRef.current = false;
         setMuted(false);
         setNeedsGesture(false);
         return;
@@ -654,24 +656,33 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         }
       }
       try {
-        wantAudibleRef.current = true;
-        element.volume = 1;
+        // iPhone native HLS errors if sound is forced on without a tap.
         element.muted = true;
         await element.play();
+        const gesture = navigator.userActivation?.isActive === true;
+        if (apple && !gesture) {
+          startedMutedRef.current = true;
+          wantAudibleRef.current = false;
+          setMuted(true);
+          setNeedsGesture(false);
+          return;
+        }
+        wantAudibleRef.current = true;
+        if (!apple) element.volume = 1;
         element.muted = false;
         setVolume(1);
         setMuted(false);
         startedMutedRef.current = false;
         if (element.paused) {
-          element.muted = false;
           await element.play();
         }
         setNeedsGesture(false);
       } catch {
-        element.muted = false;
-        startedMutedRef.current = false;
-        setMuted(false);
-        setNeedsGesture(true);
+        element.muted = apple ? true : false;
+        startedMutedRef.current = apple;
+        wantAudibleRef.current = false;
+        setMuted(apple);
+        setNeedsGesture(!apple);
       }
     };
 
@@ -697,21 +708,23 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const progressive = /\/media\.mp4(?:\?|$)/i.test(playlist);
     if (progressive || nativeHls(video)) {
       await waitForAttach((resolve, reject) => {
+        let armed = false;
+        const onErr = () => {
+          if (!armed) return;
+          reject(new Error("Playback failed."));
+        };
         const onMeta = () => {
           video.removeEventListener("loadedmetadata", onMeta);
+          video.removeEventListener("error", onErr);
           if (seq !== attachSeqRef.current) {
             reject(new Error("Playback cancelled."));
             return;
           }
-          finishAttach();
           resolve();
+          finishAttach();
         };
-        let armed = false;
         video.addEventListener("loadedmetadata", onMeta);
-        video.addEventListener("error", () => {
-          if (!armed) return;
-          reject(new Error("Playback failed."));
-        });
+        video.addEventListener("error", onErr);
         video.src = playlist;
         armed = true;
         video.load();
@@ -723,21 +736,23 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (seq !== attachSeqRef.current) throw new Error("Playback cancelled.");
     if (!mod.default.isSupported()) {
       await waitForAttach((resolve, reject) => {
+        let armed = false;
+        const onErr = () => {
+          if (!armed) return;
+          reject(new Error("Playback failed."));
+        };
         const onMeta = () => {
           video.removeEventListener("loadedmetadata", onMeta);
+          video.removeEventListener("error", onErr);
           if (seq !== attachSeqRef.current) {
             reject(new Error("Playback cancelled."));
             return;
           }
-          finishAttach();
           resolve();
+          finishAttach();
         };
-        let armed = false;
         video.addEventListener("loadedmetadata", onMeta);
-        video.addEventListener("error", () => {
-          if (!armed) return;
-          reject(new Error("Playback failed."));
-        });
+        video.addEventListener("error", onErr);
         video.src = playlist;
         armed = true;
         video.load();
@@ -1004,7 +1019,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       setHoldFrame(null);
       if (wantAudibleRef.current) {
         wantAudibleRef.current = false;
-        video.volume = 1;
+        if (appleMobile() && navigator.userActivation?.isActive !== true) return;
+        if (!appleMobile()) video.volume = 1;
         video.muted = false;
         startedMutedRef.current = false;
         setVolume(1);
