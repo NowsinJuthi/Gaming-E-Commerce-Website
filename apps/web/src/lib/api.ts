@@ -859,8 +859,14 @@ async function throwApiError(res: Response): Promise<never> {
   let retryAfterSeconds: number | undefined;
   let accountExists: boolean | undefined;
   let invalidPassword: boolean | undefined;
+  const text = await res.text();
   try {
-    const data = await res.json();
+    const data = JSON.parse(text) as {
+      message?: string | string[];
+      retryAfterSeconds?: number;
+      accountExists?: boolean;
+      invalidPassword?: boolean;
+    };
     message = Array.isArray(data.message)
       ? data.message.join(", ")
       : (data.message ?? message);
@@ -874,7 +880,7 @@ async function throwApiError(res: Response): Promise<never> {
       invalidPassword = data.invalidPassword;
     }
   } catch {
-    /* ignore */
+    if (text.trim()) message = text.trim();
   }
   throw new ApiError(message, res.status, {
     retryAfterSeconds,
@@ -1014,10 +1020,13 @@ if (typeof window !== "undefined") {
   });
 }
 
-async function authRequestRaw<T>(
+async function authRequestRawAtBase<T>(
+  apiBase: string,
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const base = apiBase.replace(/\/$/, "");
+  const urlPath = path.startsWith("/") ? path : `/${path}`;
   const run = () => {
     const headers: Record<string, string> = {
       ...(init.headers as Record<string, string> | undefined),
@@ -1025,7 +1034,7 @@ async function authRequestRaw<T>(
     if (init.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
-    return fetch(`${API_BASE}${path}`, {
+    return fetch(`${base}${urlPath}`, {
       ...init,
       headers,
       cache: "no-store",
@@ -1037,6 +1046,27 @@ async function authRequestRaw<T>(
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+async function authRequestRaw<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return authRequestRawAtBase<T>(API_BASE.replace(/\/$/, ""), path, init);
+}
+
+/** Authenticated fetch against an explicit API base (e.g. same-origin `/api` proxy). */
+export async function authRequestAtBase<T>(
+  apiBase: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const base = apiBase.replace(/\/$/, "");
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method === "GET" && init.body == null) {
+    return dedupeRequest(
+      dedupeKey(method, `${base}${path}`, true),
+      () => authRequestRawAtBase<T>(base, path, init),
+    );
+  }
+  return authRequestRawAtBase<T>(base, path, init);
 }
 
 export async function authRequest<T>(

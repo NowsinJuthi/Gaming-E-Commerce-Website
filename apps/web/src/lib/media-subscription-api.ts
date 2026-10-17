@@ -6,12 +6,29 @@ import type {
   PublicSubscriptionEvent,
   SubscriptionEntitlement,
 } from "@/lib/media-subscription-types";
-import { API_BASE, authRequest } from "@/lib/api";
+import { API_BASE, authRequestAtBase } from "@/lib/api";
 
 const CURRENCY_LOCALE: Record<string, string> = {
   BDT: "en-BD",
   USD: "en-US",
 };
+
+/**
+ * Movie subscription calls use the storefront origin `/api/*` proxy in the browser so
+ * admin plans work even when NEXT_PUBLIC_API_URL points at a host without Nest routes.
+ */
+function mediaSubscriptionApiBase(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin.replace(/\/$/, "")}/api`;
+  }
+  const internal = process.env.INTERNAL_API_URL?.trim();
+  if (internal) return internal.replace(/\/$/, "");
+  return API_BASE.replace(/\/$/, "");
+}
+
+function mediaAuth<T>(path: string, init?: RequestInit): Promise<T> {
+  return authRequestAtBase<T>(mediaSubscriptionApiBase(), path, init);
+}
 
 export function formatMediaPlanCents(cents: number, currency = "BDT"): string {
   const code = (currency || "BDT").toUpperCase();
@@ -23,25 +40,25 @@ export function formatMediaPlanCents(cents: number, currency = "BDT"): string {
 
 export const mediaSubscriptionApi = {
   publicPlans: async (): Promise<PublicPlan[]> => {
-    const res = await fetch(`${API_BASE}/media/plans`, { credentials: "include" });
+    const base = mediaSubscriptionApiBase();
+    const res = await fetch(`${base}/media/plans`, { credentials: "include" });
     if (!res.ok) return [];
     const data = (await res.json()) as { plans?: PublicPlan[] };
     return data.plans ?? [];
   },
 
   me: () =>
-    authRequest<{ subscription: PublicSubscription | null; entitlement: SubscriptionEntitlement }>(
+    mediaAuth<{ subscription: PublicSubscription | null; entitlement: SubscriptionEntitlement }>(
       "/media/subscriptions/me",
     ),
 
-  history: () =>
-    authRequest<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/history"),
+  history: () => mediaAuth<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/history"),
 
   changes: () =>
-    authRequest<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/changes"),
+    mediaAuth<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/changes"),
 
   start: (planSlug: string, billingCycle: BillingCycle) =>
-    authRequest<{
+    mediaAuth<{
       subscription: PublicSubscription;
       paymentRequired: boolean;
       entitlement: SubscriptionEntitlement;
@@ -52,7 +69,7 @@ export const mediaSubscriptionApi = {
     }),
 
   change: (planSlug: string, billingCycle: BillingCycle) =>
-    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+    mediaAuth<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
       "/media/subscriptions/me/change",
       {
         method: "POST",
@@ -62,35 +79,35 @@ export const mediaSubscriptionApi = {
     ),
 
   cancel: () =>
-    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+    mediaAuth<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
       "/media/subscriptions/me/cancel",
       { method: "POST" },
     ),
 
   resume: () =>
-    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+    mediaAuth<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
       "/media/subscriptions/me/resume",
       { method: "POST" },
     ),
 
-  adminPlans: () => authRequest<{ plans: PublicPlan[] }>("/admin/media/plans"),
+  adminPlans: () => mediaAuth<{ plans: PublicPlan[] }>("/admin/media/plans"),
 
   createPlan: (input: Record<string, unknown>) =>
-    authRequest<{ plan: PublicPlan }>("/admin/media/plans", {
+    mediaAuth<{ plan: PublicPlan }>("/admin/media/plans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
 
   updatePlan: (id: string, input: Record<string, unknown>) =>
-    authRequest<{ plan: PublicPlan }>(`/admin/media/plans/${id}`, {
+    mediaAuth<{ plan: PublicPlan }>(`/admin/media/plans/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
 
   disablePlan: (id: string) =>
-    authRequest<{ plan: PublicPlan; message: string }>(`/admin/media/plans/${id}`, {
+    mediaAuth<{ plan: PublicPlan; message: string }>(`/admin/media/plans/${id}`, {
       method: "DELETE",
     }),
 
@@ -99,7 +116,7 @@ export const mediaSubscriptionApi = {
     if (query?.userId) q.set("userId", query.userId);
     if (query?.status) q.set("status", query.status);
     const suffix = q.toString() ? `?${q.toString()}` : "";
-    return authRequest<{ subscriptions: AdminSubscriptionRow[] }>(
+    return mediaAuth<{ subscriptions: AdminSubscriptionRow[] }>(
       `/admin/media/subscriptions${suffix}`,
     );
   },
@@ -110,27 +127,27 @@ export const mediaSubscriptionApi = {
     billingCycle: BillingCycle | string;
     status?: string;
   }) =>
-    authRequest<{ subscription: PublicSubscription }>("/admin/media/subscriptions", {
+    mediaAuth<{ subscription: PublicSubscription }>("/admin/media/subscriptions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
 
   patchSubscription: (id: string, input: Record<string, unknown>) =>
-    authRequest<{ subscription: PublicSubscription }>(`/admin/media/subscriptions/${id}`, {
+    mediaAuth<{ subscription: PublicSubscription }>(`/admin/media/subscriptions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
 
   activateSubscription: (id: string) =>
-    authRequest<{ subscription: PublicSubscription }>(
+    mediaAuth<{ subscription: PublicSubscription }>(
       `/admin/media/subscriptions/${id}/activate`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
     ),
 
   suspendSubscription: (id: string, reason?: string) =>
-    authRequest<{ subscription: PublicSubscription }>(
+    mediaAuth<{ subscription: PublicSubscription }>(
       `/admin/media/subscriptions/${id}/suspend`,
       {
         method: "POST",
@@ -140,13 +157,13 @@ export const mediaSubscriptionApi = {
     ),
 
   unsuspendSubscription: (id: string) =>
-    authRequest<{ subscription: PublicSubscription }>(
+    mediaAuth<{ subscription: PublicSubscription }>(
       `/admin/media/subscriptions/${id}/unsuspend`,
       { method: "POST" },
     ),
 
   deleteSubscription: (id: string) =>
-    authRequest<{ message: string; id: string; userId: string }>(
+    mediaAuth<{ message: string; id: string; userId: string }>(
       `/admin/media/subscriptions/${id}`,
       { method: "DELETE" },
     ),
