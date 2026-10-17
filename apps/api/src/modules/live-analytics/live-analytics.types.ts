@@ -1,6 +1,8 @@
 export type LiveVisitorRow = {
   visitorKey: string;
   path: string;
+  /** Human-readable page label (e.g. movie title on /media/watch/…). */
+  pathLabel: string | null;
   label: string;
   userId: string | null;
   lastSeen: number;

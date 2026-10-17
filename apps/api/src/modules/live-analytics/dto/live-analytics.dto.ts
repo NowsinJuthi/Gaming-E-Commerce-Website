@@ -9,6 +9,11 @@ export class VisitorPingDto {
   @IsString()
   @MaxLength(240)
   path!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pathLabel?: string;
 }
 
 export class MediaWatchDto {

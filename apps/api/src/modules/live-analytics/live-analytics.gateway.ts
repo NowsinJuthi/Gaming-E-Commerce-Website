@@ -93,6 +93,7 @@ export class LiveAnalyticsGateway
       visitorKey: body.visitorKey,
       socketId: client.id,
       path: body.path,
+      pathLabel: body.pathLabel,
       label: visitorLabel(user),
       userId: user?.id ?? null,
     });

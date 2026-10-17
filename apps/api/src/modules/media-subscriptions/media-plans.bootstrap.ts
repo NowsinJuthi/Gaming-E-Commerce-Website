@@ -6,6 +6,7 @@ import { MediaPlansService } from './media-plans.service';
 import { MediaPlan, MediaPlanDocument } from './schemas/media-plan.schema';
 import { MediaSubscription, MediaSubscriptionDocument } from './schemas/media-subscription.schema';
 
+/** Canonical Movie Server packages (BDT monthly prices match admin catalog). */
 const DEFAULT_PLANS: Array<{
   slug: string;
   name: string;
@@ -25,15 +26,15 @@ const DEFAULT_PLANS: Array<{
   {
     slug: 'basic',
     name: 'Basic',
-    description: 'Watch on one device in standard definition.',
+    description: 'HD streaming on up to 2 devices with 1 stream at a time.',
     tier: PlanTier.Basic,
     rank: 1,
-    monthlyPriceCents: 999,
-    yearlyPriceCents: 9999,
-    maxVideoQuality: VideoQuality.Sd,
-    maxDevices: 1,
+    monthlyPriceCents: 4900,
+    yearlyPriceCents: 49000,
+    maxVideoQuality: VideoQuality.Hd,
+    maxDevices: 2,
     maxStreams: 1,
-    features: [PlanFeature.Catalog],
+    features: [PlanFeature.Catalog, PlanFeature.Hd],
     trialDays: 7,
     isActive: true,
     sortOrder: 1,
@@ -41,13 +42,13 @@ const DEFAULT_PLANS: Array<{
   {
     slug: 'standard',
     name: 'Standard',
-    description: 'HD on two screens at once, plus downloads.',
+    description: 'HD on 3 devices with 2 simultaneous streams, plus downloads.',
     tier: PlanTier.Standard,
     rank: 2,
-    monthlyPriceCents: 1599,
-    yearlyPriceCents: 15999,
+    monthlyPriceCents: 6900,
+    yearlyPriceCents: 69000,
     maxVideoQuality: VideoQuality.Hd,
-    maxDevices: 2,
+    maxDevices: 3,
     maxStreams: 2,
     features: [PlanFeature.Catalog, PlanFeature.Hd, PlanFeature.Downloads],
     trialDays: 7,
@@ -57,13 +58,13 @@ const DEFAULT_PLANS: Array<{
   {
     slug: 'premium',
     name: 'Premium',
-    description: 'Ultra HD, four simultaneous streams, HDR and spatial audio.',
+    description: 'Ultra HD on 6 devices with up to 4 streams, HDR and spatial audio.',
     tier: PlanTier.Premium,
     rank: 3,
-    monthlyPriceCents: 2299,
-    yearlyPriceCents: 22999,
+    monthlyPriceCents: 9900,
+    yearlyPriceCents: 99000,
     maxVideoQuality: VideoQuality.Uhd,
-    maxDevices: 4,
+    maxDevices: 6,
     maxStreams: 4,
     features: [
       PlanFeature.Catalog,
@@ -92,12 +93,15 @@ export class MediaPlansBootstrap implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const currency = this.plans.defaultCurrency();
-    const existing = await this.planModel.countDocuments();
-    if (existing === 0) {
-      await this.planModel.insertMany(DEFAULT_PLANS.map((plan) => ({ ...plan, currency })));
-      this.logger.log(`Seeded media subscription plans (${currency}).`);
-      return;
+
+    for (const plan of DEFAULT_PLANS) {
+      await this.planModel.updateOne(
+        { slug: plan.slug },
+        { $set: { ...plan, currency } },
+        { upsert: true },
+      );
     }
+    this.logger.log(`Ensured Basic, Standard, and Premium media plans (${currency}).`);
 
     const [plans, subs] = await Promise.all([
       this.planModel.updateMany({ currency: 'USD' }, { $set: { currency } }),

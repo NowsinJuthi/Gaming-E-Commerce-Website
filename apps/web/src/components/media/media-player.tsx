@@ -475,12 +475,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
   const rateRef = useRef(1);
   const durationHintRef = useRef(0);
   const [session, setSession] = useState<PlaybackSession | null>(null);
-  useLiveMediaWatch({
-    active: session?.status === "ready",
-    titleId,
-    titleName: session?.title ?? "Media",
-    episodeName: session?.episodeName,
-  });
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
@@ -562,6 +556,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       cancelled = true;
     };
   }, [titleId]);
+
+  const liveTitleName =
+    session?.title?.trim() ||
+    details?.title?.trim() ||
+    "Media";
+  useLiveMediaWatch({
+    active: session?.status === "ready" || Boolean(details?.title?.trim()),
+    titleId,
+    titleName: liveTitleName,
+    episodeName: session?.episodeName,
+  });
 
   useEffect(() => {
     if (!session?.title.trim()) return;

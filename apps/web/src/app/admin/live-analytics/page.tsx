@@ -175,8 +175,15 @@ export default function LiveAnalyticsAdminPage() {
                 {visitors.map((row) => (
                   <tr key={row.visitorKey} className="border-b border-border/70 last:border-0">
                     <td className="px-4 py-2.5">{row.label}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">
-                      {row.path}
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-foreground">
+                        {row.pathLabel?.trim() || row.path}
+                      </div>
+                      {row.pathLabel?.trim() && row.path !== row.pathLabel ? (
+                        <div className="mt-0.5 font-mono text-xs text-foreground-muted">
+                          {row.path}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2.5 tabular-nums text-foreground-muted">
                       {formatWhen(row.lastSeen)}

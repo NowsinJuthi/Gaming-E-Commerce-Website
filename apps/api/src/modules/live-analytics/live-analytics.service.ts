@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { CatalogTitle, CatalogTitleDocument } from '../../database/schemas/catalog-title.schema';
 import { CacheService } from '../../shared/cache/cache.service';
 import type {
   LiveAnalyticsSnapshot,
@@ -15,12 +18,36 @@ const visitorHash = (key: string) => `live:visitor:h:${key}`;
 const mediaHash = (key: string) => `live:media:h:${key}`;
 const socketMap = (socketId: string) => `live:socket:${socketId}`;
 
+const WATCH_PATH = /^\/media\/watch\/([^/?#]+)/;
+
+function watchTitleIdFromPath(path: string): string | null {
+  const match = path.match(WATCH_PATH);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]).trim().slice(0, 64) || null;
+  } catch {
+    return match[1].trim().slice(0, 64) || null;
+  }
+}
+
+function mediaTitleNeedsResolve(titleName: string, titleId: string): boolean {
+  const name = titleName.trim();
+  if (!name || name === 'Media' || name === 'Unknown title') return true;
+  if (name === titleId) return true;
+  if (WATCH_PATH.test(name) || name.includes('/media/watch/')) return true;
+  return false;
+}
+
 @Injectable()
 export class LiveAnalyticsService {
   private notifyTimer: ReturnType<typeof setTimeout> | null = null;
   private broadcastFn: ((snapshot: LiveAnalyticsSnapshot) => void) | null = null;
 
-  constructor(private readonly cache: CacheService) {}
+  constructor(
+    private readonly cache: CacheService,
+    @InjectModel(CatalogTitle.name)
+    private readonly catalogTitles: Model<CatalogTitleDocument>,
+  ) {}
 
   setBroadcast(fn: (snapshot: LiveAnalyticsSnapshot) => void): void {
     this.broadcastFn = fn;
@@ -56,6 +83,7 @@ export class LiveAnalyticsService {
     visitorKey: string;
     socketId: string;
     path: string;
+    pathLabel?: string | null;
     label: string;
     userId?: string | null;
   }): Promise<void> {
@@ -69,6 +97,7 @@ export class LiveAnalyticsService {
         .zadd(VISITOR_ZSET, now, key)
         .hset(visitorHash(key), {
           path: input.path.slice(0, 240),
+          pathLabel: input.pathLabel?.trim().slice(0, 200) || '',
           label: input.label.slice(0, 120),
           userId: input.userId?.trim() || '',
           socketId: input.socketId,
@@ -152,6 +181,25 @@ export class LiveAnalyticsService {
     await this.redis.zremrangebyscore(key, 0, minScore);
   }
 
+  private async lookupCatalogTitles(ids: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id) => Types.ObjectId.isValid(id)))];
+    const map = new Map<string, string>();
+    if (unique.length === 0) return map;
+    const rows = await this.catalogTitles
+      .find({ _id: { $in: unique } })
+      .select('title year')
+      .lean()
+      .exec();
+    for (const row of rows) {
+      const id = String(row._id);
+      const title = typeof row.title === 'string' ? row.title.trim() : '';
+      if (!title) continue;
+      const year = typeof row.year === 'number' && row.year > 0 ? ` (${row.year})` : '';
+      map.set(id, `${title}${year}`);
+    }
+    return map;
+  }
+
   async getSnapshot(): Promise<LiveAnalyticsSnapshot> {
     return this.safe(
       {
@@ -169,15 +217,16 @@ export class LiveAnalyticsService {
         const visitorKeys = await this.redis.zrevrange(VISITOR_ZSET, 0, 99);
         const mediaKeys = await this.redis.zrevrange(MEDIA_ZSET, 0, 99);
 
-        const visitors: LiveVisitorRow[] = [];
+        const visitorRows: LiveVisitorRow[] = [];
         for (const visitorKey of visitorKeys) {
           const row = await this.redis.hgetall(visitorHash(visitorKey));
           if (!row?.lastSeen) continue;
           const lastSeen = Number(row.lastSeen);
           if (!Number.isFinite(lastSeen) || lastSeen < minScore) continue;
-          visitors.push({
+          visitorRows.push({
             visitorKey,
             path: row.path || '/',
+            pathLabel: row.pathLabel?.trim() || null,
             label: row.label || 'Visitor',
             userId: row.userId?.trim() || null,
             lastSeen,
@@ -199,6 +248,31 @@ export class LiveAnalyticsService {
             episodeName: row.episodeName?.trim() || null,
             lastSeen,
           });
+        }
+
+        const titleIds = new Set<string>();
+        for (const visitor of visitorRows) {
+          const fromPath = watchTitleIdFromPath(visitor.path);
+          if (fromPath) titleIds.add(fromPath);
+        }
+        for (const session of mediaSessions) {
+          titleIds.add(session.titleId);
+        }
+        const titleById = await this.lookupCatalogTitles([...titleIds]);
+
+        const visitors = visitorRows.map((visitor) => {
+          let pathLabel = visitor.pathLabel;
+          if (!pathLabel) {
+            const watchId = watchTitleIdFromPath(visitor.path);
+            if (watchId) pathLabel = titleById.get(watchId) ?? null;
+          }
+          return { ...visitor, pathLabel };
+        });
+
+        for (const session of mediaSessions) {
+          if (!mediaTitleNeedsResolve(session.titleName, session.titleId)) continue;
+          const resolved = titleById.get(session.titleId);
+          if (resolved) session.titleName = resolved;
         }
 
         return {

@@ -3,6 +3,7 @@ import { API_BASE } from "@/lib/api";
 export type LiveVisitorRow = {
   visitorKey: string;
   path: string;
+  pathLabel?: string | null;
   label: string;
   userId: string | null;
   lastSeen: number;
