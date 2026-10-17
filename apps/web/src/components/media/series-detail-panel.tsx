@@ -102,7 +102,8 @@ export function SeriesDetailPanel({
         if (cancelled) return;
         setEpisodes(rows);
         const grouped = groupBySeason(rows);
-        if (grouped[0]) setSeason(grouped[0].season);
+        const firstSeason = grouped.at(0);
+        if (firstSeason) setSeason(firstSeason.season);
       })
       .catch(() => {
         if (!cancelled) setEpisodes([]);
@@ -122,7 +123,7 @@ export function SeriesDetailPanel({
   );
 
   const episodeParts = useMemo(() => buildEpisodeParts(seasonEpisodes), [seasonEpisodes]);
-  const activePart = episodeParts[partIndex] ?? episodeParts[episodeParts.length - 1] ?? null;
+  const activePart = episodeParts.at(partIndex) ?? episodeParts.at(-1) ?? null;
 
   const latestEpisodeIndex = useMemo(() => {
     let best: MediaTitleEpisode | null = null;
@@ -260,7 +261,11 @@ export function SeriesDetailPanel({
                     ))}
                   </select>
                 ) : episodeParts.length === 1 ? (
-                  <span className={styles.partSelectStatic}>{episodeParts[0].label}</span>
+                  (() => {
+                    const sole = episodeParts.at(0);
+                    if (!sole) return null;
+                    return <span className={styles.partSelectStatic}>{sole.label}</span>;
+                  })()
                 ) : null}
               </div>
             </div>
