@@ -254,31 +254,27 @@ export function SeriesDetailPanel({
                     </select>
                   </span>
                 </label>
+                {episodeParts.length > 1 ? (
+                  <select
+                    className={styles.partSelect}
+                    value={partIndex}
+                    onChange={(event) => setPartIndex(Number(event.target.value))}
+                    aria-label="Episode range"
+                  >
+                    {episodeParts.map((part, index) => (
+                      <option key={part.label} value={index}>
+                        {part.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : episodeParts.length === 1 ? (
+                  (() => {
+                    const sole = episodeParts.at(0);
+                    if (!sole) return null;
+                    return <span className={styles.partSelectStatic}>{sole.label}</span>;
+                  })()
+                ) : null}
               </div>
-              {episodeParts.length > 0 ? (
-                <div className={styles.episodesMeta}>
-                  {episodeParts.length > 1 ? (
-                    <select
-                      className={styles.partSelect}
-                      value={partIndex}
-                      onChange={(event) => setPartIndex(Number(event.target.value))}
-                      aria-label="Episode range"
-                    >
-                      {episodeParts.map((part, index) => (
-                        <option key={part.label} value={index}>
-                          {part.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : episodeParts.length === 1 ? (
-                    (() => {
-                      const sole = episodeParts.at(0);
-                      if (!sole) return null;
-                      return <span className={styles.partSelectStatic}>{sole.label}</span>;
-                    })()
-                  ) : null}
-                </div>
-              ) : null}
             </div>
             {episodesLoading ? (
               <p className={styles.overviewMuted}>Loading episodes…</p>
