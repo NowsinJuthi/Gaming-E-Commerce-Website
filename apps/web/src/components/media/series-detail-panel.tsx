@@ -47,7 +47,9 @@ function buildEpisodeParts(items: MediaTitleEpisode[]) {
   const parts: { label: string; items: MediaTitleEpisode[] }[] = [];
   for (let i = 0; i < sorted.length; i += EPISODES_PART_SIZE) {
     const chunk = sorted.slice(i, i + EPISODES_PART_SIZE);
-    const last = episodeDisplayNumber(chunk[chunk.length - 1].name, chunk[chunk.length - 1].index);
+    const tail = chunk.at(-1);
+    if (!tail) continue;
+    const last = episodeDisplayNumber(tail.name, tail.index);
     parts.push({
       label: `Part ${parts.length + 1} - ${last}`,
       items: chunk,
