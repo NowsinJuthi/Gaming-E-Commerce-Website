@@ -1014,18 +1014,18 @@ function MovieInfo({
     <div className={styles.infoOverlay} role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className={styles.infoBackdrop} aria-label="Close" onClick={onClose} />
       <div className={`${styles.infoSheet}${backdrop ? "" : ` ${styles.infoSheetCompactHero}`}`}>
+        <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
+          <span className={styles.closeBtnRing} aria-hidden />
+          <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
+          <span className={styles.closeBtnIcon} aria-hidden>
+            ×
+          </span>
+        </button>
         <div className={`${styles.hero}${backdrop ? "" : ` ${styles.heroCompact}`}`}>
           {backdrop ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
           ) : null}
-          <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
-            <span className={styles.closeBtnRing} aria-hidden />
-            <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
-            <span className={styles.closeBtnIcon} aria-hidden>
-              ×
-            </span>
-          </button>
         </div>
         <div className={styles.headerBlock}>
           <div className={styles.poster}>

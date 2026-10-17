@@ -176,6 +176,13 @@ export function SeriesDetailPanel({
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className={styles.backdrop} aria-label="Close" onClick={onClose} />
       <div className={styles.sheet}>
+        <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
+          <span className={styles.closeBtnRing} aria-hidden />
+          <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
+          <span className={styles.closeBtnIcon} aria-hidden>
+            ×
+          </span>
+        </button>
         <div className={styles.scroll}>
           <div className={styles.hero}>
             <div className={styles.heroMedia} aria-hidden>
@@ -185,13 +192,6 @@ export function SeriesDetailPanel({
               ) : null}
               <div className={styles.heroShade} />
             </div>
-            <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
-              <span className={styles.closeBtnRing} aria-hidden />
-              <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
-              <span className={styles.closeBtnIcon} aria-hidden>
-                ×
-              </span>
-            </button>
             <div className={styles.heroBody}>
               <div className={styles.poster}>
                 {poster ? (
