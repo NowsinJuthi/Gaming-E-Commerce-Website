@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
-import { AdminMediaPlanPackages } from "@/components/admin/media-plans/AdminMediaPlanPackages";
 import styles from "@/components/admin/media-plans/admin-media-plans.module.css";
 import { TagIcon } from "@/components/admin/icons";
 import {
@@ -122,8 +121,6 @@ export default function MovieServerPlansPage() {
             {error}
           </p>
         ) : null}
-
-        <AdminMediaPlanPackages plans={plans} />
 
         <form
           className={`${styles.card} ${styles.formGrid}`}
