@@ -210,20 +210,25 @@ export function SeriesDetailPanel({
                 ) : null}
                 <div className={styles.actions}>
                   <button type="button" className={styles.playBtn} onClick={() => onPlay(0)}>
-                    <span className={styles.playBtnIconWrap} aria-hidden>
-                      <span className={styles.playBtnRipple} />
-                      <span className={styles.playBtnRipple} />
-                      <span className={styles.playBtnRipple} />
-                      <span className={styles.playBtnSpinner} />
-                      <span className={styles.playBtnOrbit} />
-                      <span className={styles.playBtnIcon}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 7.5v9l8-4.5-8-4.5z" />
-                        </svg>
+                    <span className={styles.playFabWrap} aria-hidden>
+                      <span className={styles.playFabAura} />
+                      <span className={styles.playFabHalo} />
+                      <span className={`${styles.playFabHalo} ${styles.playFabHaloReverse}`} />
+                      <span className={styles.playFabRing} />
+                      <span className={`${styles.playFabRing} ${styles.playFabRingDelayed}`} />
+                      <span className={`${styles.playFabRing} ${styles.playFabRingSlow}`} />
+                      <span className={`${styles.playFabRing} ${styles.playFabRingOuter}`} />
+                      <span className={styles.playFabCore}>
+                        <span className={styles.playFabBorderSpin} />
+                        <span className={styles.playFabShimmer} />
+                        <span className={styles.playFabIcon}>
+                          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 7.5v9l8-4.5-8-4.5z" />
+                          </svg>
+                        </span>
                       </span>
                     </span>
-                    <span className={styles.playBtnLabel}>Play</span>
-                    <span className={styles.playBtnShine} aria-hidden />
+                    <span className={styles.playBtnTail}>Play</span>
                   </button>
                 </div>
               </div>
