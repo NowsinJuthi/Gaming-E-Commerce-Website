@@ -36522,6 +36522,11 @@
   .admin-panel:not(.customer-panel) .site-header--shell-embedded {
     display: none !important;
   }
+
+  .customer-panel .admin-topbar-inner .site-header-nav {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 a:has(> .site-logo-img),

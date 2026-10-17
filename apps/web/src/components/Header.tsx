@@ -45,6 +45,7 @@ import {
   type SiteMenuLink,
 } from "@/lib/site-menus";
 import { hardNavigateFromMediaCatalog } from "@/lib/storefront-nav";
+import { StorefrontHeaderNav } from "@/components/nav/StorefrontHeaderNav";
 
 const iconBtn = "shell-icon-btn";
 
@@ -68,82 +69,6 @@ function siteMenuIcon(href: string) {
   if (path === "/reviews") return StoreIcon;
   if (path === "/website") return GridIcon;
   return StoreIcon;
-}
-
-function NavOthersDropdown({
-  items,
-  pathname,
-  typeParam,
-}: {
-  items: SiteMenuLink[];
-  pathname: string;
-  typeParam: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const active = isHeaderOthersMenuActive(items, pathname, typeParam);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    const id = window.setTimeout(() => {
-      document.addEventListener("click", handleClick);
-    }, 0);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener("click", handleClick);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div ref={rootRef} className="site-nav-dropdown">
-      <button
-        type="button"
-        className={`site-nav-link site-nav-dropdown__trigger${active ? " site-nav-link--active" : ""}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span>Others</span>
-        <ChevronIcon
-          className={`site-nav-dropdown__chevron${open ? " site-nav-dropdown__chevron--open" : ""}`}
-          aria-hidden
-        />
-      </button>
-
-      {open ? (
-        <div className="site-nav-dropdown__menu z-[70]" role="menu">
-          {items.map((item) => {
-            const itemActive = isSiteMenuLinkActive(item.href, pathname, typeParam);
-            return (
-              <Link
-                key={item.href}
-                href={item.href as "/"}
-                role="menuitem"
-                className={`site-nav-dropdown__item${itemActive ? " site-nav-dropdown__item--active" : ""}`}
-                onClick={(event) => {
-                  setOpen(false);
-                  hardNavigateFromMediaCatalog(pathname, item.href, event);
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function MobileNavOthers({
@@ -210,70 +135,6 @@ function MobileNavOthers({
         </ul>
       ) : null}
     </li>
-  );
-}
-
-// ── Isolated nav components that use useSearchParams ─────────────────────────
-// Kept separate so the main Header doesn't need a Suspense boundary and
-// the whole header never shows a blank-bar flash on load.
-
-function NavLinks({
-  navItems,
-  headerOthers,
-  pathname,
-}: {
-  navItems: SiteMenuLink[];
-  headerOthers: SiteMenuLink[];
-  pathname: string;
-}) {
-  const searchParams = useSearchParams();
-  const typeParam = searchParams.get("type");
-  const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
-  return (
-    <>
-      {primary.map((item) => {
-        const active = isSiteMenuLinkActive(item.href, pathname, typeParam);
-        return (
-          <Link
-            key={item.href}
-            href={item.href as "/"}
-            className={active ? "site-nav-link site-nav-link--active" : "site-nav-link"}
-            onClick={(event) => {
-              hardNavigateFromMediaCatalog(pathname, item.href, event);
-            }}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
-    </>
-  );
-}
-
-function NavLinksFallback({
-  navItems,
-  headerOthers,
-}: {
-  navItems: SiteMenuLink[];
-  headerOthers: SiteMenuLink[];
-}) {
-  const pathname = usePathname() ?? "";
-  const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
-  return (
-    <>
-      {primary.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href as "/"}
-          className="site-nav-link"
-          onClick={(event) => {
-            hardNavigateFromMediaCatalog(pathname, item.href, event);
-          }}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </>
   );
 }
 
@@ -605,31 +466,7 @@ export function Header({
 
           {/* ── Center column ──────────────────────────────────────────── */}
           <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-center justify-self-stretch overflow-visible lg:justify-self-center">
-            {/* Desktop nav links */}
-            <nav
-              className="site-header-nav scrollbar-none hidden min-w-0 max-w-full flex-nowrap items-center justify-center overflow-visible text-sm font-bold lg:flex"
-              aria-label="Main"
-            >
-              <Suspense
-                fallback={
-                  <NavLinksFallback
-                    navItems={navItems}
-                    headerOthers={headerOthers}
-                  />
-                }
-              >
-                <NavLinks
-                  navItems={navItems}
-                  headerOthers={headerOthers}
-                  pathname={pathname ?? ""}
-                />
-              </Suspense>
-              <NavOthersDropdown
-                items={headerOthers}
-                pathname={pathname ?? ""}
-                typeParam={null}
-              />
-            </nav>
+            <StorefrontHeaderNav />
           </div>
 
           {/* ── Right column ───────────────────────────────────────────── */}

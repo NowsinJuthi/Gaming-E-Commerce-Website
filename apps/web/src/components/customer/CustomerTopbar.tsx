@@ -15,6 +15,7 @@ import {
   getPrimaryRoleLabel,
 } from "@/lib/admin-order-view";
 import { resolveAvatarSrc } from "@/lib/site-appearance";
+import { StorefrontHeaderNav } from "@/components/nav/StorefrontHeaderNav";
 
 type Props = {
   pathname: string | null;
@@ -179,6 +180,10 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
 
         <div className="site-header-brand-slot col-start-2 row-start-1 flex min-w-0 items-center justify-center self-center lg:col-start-1 lg:justify-start lg:pl-3">
           <AdminHeaderLogo />
+        </div>
+
+        <div className="col-start-2 row-start-1 hidden min-w-0 items-center justify-center overflow-visible lg:flex lg:justify-self-stretch">
+          <StorefrontHeaderNav />
         </div>
 
         <div className="col-start-3 row-start-1 flex min-w-0 items-center justify-end gap-1 px-2 sm:gap-2 sm:px-3 lg:gap-3 lg:px-6">
