@@ -30,18 +30,30 @@ function parseSeasonNumber(name: string): number {
   return 1;
 }
 
-function episodeCode(name: string, index: number): string {
-  const sxe = name.match(/\bS(\d+)E(\d+)\b/i);
-  if (sxe) return `S${sxe[1]}:E${sxe[2]}`;
-  return `E${index + 1}`;
+const EPISODES_PART_SIZE = 30;
+
+function episodeDisplayNumber(name: string, index: number): number {
+  const sxe = name.match(/\bS\d+E(\d+)\b/i);
+  if (sxe) return Number(sxe[1]);
+  const ep = name.match(/\bEP?\s*(\d+)\b/i);
+  if (ep) return Number(ep[1]);
+  return index + 1;
 }
 
-function episodeTitle(name: string): string {
-  const cleaned = name
-    .replace(/^season\s*\d+\s*[·\-–—]\s*/i, "")
-    .replace(/\bS\d+E\d+\b[-.\s]*/i, "")
-    .trim();
-  return cleaned || name;
+function buildEpisodeParts(items: MediaTitleEpisode[]) {
+  const sorted = [...items].sort(
+    (a, b) => episodeDisplayNumber(a.name, a.index) - episodeDisplayNumber(b.name, b.index),
+  );
+  const parts: { label: string; items: MediaTitleEpisode[] }[] = [];
+  for (let i = 0; i < sorted.length; i += EPISODES_PART_SIZE) {
+    const chunk = sorted.slice(i, i + EPISODES_PART_SIZE);
+    const last = episodeDisplayNumber(chunk[chunk.length - 1].name, chunk[chunk.length - 1].index);
+    parts.push({
+      label: `Part ${parts.length + 1} - ${last}`,
+      items: chunk,
+    });
+  }
+  return parts;
 }
 
 function groupBySeason(episodes: MediaTitleEpisode[]) {
@@ -77,6 +89,8 @@ export function SeriesDetailPanel({
   const [episodes, setEpisodes] = useState<MediaTitleEpisode[]>([]);
   const [episodesLoading, setEpisodesLoading] = useState(true);
   const [season, setSeason] = useState(1);
+  const [partIndex, setPartIndex] = useState(0);
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +118,35 @@ export function SeriesDetailPanel({
     () => seasons.find((row) => row.season === season)?.items ?? [],
     [season, seasons],
   );
+
+  const episodeParts = useMemo(() => buildEpisodeParts(seasonEpisodes), [seasonEpisodes]);
+  const activePart = episodeParts[partIndex] ?? episodeParts[episodeParts.length - 1] ?? null;
+
+  const latestEpisodeIndex = useMemo(() => {
+    if (seasonEpisodes.length === 0) return null;
+    let best = seasonEpisodes[0];
+    let bestNum = episodeDisplayNumber(best.name, best.index);
+    for (const episode of seasonEpisodes) {
+      const num = episodeDisplayNumber(episode.name, episode.index);
+      if (num >= bestNum) {
+        bestNum = num;
+        best = episode;
+      }
+    }
+    return best.index;
+  }, [seasonEpisodes]);
+
+  const gridEpisodes = useMemo(() => {
+    if (!activePart) return [];
+    return [...activePart.items].sort(
+      (a, b) => episodeDisplayNumber(b.name, b.index) - episodeDisplayNumber(a.name, a.index),
+    );
+  }, [activePart]);
+
+  useEffect(() => {
+    setPartIndex(Math.max(0, episodeParts.length - 1));
+    setHighlightIndex(null);
+  }, [season, episodeParts.length]);
 
   const seasonLabel =
     card.seasonCount && card.seasonCount > 0
@@ -179,54 +222,75 @@ export function SeriesDetailPanel({
             )}
           </section>
 
-          <section className={styles.section}>
+          <section className={`${styles.section} ${styles.episodesSection}`}>
             <div className={styles.episodesHead}>
               <h3>Episodes</h3>
-              {seasons.length > 1 ? (
-                <select
-                  className={styles.seasonSelect}
-                  value={season}
-                  onChange={(event) => setSeason(Number(event.target.value))}
-                  aria-label="Season"
-                >
-                  {seasons.map((row) => (
-                    <option key={row.season} value={row.season}>
-                      Season {row.season}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className={styles.overviewMuted}>Season 1</span>
-              )}
+              <div className={styles.episodesTools}>
+                {seasonEpisodes.length > 0 ? (
+                  <span className={styles.episodeCountPill}>
+                    {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+                {seasons.length > 1 ? (
+                  <select
+                    className={styles.seasonSelect}
+                    value={season}
+                    onChange={(event) => setSeason(Number(event.target.value))}
+                    aria-label="Season"
+                  >
+                    {seasons.map((row) => (
+                      <option key={row.season} value={row.season}>
+                        Season {row.season}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                {episodeParts.length > 1 ? (
+                  <select
+                    className={styles.partSelect}
+                    value={partIndex}
+                    onChange={(event) => setPartIndex(Number(event.target.value))}
+                    aria-label="Episode range"
+                  >
+                    {episodeParts.map((part, index) => (
+                      <option key={part.label} value={index}>
+                        {part.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : episodeParts.length === 1 ? (
+                  <span className={styles.partSelectStatic}>{episodeParts[0].label}</span>
+                ) : null}
+              </div>
             </div>
             {episodesLoading ? (
               <p className={styles.overviewMuted}>Loading episodes…</p>
             ) : seasonEpisodes.length === 0 ? (
               <p className={styles.overviewMuted}>No episodes found on storage.</p>
             ) : (
-              <div className={styles.episodeTrack}>
-                {seasonEpisodes.map((episode) => (
-                  <button
-                    key={episode.index}
-                    type="button"
-                    className={styles.episodeCard}
-                    onClick={() => onPlay(episode.index)}
-                  >
-                    <div className={styles.episodeThumb}>
-                      {poster ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={poster} alt="" referrerPolicy="no-referrer" />
-                      ) : null}
-                      <span className={styles.episodeBadge}>{episodeCode(episode.name, episode.index)}</span>
-                    </div>
-                    <div className={styles.episodeBody}>
-                      <p className={styles.episodeTitle}>
-                        {episodeCode(episode.name, episode.index)} — {episodeTitle(episode.name)}
-                      </p>
-                      <p className={styles.episodeSynopsis}>{episodeTitle(episode.name)}</p>
-                    </div>
-                  </button>
-                ))}
+              <div className={styles.episodeGrid}>
+                {gridEpisodes.map((episode) => {
+                  const epNum = episodeDisplayNumber(episode.name, episode.index);
+                  const isNew = latestEpisodeIndex === episode.index;
+                  const isActive =
+                    highlightIndex === episode.index ||
+                    (highlightIndex == null && isNew);
+                  return (
+                    <button
+                      key={episode.index}
+                      type="button"
+                      className={`${styles.episodeChip} ${isActive ? styles.episodeChipActive : ""}`}
+                      aria-label={`Episode ${epNum}`}
+                      onClick={() => {
+                        setHighlightIndex(episode.index);
+                        onPlay(episode.index);
+                      }}
+                    >
+                      {isNew ? <span className={styles.episodeNewBadge}>NEW</span> : null}
+                      EP {epNum}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>

@@ -240,12 +240,17 @@
   color: rgb(255 255 255 / 0.45);
 }
 
+.episodesSection {
+  padding-bottom: 1.35rem;
+}
+
 .episodesHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .episodesHead h3 {
@@ -255,94 +260,112 @@
   color: #fff;
 }
 
+.episodesTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.episodeCountPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.04);
+  padding: 0.28rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.72);
+}
+
 .seasonSelect {
-  min-width: 7rem;
+  min-width: 6.5rem;
   border-radius: 0.45rem;
   border: 1px solid rgb(255 255 255 / 0.15);
-  background: rgb(255 255 255 / 0.06);
-  color: #fff;
-  padding: 0.35rem 0.55rem;
-  font-size: 0.82rem;
+  background: rgb(28 33 45 / 0.95);
+  color: rgb(255 255 255 / 0.88);
+  padding: 0.38rem 0.55rem;
+  font-size: 0.8rem;
 }
 
-.episodeTrack {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: min(16rem, 78vw);
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.35rem;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-}
-
-.episodeCard {
-  scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  border: 0;
-  border-radius: 0.55rem;
-  overflow: hidden;
-  background: rgb(255 255 255 / 0.04);
-  text-align: left;
+.partSelect {
+  min-width: 8.5rem;
+  border-radius: 0.45rem;
+  border: 1px solid #ffb700;
+  background: rgb(28 33 45 / 0.95);
+  color: #ffb700;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
 }
 
-.episodeCard:hover {
-  background: rgb(255 255 255 / 0.08);
-  transform: translateY(-2px);
+.partSelectStatic {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  border: 1px solid #ffb700;
+  background: rgb(28 33 45 / 0.95);
+  color: #ffb700;
+  padding: 0.38rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
-.episodeThumb {
+.episodeGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.episodeChip {
   position: relative;
-  aspect-ratio: 16 / 9;
-  background: linear-gradient(135deg, #122028, #0a1016);
-}
-
-.episodeThumb img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.55;
-}
-
-.episodeBadge {
-  position: absolute;
-  left: 0.45rem;
-  bottom: 0.45rem;
-  border-radius: 0.35rem;
-  padding: 0.15rem 0.4rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: rgb(0 0 0 / 0.65);
-  color: #fff;
-}
-
-.episodeBody {
-  padding: 0.65rem 0.7rem 0.75rem;
-}
-
-.episodeTitle {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #fff;
-}
-
-.episodeSynopsis {
-  margin: 0.35rem 0 0;
+  min-width: 3.35rem;
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.42rem 0.55rem;
   font-size: 0.72rem;
-  line-height: 1.45;
-  color: rgb(255 255 255 / 0.55);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #1c212d;
+  color: rgb(255 255 255 / 0.72);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.episodeChip:hover {
+  background: #252b3a;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.episodeChipActive {
+  background: #ffb700;
+  color: #0b0e14;
+  box-shadow: 0 0 0 1px rgb(255 183 0 / 0.35), 0 0 18px rgb(255 183 0 / 0.35);
+}
+
+.episodeChipActive:hover {
+  background: #ffc933;
+  color: #0b0e14;
+}
+
+.episodeNewBadge {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.35rem;
+  z-index: 1;
+  border-radius: 999px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: #00c853;
+  color: #fff;
+  line-height: 1.2;
+  pointer-events: none;
 }
 
 .castSection {
