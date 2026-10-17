@@ -47,15 +47,22 @@ export default function MovieServerPlansPage() {
   );
 
   const create = useMutation({
-    mutationFn: () =>
-      mediaSubscriptionApi.createPlan({
+    mutationFn: () => {
+      const slug = form.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-|-$/g, "");
+      return mediaSubscriptionApi.createPlan({
         ...form,
+        slug,
         monthlyPriceCents: Number(form.monthlyPriceCents),
         yearlyPriceCents: Number(form.yearlyPriceCents),
         maxDevices: Number(form.maxDevices),
         maxStreams: Number(form.maxStreams),
         trialDays: Number(form.trialDays),
-      }),
+      });
+    },
     onSuccess: async () => {
       setError(null);
       await queryClient.invalidateQueries({ queryKey: ["admin-media-plans"] });
@@ -125,7 +132,12 @@ export default function MovieServerPlansPage() {
             create.mutate();
           }}
         >
-          <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} />
+          <Field
+            label="Slug"
+            hint="Lowercase kebab-case (e.g. basic). Basic, standard, premium already exist from API sync."
+            value={form.slug}
+            onChange={(v) => setForm({ ...form, slug: v })}
+          />
           <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
           <label className="sm:col-span-2">
             <span className={styles.fieldLabel}>Description</span>
@@ -149,6 +161,7 @@ export default function MovieServerPlansPage() {
           />
           <Field
             label="Monthly price (cents)"
+            hint="BDT 49.00 = 4900 (not 49)."
             type="number"
             value={String(form.monthlyPriceCents)}
             onChange={(v) => setForm({ ...form, monthlyPriceCents: Number(v) })}
@@ -314,11 +327,13 @@ export default function MovieServerPlansPage() {
 
 function Field({
   label,
+  hint,
   value,
   onChange,
   type = "text",
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -332,6 +347,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint ? <span className="mt-1 block text-xs text-foreground-muted">{hint}</span> : null}
     </label>
   );
 }

@@ -182,15 +182,15 @@ const nextConfig: NextConfig = {
       source: "/favicon.ico",
       destination: "/favicon",
     };
-    const apiBase =
-      process.env.INTERNAL_API_URL?.trim() ||
-      process.env.NEXT_PUBLIC_API_URL?.trim() ||
-      "http://localhost:4000/api";
-    let apiOrigin: string;
-    try {
-      apiOrigin = new URL(apiBase.replace(/\/$/, "")).origin;
-    } catch {
-      apiOrigin = "http://localhost:4000";
+    // Rewrites must target loopback Nest — never NEXT_PUBLIC_API_URL (often https://uniqbd.com/api → rewrite loop).
+    let apiOrigin = "http://127.0.0.1:4000";
+    const internal = process.env.INTERNAL_API_URL?.trim();
+    if (internal) {
+      try {
+        apiOrigin = new URL(internal.replace(/\/$/, "")).origin;
+      } catch {
+        /* keep loopback default */
+      }
     }
     return [
       faviconRewrite,
