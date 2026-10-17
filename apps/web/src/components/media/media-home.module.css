@@ -817,8 +817,7 @@
 
 .posterLink img,
 .posterFallback,
-.playOverlay,
-.playButton {
+.playOverlay {
   pointer-events: none;
 }
 
@@ -859,43 +858,44 @@
 .playOverlay {
   position: absolute;
   inset: 0;
-  display: none;
+  z-index: 2;
+  display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(1 19 26 / 0.08), rgb(1 19 26 / 0.42));
-  opacity: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.06), rgb(0 0 0 / 0.38));
+  opacity: 0.92;
+  transition: opacity 0.28s ease, background 0.28s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .playOverlay {
-    display: flex;
-    transition: opacity 0.28s ease;
+    opacity: 0;
+  }
+
+  .posterLink:hover .playOverlay,
+  .posterLink:focus-visible .playOverlay {
+    opacity: 1;
   }
 }
 
-.posterLink:hover .playOverlay,
-.posterLink:focus-visible .playOverlay {
-  opacity: 1;
+.posterPlayHit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.45));
+  transition: background 0.25s ease;
 }
 
-.playButton {
-  height: 3rem;
-  width: 3rem;
-  pointer-events: none;
-  border-radius: 999px;
-  border: 2px solid rgb(38 191 176 / 0.8);
-  background: rgb(1 19 26 / 0.45);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.38);
-}
-
-.playButton::before {
-  content: "";
-  display: block;
-  margin: 0.85rem auto 0 1.15rem;
-  border-style: solid;
-  border-width: 0.45rem 0 0.45rem 0.7rem;
-  border-color: transparent transparent transparent #fff;
+.posterPlayHit:hover {
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.55));
 }
 
 .cardTitle,

@@ -15,6 +15,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
+import { MediaPosterPlayMark } from "./media-poster-play-mark";
 import styles from "./media-home.module.css";
 import { SeriesDetailPanel } from "./series-detail-panel";
 import {
@@ -778,7 +779,7 @@ function RecentlyWatchedSlider({
                     <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
                   )}
                   <span className={styles.playOverlay} aria-hidden>
-                    <span className={styles.playButton} />
+                    <MediaPosterPlayMark size="card" />
                   </span>
                   {progress > 0 ? (
                     <span className={styles.recentProgressTrack} aria-hidden>
@@ -919,17 +920,20 @@ function WatchPlayButton({
   className,
   children,
   onBeforeNavigate,
+  ariaLabel = "Play",
 }: {
   id: string;
   className?: string;
   children: ReactNode;
   onBeforeNavigate?: () => void;
+  ariaLabel?: string;
 }) {
   const navigateToWatch = useNavigateToWatch();
   return (
     <button
       type="button"
       className={className}
+      aria-label={ariaLabel}
       onClick={() => {
         onBeforeNavigate?.();
         navigateToWatch(id);
@@ -961,7 +965,7 @@ function TitleGrid({ items, onSelect }: { items: MediaCard[]; onSelect: (item: M
                 <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
               )}
               <span className={styles.playOverlay} aria-hidden>
-                <span className={styles.playButton} />
+                <MediaPosterPlayMark size="card" />
               </span>
             </span>
           </PosterPlayLink>
@@ -1025,6 +1029,9 @@ function MovieInfo({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={poster} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async" />
             ) : null}
+            <WatchPlayButton id={card.id} className={styles.posterPlayHit} onBeforeNavigate={onClose}>
+              <MediaPosterPlayMark size="detail" />
+            </WatchPlayButton>
           </div>
           <div className={styles.headerCopy}>
             <p className={styles.kicker}>{kind === "series" ? "Series" : "Movie"}</p>
@@ -1048,9 +1055,6 @@ function MovieInfo({
             <p className={styles.overviewMuted}>No description available.</p>
           )}
           <div className={styles.actions}>
-            <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
-              ▶ Play
-            </WatchPlayButton>
             <span className={styles.ghost}>+ My List</span>
             <span className={styles.ghost}>Mark watched</span>
           </div>
