@@ -11,12 +11,9 @@ import {
   ChatPanel,
 } from "@/components/chat/ChatPanel";
 import { SupportTeamAvatar } from "@/components/chat/ChatRoomAvatar";
-import { useLiveChatIconAlerts } from "@/hooks/useStaffChatAlerts";
-import {
-  notifyUnreadCountChanged,
-  useStaffChatUnreadCount,
-  useUnreadNotifications,
-} from "@/hooks/useUnreadNotifications";
+import { useLiveChatFabUnread } from "@/hooks/useLiveChatFabUnread";
+import { notifyUnreadCountChanged } from "@/hooks/useUnreadNotifications";
+import { syncLiveChatFabUnread } from "@/lib/live-chat-fab-unread";
 import {
   getMe,
   getOnlineSupportStaff,
@@ -151,13 +148,7 @@ export function LiveChatLauncher({
 
   const chatAllowed = canAccessLiveChat(allowGuestChat);
 
-  const staffUnread = useStaffChatUnreadCount(chatAllowed && role === "staff");
-  const customerUnread = useUnreadNotifications(
-    chatAllowed && role === "customer",
-    "customer",
-    true,
-  );
-  const unread = role === "staff" ? staffUnread : customerUnread;
+  const unread = useLiveChatFabUnread();
 
   const hidden = isLauncherHidden(pathname);
 
@@ -267,14 +258,6 @@ export function LiveChatLauncher({
     setOpen(true);
   }
 
-  useLiveChatIconAlerts({
-    enabled: chatAllowed && role !== "guest",
-    alertOn: role === "staff" ? "customer" : "staff",
-    chatOpen: open,
-    playSound: true,
-    bumpUnread: role !== "guest",
-  });
-
   useEffect(() => {
     if (!open || role === "staff" || !chatAllowed) return;
     getOnlineSupportStaff()
@@ -285,7 +268,10 @@ export function LiveChatLauncher({
   useEffect(() => {
     if (!open || !chatAllowed) return;
     markChatNotificationsRead(role === "staff" ? "staff" : "customer")
-      .then(() => notifyUnreadCountChanged(true))
+      .then(() => {
+        syncLiveChatFabUnread(0, true);
+        notifyUnreadCountChanged(true);
+      })
       .catch(() => undefined);
   }, [open, role, chatAllowed]);
 
