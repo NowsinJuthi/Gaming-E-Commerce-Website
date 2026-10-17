@@ -9,7 +9,6 @@ import {
   displayTimelineSeconds,
   isLocalTimeInPack,
   localTimelineSeconds,
-  seekVideoTo,
 } from "@/lib/media-playback-timeline";
 import { useLiveMediaWatch } from "@/hooks/useLiveMediaWatch";
 import {
@@ -113,12 +112,6 @@ async function lockPlaybackLandscape() {
     lock?: (mode: string) => Promise<void>;
   };
   await orientation.lock?.("landscape").catch(() => undefined);
-}
-
-/** iPhone/iPad play native HLS. Android uses the same direct stream as desktop. */
-function isPhonePlayback(): boolean {
-  if (typeof window === "undefined") return false;
-  return appleMobile();
 }
 
 function appleMobile(): boolean {
@@ -613,28 +606,8 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     return data;
   }, []);
 
-  /** Stop hls.js only — keep the video surface alive (Movie-Server seek model on iPhone). */
-  const detachPhonePlayback = useCallback(() => {
-    attachSeqRef.current += 1;
-    const hls = hlsRef.current;
-    if (hls) {
-      try {
-        hls.stopLoad();
-      } catch {
-        /* destroyed */
-      }
-      hls.destroy();
-    }
-    hlsRef.current = null;
-  }, []);
-
   /** Stop segment requests before API clears the pack (seek/retarget would otherwise 404 old seg*.m2ts). */
   const stopActivePlayback = useCallback(() => {
-    if (isPhonePlayback()) {
-      captureHoldRef.current();
-      detachPhonePlayback();
-      return;
-    }
     attachSeqRef.current += 1;
     const hls = hlsRef.current;
     if (hls) {
@@ -653,7 +626,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       video.removeAttribute("src");
       video.load();
     }
-  }, [detachPhonePlayback]);
+  }, []);
 
   const attachPlaybackPack = useCallback(async (pack: PlaybackSession): Promise<void> => {
     const video = videoRef.current;
@@ -662,21 +635,15 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const seq = ++attachSeqRef.current;
     const packStart = pack.startSeconds;
     const loadToken = ++loadTokenRef.current;
-    const playbackUrl = isPhonePlayback()
-      ? pack.playlistUrl.replace(/\/media\.mp4(?=$|\?)/i, "/index.m3u8")
-      : pack.playlistUrl;
-    const playlist = hlsPlaylistSource(playbackUrl, packStart, loadToken);
+    const playlist = hlsPlaylistSource(pack.playlistUrl, packStart, loadToken);
 
     hlsRef.current?.destroy();
     hlsRef.current = null;
     captureHoldRef.current();
-    const phone = isPhonePlayback();
-    if (!phone) {
-      video.removeAttribute("src");
-      video.load();
-    }
+    video.removeAttribute("src");
+    video.load();
 
-    originRef.current = phone ? 0 : packStart;
+    originRef.current = packStart;
     packRestartRef.current = true;
 
     const finishAttach = () => {
@@ -756,59 +723,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       }
     };
 
-    const waitForPhonePlaylist = (element: HTMLVideoElement, source: string, attachSeq: number) =>
-      new Promise<void>((resolve, reject) => {
-        let settled = false;
-        let attempt = 0;
-        let timer = 0;
-        let ignoreUntil = 0;
-        const cleanup = () => {
-          element.removeEventListener("loadedmetadata", onReady);
-          element.removeEventListener("error", onErr);
-          window.clearTimeout(timer);
-        };
-        const finish = (fn: () => void) => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(giveUp);
-          cleanup();
-          fn();
-        };
-        const giveUp = window.setTimeout(
-          () => finish(() => reject(new Error("Playback timed out. Try again."))),
-          90_000,
-        );
-        const onReady = () => {
-          if (attachSeq !== attachSeqRef.current) {
-            finish(() => reject(new Error("Playback cancelled.")));
-            return;
-          }
-          finish(resolve);
-        };
-        const onErr = () => {
-          if (Date.now() < ignoreUntil) return;
-          if (attempt >= 6) {
-            finish(() => reject(new Error("Playback failed.")));
-            return;
-          }
-          attempt += 1;
-          window.clearTimeout(timer);
-          timer = window.setTimeout(arm, 1000);
-        };
-        const arm = () => {
-          if (settled || attachSeq !== attachSeqRef.current) return;
-          element.removeEventListener("loadedmetadata", onReady);
-          element.removeEventListener("error", onErr);
-          element.addEventListener("loadedmetadata", onReady);
-          element.addEventListener("error", onErr);
-          ignoreUntil = Date.now() + 600;
-          const joiner = source.includes("?") ? "&" : "?";
-          element.src = attempt === 0 ? source : `${source}${joiner}retry=${attempt}`;
-          element.load();
-        };
-        arm();
-      });
-
     const waitForAttach = (bind: (resolve: () => void, reject: (error: Error) => void) => void) =>
       new Promise<void>((resolve, reject) => {
         let settled = false;
@@ -827,16 +741,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
           (error) => finish(() => reject(error)),
         );
       });
-
-    if (phone) {
-      await waitForPhonePlaylist(video, playlist, seq);
-      if (seq !== attachSeqRef.current) throw new Error("Playback cancelled.");
-      if (packStart > 0.25) video.currentTime = packStart;
-      setCurrent(packStart);
-      video.playbackRate = rateRef.current;
-      void startAttachedPlayback(video);
-      return;
-    }
 
     const progressive = /\/media\.mp4(?:\?|$)/i.test(playlist);
     if (progressive || nativeHls(video)) {
@@ -976,7 +880,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
         const ready = next.status === "ready" ? next : await waitForSessionReady(currentSession.sessionId);
         await attachPlaybackPack(ready);
         attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
-        if (!isPhonePlayback()) originRef.current = ready.startSeconds;
         setCurrent(ready.startSeconds);
         setSession(ready);
       } catch (reason) {
@@ -1445,7 +1348,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       const ready = next.status === "ready" ? next : await waitForSessionReady(currentSession.sessionId);
       await attachPlaybackPack(ready);
       attachedPackRef.current = `${ready.sessionId}:${ready.startSeconds}`;
-      if (!isPhonePlayback()) originRef.current = ready.startSeconds;
       setCurrent(ready.startSeconds);
       setSession(ready);
     } catch (reason) {
@@ -1493,16 +1395,11 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     remember(absolute);
 
     const wasPlaying = !video.paused;
-    if (isPhonePlayback()) {
-      quietSeekUntil.current = Date.now() + 1800;
-      const packDuration = movie > 0 ? movie : Number.isFinite(video.duration) ? video.duration : 0;
-      seekVideoTo(video, absolute, packDuration);
-      if (wasPlaying) void video.play().catch(() => undefined);
-      return;
-    }
+    if (appleMobile()) quietSeekUntil.current = Date.now() + 1800;
     if (targetIsInCurrentPack && isLocalTimeInPack(video, localTarget)) {
       applyVideoSeek(video, localTarget);
       setCurrent(absolute);
+      if (wasPlaying) void video.play().catch(() => undefined);
       return;
     }
 
