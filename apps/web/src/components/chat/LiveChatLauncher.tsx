@@ -268,7 +268,7 @@ export function LiveChatLauncher({
     alertOn: role === "staff" ? "customer" : "staff",
     chatOpen: open,
     playSound: true,
-    bumpUnread: role === "staff",
+    bumpUnread: role !== "guest",
   });
 
   useEffect(() => {
@@ -281,7 +281,7 @@ export function LiveChatLauncher({
   useEffect(() => {
     if (!open || !chatAllowed) return;
     markChatNotificationsRead(role === "staff" ? "staff" : "customer")
-      .then(() => notifyUnreadCountChanged())
+      .then(() => notifyUnreadCountChanged(true))
       .catch(() => undefined);
   }, [open, role, chatAllowed]);
 

@@ -1,7 +1,7 @@
 "use client";
 import { hasAuthSession } from "@/lib/access-token";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getStaffChatUnreadCount,
   getUnreadCount,
@@ -15,8 +15,16 @@ export function bumpStaffChatUnread() {
   window.dispatchEvent(new Event(CHAT_UNREAD_BUMP_EVENT));
 }
 
-export function notifyUnreadCountChanged() {
-  window.dispatchEvent(new Event(NOTIFICATION_CHANGE_EVENT));
+/** When `exact` is true, the next refresh replaces the count (e.g. after mark-read). */
+export function notifyUnreadCountChanged(exact = false) {
+  window.dispatchEvent(
+    new CustomEvent(NOTIFICATION_CHANGE_EVENT, { detail: { exact } }),
+  );
+}
+
+function notificationChangeExact(event: Event): boolean {
+  const detail = (event as CustomEvent<{ exact?: boolean }>).detail;
+  return detail?.exact === true;
 }
 
 export function useUnreadNotifications(
@@ -26,26 +34,48 @@ export function useUnreadNotifications(
   excludeChat = false,
 ) {
   const [unread, setUnread] = useState(0);
+  const exactSyncRef = useRef(false);
 
   const refresh = useCallback(() => {
     if (!enabled || !hasAuthSession()) {
       setUnread(0);
       return;
     }
+    const exact = exactSyncRef.current;
+    exactSyncRef.current = false;
     getUnreadCount(audience, chatOnly, excludeChat)
-      .then((r) => setUnread(r.count))
+      .then((r) => {
+        if (exact || !chatOnly) {
+          setUnread(r.count);
+          return;
+        }
+        // Chat badge: message:new can arrive before the notification row exists.
+        setUnread((prev) => Math.max(r.count, prev));
+      })
       .catch(() => setUnread(0));
   }, [audience, chatOnly, excludeChat, enabled]);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("auth-change", refresh);
-    window.addEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+    const onAuthChange = () => refresh();
+    const onNotificationChange = (event: Event) => {
+      if (notificationChangeExact(event)) {
+        exactSyncRef.current = true;
+      }
+      refresh();
+    };
+    const onBump = () => setUnread((count) => count + 1);
+
+    window.addEventListener("auth-change", onAuthChange);
+    window.addEventListener(NOTIFICATION_CHANGE_EVENT, onNotificationChange);
+    if (chatOnly) {
+      window.addEventListener(CHAT_UNREAD_BUMP_EVENT, onBump);
+    }
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
       refresh();
-    }, 30_000);
+    }, chatOnly ? 15_000 : 30_000);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -55,12 +85,15 @@ export function useUnreadNotifications(
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      window.removeEventListener("auth-change", refresh);
-      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+      window.removeEventListener("auth-change", onAuthChange);
+      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, onNotificationChange);
+      if (chatOnly) {
+        window.removeEventListener(CHAT_UNREAD_BUMP_EVENT, onBump);
+      }
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.clearInterval(intervalId);
     };
-  }, [refresh]);
+  }, [chatOnly, refresh]);
 
   return unread;
 }

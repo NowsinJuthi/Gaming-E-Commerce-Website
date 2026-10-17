@@ -1904,7 +1904,9 @@ export function markChatNotificationsRead(
     method: "PATCH",
   }).then((result) => {
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("notification-change"));
+      window.dispatchEvent(
+        new CustomEvent("notification-change", { detail: { exact: true } }),
+      );
     }
     return result as { success: boolean };
   });
@@ -1914,7 +1916,9 @@ export function markNotificationRead(id: string): Promise<unknown> {
   return authRequest(`/notifications/${id}/read`, { method: "PATCH" }).then(
     (result) => {
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("notification-change"));
+        window.dispatchEvent(
+          new CustomEvent("notification-change", { detail: { exact: true } }),
+        );
       }
       return result;
     },
@@ -1929,7 +1933,9 @@ export function markAllNotificationsRead(
   }).then(
     (result) => {
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("notification-change"));
+        window.dispatchEvent(
+          new CustomEvent("notification-change", { detail: { exact: true } }),
+        );
       }
       return result;
     },

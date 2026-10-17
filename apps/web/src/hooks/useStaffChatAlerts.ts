@@ -50,7 +50,8 @@ export function useLiveChatIconAlerts(options: {
 
     const timers = new Set<number>();
     const refreshSoon = () => {
-      for (const delay of [400, 1200]) {
+      // In-app chat notifications are upserted after message:new is broadcast.
+      for (const delay of [800, 2000, 5000]) {
         const timer = window.setTimeout(() => {
           timers.delete(timer);
           notifyUnreadCountChanged();
@@ -74,8 +75,13 @@ export function useLiveChatIconAlerts(options: {
       if (alertOn === "staff" && !fromStaff) return;
       const path = pathnameRef.current;
       if (path?.startsWith("/admin/chat") || path === "/chat") return;
-      if (bumpUnreadRef.current && !fromStaff) {
-        bumpStaffChatUnread();
+      if (bumpUnreadRef.current) {
+        const bump =
+          (alertOn === "staff" && fromStaff) ||
+          (alertOn === "customer" && !fromStaff);
+        if (bump && !(alertOn === "staff" && chatOpenRef.current)) {
+          bumpStaffChatUnread();
+        }
       }
       if (playSoundRef.current && !chatOpenRef.current) {
         playChatNotificationSound();
