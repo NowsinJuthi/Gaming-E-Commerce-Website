@@ -389,26 +389,30 @@ export function Header({
   );
 
   const AvatarInner = () => (
-    <span className="admin-topbar-avatar overflow-hidden">
-      {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resolveAvatarSrc(avatarUrl)}
-          alt=""
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <span className="grid h-full place-items-center text-sm font-bold">
-          {displayName.charAt(0).toUpperCase()}
-        </span>
-      )}
+    <span className="site-header-profile-ring">
+      <span className="site-header-profile-ringOrbit" aria-hidden />
+      <span className="site-header-profile-ringRipple" aria-hidden />
+      <span className="admin-topbar-avatar overflow-hidden">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={resolveAvatarSrc(avatarUrl)}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="grid h-full place-items-center text-sm font-bold">
+            {displayName.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </span>
     </span>
   );
 
   const headerChrome = (
     <>
       <header
-        className={`site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b${shellEmbedded ? " site-header--shell-embedded" : ""}`}
+        className={`site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b${shellEmbedded ? " site-header--shell-embedded" : ""}${!isAdminRoute ? " site-header--storefront" : ""}`}
       >
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
@@ -531,7 +535,7 @@ export function Header({
                     setMenuOpen(false);
                     setUserOpen((o) => !o);
                   }}
-                  className="rounded-full border border-transparent p-0.5 transition hover:border-border hover:bg-muted/60"
+                  className="overflow-visible rounded-full border border-transparent p-0 transition hover:border-border hover:bg-muted/60"
                   aria-label="My account"
                   aria-expanded={userOpen}
                   aria-haspopup="menu"
@@ -562,7 +566,7 @@ export function Header({
                     setMenuOpen(false);
                     setUserOpen((o) => !o);
                   }}
-                  className="flex items-center gap-2 rounded-xl border border-transparent py-1 pl-1 pr-2 transition hover:border-border hover:bg-muted/60"
+                  className="flex items-center gap-2 overflow-visible rounded-xl border border-transparent py-1 pl-1 pr-2 transition hover:border-border hover:bg-muted/60"
                   aria-expanded={userOpen}
                   aria-haspopup="menu"
                 >

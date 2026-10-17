@@ -37995,6 +37995,74 @@ html.media-catalog-route .media-page-root :where(
     0 0 12px -6px rgb(var(--brand) / 0.35);
 }
 
+@keyframes siteHeaderProfileOrbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes siteHeaderProfileGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: scale(1.06);
+    opacity: 0.82;
+  }
+}
+
+.site-header.site-header--storefront .site-header-profile-ring {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.site-header.site-header--storefront .site-header-profile-ringOrbit,
+.site-header.site-header--storefront .site-header-profile-ringRipple {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.site-header.site-header--storefront .site-header-profile-ringOrbit {
+  inset: -2px;
+  border: 1.5px solid rgb(255 183 0 / 0.18);
+  border-top-color: rgb(255 183 0 / 0.82);
+  border-right-color: rgb(255 215 90 / 0.48);
+  animation: siteHeaderProfileOrbit 2.6s linear infinite;
+}
+
+.site-header.site-header--storefront .site-header-profile-ringRipple {
+  inset: -4px;
+  border: 1px solid rgb(255 183 0 / 0.32);
+  animation: siteHeaderProfileGlow 2.2s ease-in-out infinite;
+}
+
+.site-header.site-header--storefront button:hover .site-header-profile-ringOrbit,
+.site-header.site-header--storefront button:focus-visible .site-header-profile-ringOrbit {
+  animation-duration: 1.5s;
+}
+
+.site-header.site-header--storefront .admin-topbar-avatar {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header.site-header--storefront .site-header-profile-ringOrbit,
+  .site-header.site-header--storefront .site-header-profile-ringRipple {
+    animation: none;
+    border-color: rgb(255 183 0 / 0.42);
+    opacity: 0.72;
+  }
+}
+
 @media (max-width: 767px) {
   .site-header .shell-icon-btn {
     @apply h-8 w-8;
