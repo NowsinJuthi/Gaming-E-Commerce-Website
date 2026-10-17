@@ -23,4 +23,10 @@ id uniqbd >/dev/null 2>&1 || {
 # Root-owned .git/objects breaks `sudo -u uniqbd git pull`.
 chown -R uniqbd:uniqbd "$APP_DIR/.git"
 runuser -u uniqbd -- git -C "$APP_DIR" pull origin "$BRANCH"
-echo "Git pull OK ($(runuser -u uniqbd -- git -C "$APP_DIR" rev-parse --short HEAD))"
+SHA="$(runuser -u uniqbd -- git -C "$APP_DIR" rev-parse --short HEAD)"
+echo "Git pull OK ($SHA)"
+echo ""
+echo "Pull alone does not rebuild running services. After API changes (e.g. Movie Server plans):"
+echo "  sudo bash $APP_DIR/deploy/deploy/ubuntu22.04/rebuild-api.sh"
+echo "After web/admin UI changes:"
+echo "  sudo bash $APP_DIR/deploy/deploy/ubuntu22.04/rebuild-web.sh"
