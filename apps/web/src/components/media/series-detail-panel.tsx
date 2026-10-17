@@ -186,7 +186,9 @@ export function SeriesDetailPanel({
               <div className={styles.heroShade} />
             </div>
             <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
-              ×
+              <span className={styles.closeBtnIcon} aria-hidden>
+                ×
+              </span>
             </button>
             <div className={styles.heroBody}>
               <div className={styles.poster}>

@@ -1020,7 +1020,9 @@ function MovieInfo({
             <img src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
           ) : null}
           <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
-            ×
+            <span className={styles.closeBtnIcon} aria-hidden>
+              ×
+            </span>
           </button>
         </div>
         <div className={styles.headerBlock}>
