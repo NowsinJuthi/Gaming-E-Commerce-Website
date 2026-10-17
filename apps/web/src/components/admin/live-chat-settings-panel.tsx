@@ -13,8 +13,8 @@ import {
   updateChatWelcomeAutoReply,
   updateCustomerPanelSettings,
 } from "@/lib/api";
-import { hasStrictAdminRole } from "@/lib/auth-roles";
 import { isChatStaffFromRoles } from "@/lib/chat-roles";
+import { getSessionRoles } from "@/lib/access-token";
 import { resolveNavItemEnabled } from "@/lib/customer-panel";
 
 const DEFAULT_WELCOME_AUTO_REPLY =
@@ -70,8 +70,9 @@ export function LiveChatSettingsPanel() {
   const [savingGuestChat, setSavingGuestChat] = useState(false);
   const [savingChatNav, setSavingChatNav] = useState(false);
   const [savingResponseTime, setSavingResponseTime] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [canManageReplies, setCanManageReplies] = useState(false);
+  const [canManageReplies, setCanManageReplies] = useState(() =>
+    isChatStaffFromRoles(getSessionRoles()),
+  );
   const [quickReplyCount, setQuickReplyCount] = useState<number | null>(null);
   const [quickReplyEnabled, setQuickReplyEnabled] = useState<number | null>(null);
   const [welcomeEnabled, setWelcomeEnabled] = useState(false);
@@ -86,10 +87,12 @@ export function LiveChatSettingsPanel() {
   const [savingWelcome, setSavingWelcome] = useState(false);
 
   useEffect(() => {
-    const sync = () => setIsAdmin(hasStrictAdminRole());
-    sync();
-    window.addEventListener("auth-change", sync);
-    return () => window.removeEventListener("auth-change", sync);
+    const syncFromSession = () => {
+      setCanManageReplies(isChatStaffFromRoles(getSessionRoles()));
+    };
+    syncFromSession();
+    window.addEventListener("auth-change", syncFromSession);
+    return () => window.removeEventListener("auth-change", syncFromSession);
   }, []);
 
   useEffect(() => {
@@ -163,7 +166,7 @@ export function LiveChatSettingsPanel() {
   }, [canManageReplies]);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageReplies) {
       setWelcomeLoading(false);
       return;
     }
@@ -193,7 +196,7 @@ export function LiveChatSettingsPanel() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin]);
+  }, [canManageReplies]);
 
   const handleToggleChatImages = useCallback(
     async (enabled: boolean) => {
@@ -406,7 +409,7 @@ export function LiveChatSettingsPanel() {
         subtitle="Reply instantly when a customer starts a new conversation"
         className="w-full"
       >
-        {isAdmin ? (
+        {canManageReplies ? (
           <div className="space-y-3">
             <SettingSwitchRow
               title="Enable welcome auto-reply"
@@ -455,7 +458,8 @@ export function LiveChatSettingsPanel() {
           </div>
         ) : (
           <p className="text-sm text-foreground-muted">
-            Welcome auto-replies are managed by administrators.
+            Welcome auto-replies can be edited by chat staff (admin or support).
+            Ask a team lead to grant chat access if you need to change this message.
           </p>
         )}
       </ProductFormOrderCard>

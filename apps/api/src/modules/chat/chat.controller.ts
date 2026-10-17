@@ -286,14 +286,14 @@ export class ChatController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(...CHAT_STAFF_ROLES)
   @Get('admin/welcome-auto-reply')
   getWelcomeAutoReply() {
     return this.chatSettings.getWelcomeAutoReply();
   }
 
   @UseGuards(RolesGuard, LicenseFeatureGuard)
-  @Roles(Role.Admin)
+  @Roles(...CHAT_STAFF_ROLES)
   @Put('admin/welcome-auto-reply')
   @RequiresLicenseFeature('liveChat')
   updateWelcomeAutoReply(@Body() dto: UpdateChatWelcomeAutoReplyDto) {
