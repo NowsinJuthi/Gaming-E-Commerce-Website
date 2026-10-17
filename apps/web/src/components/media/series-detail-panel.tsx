@@ -177,11 +177,13 @@ export function SeriesDetailPanel({
       <div className={styles.sheet}>
         <div className={styles.scroll}>
           <div className={styles.hero}>
-            {backdrop ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className={styles.heroImg} src={backdrop} alt="" referrerPolicy="no-referrer" />
-            ) : null}
-            <div className={styles.heroShade} aria-hidden />
+            <div className={styles.heroMedia} aria-hidden>
+              {backdrop ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.heroImg} src={backdrop} alt="" />
+              ) : null}
+              <div className={styles.heroShade} />
+            </div>
             <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
               ×
             </button>
@@ -212,6 +214,7 @@ export function SeriesDetailPanel({
                       <span className={styles.playBtnRipple} />
                       <span className={styles.playBtnRipple} />
                       <span className={styles.playBtnRipple} />
+                      <span className={styles.playBtnSpinner} />
                       <span className={styles.playBtnOrbit} />
                       <span className={styles.playBtnIcon}>
                         <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
