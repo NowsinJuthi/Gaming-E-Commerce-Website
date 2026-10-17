@@ -4,7 +4,6 @@ import { hasAuthSession } from "@/lib/access-token";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CustomerSidebar } from "@/components/customer/CustomerSidebar";
-import { CustomerTopbar } from "@/components/customer/CustomerTopbar";
 import { Header } from "@/components/Header";
 import { HOME_CONTAINER_CLS, HOME_PAGE_BG } from "@/components/home/home-container";
 import {
@@ -15,8 +14,6 @@ import {
   type CustomerPanelConfig,
 } from "@/lib/customer-panel";
 import { isCustomerCartRoute, isCustomerCheckoutRoute } from "@/lib/customer-nav";
-import { useLgScreen } from "@/hooks/useLgScreen";
-
 export function CustomerPanelShell({
   children,
   title,
@@ -32,8 +29,6 @@ export function CustomerPanelShell({
   );
   const [loggedIn, setLoggedIn] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isLgScreen = useLgScreen();
-
   useEffect(() => {
     const sync = () => setLoggedIn(hasAuthSession());
     sync();
@@ -131,11 +126,7 @@ export function CustomerPanelShell({
         />
       ) : null}
 
-      {!isLgScreen ? (
-        <Header onOpenMobileMenu={() => setSidebarOpen(true)} />
-      ) : (
-        <CustomerTopbar pathname={pathname} onOpenMenu={() => {}} />
-      )}
+      <Header onOpenMobileMenu={() => setSidebarOpen(true)} />
 
       <CustomerSidebar
         open={sidebarOpen}
