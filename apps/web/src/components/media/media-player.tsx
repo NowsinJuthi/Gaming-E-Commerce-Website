@@ -676,7 +676,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
       video.load();
     }
 
-    originRef.current = phone ? 0 : packStart;
+    originRef.current = packStart;
     packRestartRef.current = true;
 
     const finishAttach = () => {
@@ -831,7 +831,6 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     if (phone) {
       await waitForPhonePlaylist(video, playlist, seq);
       if (seq !== attachSeqRef.current) throw new Error("Playback cancelled.");
-      if (packStart > 0.25) video.currentTime = packStart;
       setCurrent(packStart);
       video.playbackRate = rateRef.current;
       void startAttachedPlayback(video);
@@ -1495,8 +1494,17 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const wasPlaying = !video.paused;
     if (isPhonePlayback()) {
       quietSeekUntil.current = Date.now() + 1800;
-      const packDuration = movie > 0 ? movie : Number.isFinite(video.duration) ? video.duration : 0;
-      seekVideoTo(video, absolute, packDuration);
+      const packDuration =
+        movie > 0
+          ? Math.max(0, movie - originRef.current)
+          : Number.isFinite(video.duration)
+            ? video.duration
+            : 0;
+      if (!targetIsInCurrentPack || !isLocalTimeInPack(video, localTarget)) {
+        await restartPlaybackAt(absolute, beforeSeek, previousOrigin);
+        return;
+      }
+      seekVideoTo(video, localTarget, packDuration);
       if (wasPlaying) void video.play().catch(() => undefined);
       return;
     }

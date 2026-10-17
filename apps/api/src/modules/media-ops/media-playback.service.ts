@@ -191,13 +191,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.touchedAt = Date.now();
     if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
-    const vodDuration =
-      session.durationSeconds > 0 ? session.durationSeconds : session.runtimeSeconds;
-    if (vodDuration > 0) {
-      if (session.durationSeconds <= 0) session.durationSeconds = vodDuration;
-      this.stopFfmpeg(session);
-      return this.mobileVodPlaylist(session);
-    }
+    // One continuous ffmpeg HLS timeline — Safari jumps when each segment is encoded separately (on-demand VOD).
     const playlist = join(session.dir, 'index.m3u8');
     if (!existsSync(playlist)) {
       if (!session.ffmpeg) {
@@ -287,7 +281,12 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       }
       out.push(line);
     }
-    return out.join('\n');
+    let body = out.join('\n');
+    body = body.replace('#EXT-X-PLAYLIST-TYPE:EVENT', '#EXT-X-PLAYLIST-TYPE:VOD');
+    if (session?.complete && !body.includes('#EXT-X-ENDLIST')) {
+      body = `${body.trimEnd()}\n#EXT-X-ENDLIST\n`;
+    }
+    return body;
   }
 
   async ensurePlaybackFile(sessionId: string, name: string): Promise<{ path: string; type: string }> {
@@ -298,15 +297,20 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const resolved = this.resolvePack(sessionId);
     if (!resolved) throw new NotFoundException();
     const { session, dir } = resolved;
-    if (session?.sourceFile && session.durationSeconds > 0) {
-      if (baseName === 'init.mp4') {
-        await this.ensureMobileInit(session);
-      } else {
-        const index = this.parseMobileSegmentIndex(baseName);
-        if (index != null) await this.ensureMobileSegmentOnDemand(session, index);
+    const full = join(dir, baseName);
+    if (session?.sourceFile) {
+      const packedHls = existsSync(join(dir, 'index.m3u8'));
+      if (packedHls && !existsSync(full) && session.ffmpeg) {
+        await this.waitForSegment(full, session.ffmpeg, 120_000);
+      } else if (!packedHls && session.durationSeconds > 0) {
+        if (baseName === 'init.mp4') {
+          await this.ensureMobileInit(session);
+        } else {
+          const index = this.parseMobileSegmentIndex(baseName);
+          if (index != null) await this.ensureMobileSegmentOnDemand(session, index);
+        }
       }
     }
-    const full = join(dir, baseName);
     const root = resolve(dir);
     if (!full.startsWith(root + sep) && full !== root) throw new NotFoundException();
     if (!existsSync(full)) throw new NotFoundException();
@@ -660,7 +664,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const fmp4 = hevc;
     const segment = join(session.dir, fmp4 ? 'seg%05d.m4s' : 'seg%05d.ts');
     const seekPack = session.startSeconds > 0.5;
-    const segmentSeconds = seekPack ? 2 : 4;
+    const segmentSeconds = seekPack ? 4 : 6;
     const videoArgs = hevc
       ? ['-c:v', 'copy', '-tag:v', 'hvc1']
       : h264
@@ -685,7 +689,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-hls_init_time', String(Math.min(2, segmentSeconds)),
       '-hls_list_size', '0',
       '-start_number', '0',
-      '-hls_playlist_type', 'event',
+      '-hls_playlist_type', 'vod',
       '-hls_flags', 'independent_segments+omit_endlist+temp_file',
       ...(fmp4 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
       '-avoid_negative_ts', 'make_zero',
@@ -703,6 +707,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     });
     child.on('close', () => {
       if (session.ffmpeg === child) session.ffmpeg = null;
+      if (session.token !== token) return;
+      void this.finishPlaylist(session);
     });
     child.on('error', (error) => {
       if (session.token !== token) return;
