@@ -66,17 +66,19 @@ export function ChromeShell({
       <QueryProvider enableDevtools={isAdmin}>
         <ThemeProvider>
           <SiteAppearanceProvider initialAppearance={initialAppearance}>
-            <DocumentFaviconHead />
-            <StoreEventsProvider />
-            <SitePresenceTracker />
-            <RecaptchaBadgeVisibility />
-            <a href="#main-content" className="skip-link">
-              Skip to content
-            </a>
-            {children}
-            <LiveChatFabSync allowGuestChat={allowGuestChat} />
-            <LiveChatLauncher allowGuestChat={allowGuestChat} />
-            <Toaster />
+            <SiteMenusProvider initialMenus={initialSiteMenus}>
+              <DocumentFaviconHead />
+              <StoreEventsProvider />
+              <SitePresenceTracker />
+              <RecaptchaBadgeVisibility />
+              <a href="#main-content" className="skip-link">
+                Skip to content
+              </a>
+              {children}
+              <LiveChatFabSync allowGuestChat={allowGuestChat} />
+              <LiveChatLauncher allowGuestChat={allowGuestChat} />
+              <Toaster />
+            </SiteMenusProvider>
           </SiteAppearanceProvider>
         </ThemeProvider>
       </QueryProvider>

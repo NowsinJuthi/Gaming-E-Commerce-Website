@@ -36522,6 +36522,23 @@
   .admin-panel:not(.customer-panel) .site-header--shell-embedded {
     display: none !important;
   }
+
+  /* Customer dashboard: storefront nav beside fixed sidebar (same links as homepage) */
+  .customer-panel .site-header-inner--customer-panel {
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
+    padding-right: 1.5rem;
+    padding-left: calc(20rem + 1.5rem);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .customer-panel .site-header-inner--customer-panel .site-header-nav {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: center;
+  }
 }
 
 a:has(> .site-logo-img),

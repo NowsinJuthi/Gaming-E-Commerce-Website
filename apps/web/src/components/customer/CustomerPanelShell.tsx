@@ -126,7 +126,10 @@ export function CustomerPanelShell({
         />
       ) : null}
 
-      <Header onOpenMobileMenu={() => setSidebarOpen(true)} />
+      <Header
+        onOpenMobileMenu={() => setSidebarOpen(true)}
+        customerPanelLayout
+      />
 
       <CustomerSidebar
         open={sidebarOpen}
