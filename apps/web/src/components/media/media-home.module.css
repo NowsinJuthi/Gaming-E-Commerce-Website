@@ -1413,6 +1413,7 @@
     max-height: min(94dvh, 100%);
     border-radius: 1rem 1rem 0 0;
     border-bottom: 0;
+    overscroll-behavior: contain;
   }
 
   .hero {
@@ -1463,9 +1464,16 @@
     justify-content: center;
   }
 
+  .headerActions {
+    width: 100%;
+    margin-top: 0.65rem;
+  }
+
   .body {
     padding: 0.85rem 1rem 1.15rem;
     padding-bottom: max(1.15rem, env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .actions {
@@ -1495,5 +1503,11 @@
 
   .person span {
     height: 5.25rem;
+  }
+
+  .castRow {
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.15rem;
   }
 }
