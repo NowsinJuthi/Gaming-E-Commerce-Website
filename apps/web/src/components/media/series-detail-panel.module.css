@@ -179,6 +179,11 @@
   padding-bottom: 0.15rem;
 }
 
+.heroActions {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+}
+
 .title {
   margin: 0;
   font-size: clamp(1.45rem, 3.2vw, 2.35rem);

@@ -1044,6 +1044,17 @@ function MovieInfo({
                 ))}
               </div>
             ) : null}
+            <div className={`${styles.actions} ${styles.headerActions}`}>
+              <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
+                <span aria-hidden>▶</span> Play
+              </WatchPlayButton>
+              <button type="button" className={styles.ghost}>
+                + My List
+              </button>
+              <button type="button" className={styles.ghost}>
+                Mark watched
+              </button>
+            </div>
           </div>
         </div>
         <div className={styles.body}>
@@ -1054,17 +1065,6 @@ function MovieInfo({
           ) : (
             <p className={styles.overviewMuted}>No description available.</p>
           )}
-          <div className={styles.actions}>
-            <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
-              <span aria-hidden>▶</span> Play
-            </WatchPlayButton>
-            <button type="button" className={styles.ghost}>
-              + My List
-            </button>
-            <button type="button" className={styles.ghost}>
-              Mark watched
-            </button>
-          </div>
           {details && (details.directors.length > 0 || details.writers.length > 0 || details.cast.length > 0) ? (
             <section className={styles.castSection}>
               <div className={styles.castHead}>

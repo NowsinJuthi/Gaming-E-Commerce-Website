@@ -217,6 +217,17 @@ export function SeriesDetailPanel({
                     ) : null}
                   </div>
                 ) : null}
+                <div className={`${homeStyles.actions} ${styles.heroActions}`}>
+                  <button type="button" className={homeStyles.play} onClick={() => onPlay(0)}>
+                    <span aria-hidden>▶</span> Play
+                  </button>
+                  <button type="button" className={homeStyles.ghost}>
+                    + My List
+                  </button>
+                  <button type="button" className={homeStyles.ghost}>
+                    Mark watched
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -229,17 +240,6 @@ export function SeriesDetailPanel({
             ) : (
               <p className={styles.overviewMuted}>No description available.</p>
             )}
-            <div className={homeStyles.actions}>
-              <button type="button" className={homeStyles.play} onClick={() => onPlay(0)}>
-                <span aria-hidden>▶</span> Play
-              </button>
-              <button type="button" className={homeStyles.ghost}>
-                + My List
-              </button>
-              <button type="button" className={homeStyles.ghost}>
-                Mark watched
-              </button>
-            </div>
           </section>
 
           <section className={`${styles.section} ${styles.episodesSection}`}>
