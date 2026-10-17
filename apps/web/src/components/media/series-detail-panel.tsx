@@ -142,7 +142,7 @@ export function SeriesDetailPanel({
   const gridEpisodes = useMemo(() => {
     if (!activePart) return [];
     return [...activePart.items].sort(
-      (a, b) => episodeDisplayNumber(b.name, b.index) - episodeDisplayNumber(a.name, a.index),
+      (a, b) => episodeDisplayNumber(a.name, a.index) - episodeDisplayNumber(b.name, b.index),
     );
   }, [activePart]);
 
