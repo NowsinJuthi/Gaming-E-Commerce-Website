@@ -31,7 +31,6 @@ import { SiteUserMenu } from "@/components/SiteUserMenu";
 import { ThemePreferenceIcon } from "@/components/theme/ThemeToggle";
 import { useSiteMenus } from "@/components/SiteMenusProvider";
 import {
-  BellIcon,
   ChevronIcon,
   ChatIcon,
   GridIcon,
@@ -381,7 +380,6 @@ export function Header({
     false,
     true,
   );
-  const notifHref = canAccessAdminPanel ? "/admin/notifications" : "/notifications";
   const [term, setTerm] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -687,25 +685,7 @@ export function Header({
               </Link>
             )}
 
-            {/* Bell — desktop only */}
-            {loggedIn ? (
-              <Link
-                href={notifHref}
-                className={`${iconBtn} relative hidden lg:grid`}
-                aria-label={
-                  unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
-                }
-              >
-                <BellIcon className="h-5 w-5 text-[#f5b737]" />
-                {unread > 0 ? (
-                  <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                ) : null}
-              </Link>
-            ) : null}
-
-            {/* Mobile profile avatar — shown right of cart/bell on mobile */}
+            {/* Mobile profile avatar — shown right of cart on mobile */}
             {loggedIn ? (
               <div ref={userMobileRef} className="relative shrink-0 lg:hidden">
                 <button

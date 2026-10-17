@@ -301,7 +301,7 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
                   }`}
                 >
                   <LoginTabMailIcon className="login-page__tab-icon" />
-                  OTP / Email Code
+                  OTP / Email Log in
                 </button>
               </div>
 
