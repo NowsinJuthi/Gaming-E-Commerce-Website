@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { MediaCard } from "@/lib/media-home-api";
 import { getMediaTitleEpisodes, type MediaTitleEpisode } from "@/lib/media-home-api";
 import homeStyles from "./media-home.module.css";
-import { MediaPosterPlayMark } from "./media-poster-play-mark";
 import styles from "./series-detail-panel.module.css";
 
 type MediaDetails = {
@@ -198,14 +197,6 @@ export function SeriesDetailPanel({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={poster} alt="" referrerPolicy="no-referrer" />
                 ) : null}
-                <button
-                  type="button"
-                  className={styles.posterPlayHit}
-                  aria-label="Play"
-                  onClick={() => onPlay(0)}
-                >
-                  <MediaPosterPlayMark size="detail" />
-                </button>
               </div>
               <div className={styles.heroCopy}>
                 <h2 className={styles.title}>{title}</h2>
