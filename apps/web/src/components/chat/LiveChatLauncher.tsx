@@ -82,7 +82,9 @@ export function LiveChatLauncher({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [role, setRole] = useState<ChatLauncherRole>("guest");
+  const [role, setRole] = useState<ChatLauncherRole>(() =>
+    resolveLauncherRole(),
+  );
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestStarting, setGuestStarting] = useState(false);
@@ -126,11 +128,13 @@ export function LiveChatLauncher({
     setDock(readChatDock());
     syncRole();
     let cancelled = false;
-    if (hasAuthSession() && !isChatStaffFromRoles(getSessionRoles())) {
+    if (hasAuthSession()) {
       getMe()
         .then((me) => {
           if (cancelled) return;
-          if (isChatStaffFromRoles(me.roles ?? [])) setRole("staff");
+          setRole(
+            isChatStaffFromRoles(me.roles ?? []) ? "staff" : "customer",
+          );
         })
         .catch(() => undefined);
     }
@@ -264,7 +268,7 @@ export function LiveChatLauncher({
   }
 
   useLiveChatIconAlerts({
-    enabled: chatAllowed && !hidden && role !== "guest",
+    enabled: chatAllowed && role !== "guest",
     alertOn: role === "staff" ? "customer" : "staff",
     chatOpen: open,
     playSound: true,

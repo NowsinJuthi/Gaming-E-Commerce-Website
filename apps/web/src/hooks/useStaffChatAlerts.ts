@@ -79,7 +79,9 @@ export function useLiveChatIconAlerts(options: {
         const bump =
           (alertOn === "staff" && fromStaff) ||
           (alertOn === "customer" && !fromStaff);
-        if (bump && !(alertOn === "staff" && chatOpenRef.current)) {
+        const skipBumpForOpenCustomerChat =
+          alertOn === "staff" && chatOpenRef.current;
+        if (bump && !skipBumpForOpenCustomerChat) {
           bumpStaffChatUnread();
         }
       }

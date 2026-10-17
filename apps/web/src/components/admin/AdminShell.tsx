@@ -17,7 +17,6 @@ import { hasAdminRole, hasBlogWorkspaceRole } from "@/lib/auth-roles";
 import { mapAdminBlogPathToCustomer } from "@/lib/blog-workspace";
 import { normalizeSiteAppearance } from "@/lib/site-appearance";
 import { applyAdminFavicon } from "@/stores/admin-favicon-store";
-import { useStaffChatAlerts } from "@/hooks/useStaffChatAlerts";
 import { useLgScreen } from "@/hooks/useLgScreen";
 
 function isCustomerBlogRoute(path: string): path is Route {
@@ -43,8 +42,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const authStateRef = useRef(authState);
   authStateRef.current = authState;
   const isLgScreen = useLgScreen();
-
-  useStaffChatAlerts(authState === "ok" && shellMode === "admin");
 
   useEffect(() => {
     getCustomerPanelConfig()

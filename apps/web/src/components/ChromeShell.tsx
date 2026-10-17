@@ -17,6 +17,7 @@ import { ReferralTracker } from "@/components/ReferralTracker";
 import { SiteAppearanceProvider } from "@/components/theme/SiteAppearanceProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Toaster } from "@/components/ui/Toaster";
+import { ChatSocketSession } from "@/components/chat/ChatSocketSession";
 import { LiveChatLauncher } from "@/components/chat/LiveChatLauncher";
 import { StoreEventsProvider } from "@/components/StoreEventsProvider";
 import { QueryProvider } from "@/components/QueryProvider";
@@ -73,6 +74,7 @@ export function ChromeShell({
               Skip to content
             </a>
             {children}
+            <ChatSocketSession />
             <LiveChatLauncher allowGuestChat={allowGuestChat} />
             <Toaster />
           </SiteAppearanceProvider>
@@ -120,6 +122,7 @@ export function ChromeShell({
             </SiteMenusProvider>
           </div>
           <ContactEmailPopup disableOnContactPage />
+          <ChatSocketSession />
           <LiveChatLauncher allowGuestChat={allowGuestChat} />
           <Toaster />
         </SiteAppearanceProvider>

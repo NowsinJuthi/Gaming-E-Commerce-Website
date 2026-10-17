@@ -101,22 +101,37 @@ export function useUnreadNotifications(
 /** Unread customer chats for the support icon. One room counts as one. */
 export function useStaffChatUnreadCount(enabled: boolean) {
   const [unread, setUnread] = useState(0);
+  const exactSyncRef = useRef(false);
 
   const refresh = useCallback(() => {
     if (!enabled || !hasAuthSession()) {
       setUnread(0);
       return;
     }
+    const exact = exactSyncRef.current;
+    exactSyncRef.current = false;
     getStaffChatUnreadCount()
-      .then((result) => setUnread(result.count))
+      .then((result) => {
+        if (exact) {
+          setUnread(result.count);
+          return;
+        }
+        setUnread((prev) => Math.max(result.count, prev));
+      })
       .catch(() => undefined);
   }, [enabled]);
 
   useEffect(() => {
     refresh();
     const onBump = () => setUnread((count) => count + 1);
+    const onNotificationChange = (event: Event) => {
+      if (notificationChangeExact(event)) {
+        exactSyncRef.current = true;
+      }
+      refresh();
+    };
     window.addEventListener("auth-change", refresh);
-    window.addEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+    window.addEventListener(NOTIFICATION_CHANGE_EVENT, onNotificationChange);
     window.addEventListener(CHAT_UNREAD_BUMP_EVENT, onBump);
 
     const intervalId = window.setInterval(() => {
@@ -131,7 +146,7 @@ export function useStaffChatUnreadCount(enabled: boolean) {
 
     return () => {
       window.removeEventListener("auth-change", refresh);
-      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, refresh);
+      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, onNotificationChange);
       window.removeEventListener(CHAT_UNREAD_BUMP_EVENT, onBump);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.clearInterval(intervalId);
