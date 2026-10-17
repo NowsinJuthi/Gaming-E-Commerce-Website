@@ -89,9 +89,9 @@ export default function MovieServerDashboardPage() {
           </div>
         </div>
 
-        <MovieServerLiveVisitorsPanel />
-
         <MovieServerHostMetricsPanel />
+
+        <MovieServerLiveVisitorsPanel />
 
         <div className={styles.quickLinks}>
           <Link href="/admin/movie-server/plans" className={styles.quickLink}>
