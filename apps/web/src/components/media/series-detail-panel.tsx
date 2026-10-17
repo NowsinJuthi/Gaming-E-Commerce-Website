@@ -125,9 +125,8 @@ export function SeriesDetailPanel({
   const activePart = episodeParts[partIndex] ?? episodeParts[episodeParts.length - 1] ?? null;
 
   const latestEpisodeIndex = useMemo(() => {
-    if (seasonEpisodes.length === 0) return null;
-    let best = seasonEpisodes[0];
-    let bestNum = episodeDisplayNumber(best.name, best.index);
+    let best: MediaTitleEpisode | null = null;
+    let bestNum = -1;
     for (const episode of seasonEpisodes) {
       const num = episodeDisplayNumber(episode.name, episode.index);
       if (num >= bestNum) {
@@ -135,7 +134,7 @@ export function SeriesDetailPanel({
         best = episode;
       }
     }
-    return best.index;
+    return best?.index ?? null;
   }, [seasonEpisodes]);
 
   const gridEpisodes = useMemo(() => {
