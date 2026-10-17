@@ -49,6 +49,7 @@ import { ProductRequestsModule } from './modules/product-requests/product-reques
 import { EventsModule } from './shared/events/events.module';
 import { LicenseModule } from './modules/license/license.module';
 import { MediaOpsModule } from './modules/media-ops/media-ops.module';
+import { MediaSubscriptionsModule } from './modules/media-subscriptions/media-subscriptions.module';
 import { LiveAnalyticsModule } from './modules/live-analytics/live-analytics.module';
 
 /**
@@ -132,6 +133,7 @@ import { LiveAnalyticsModule } from './modules/live-analytics/live-analytics.mod
     EventsModule,
     LicenseModule,
     MediaOpsModule,
+    MediaSubscriptionsModule,
     LiveAnalyticsModule,
   ],
   providers: [

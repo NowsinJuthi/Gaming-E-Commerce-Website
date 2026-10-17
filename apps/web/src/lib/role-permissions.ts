@@ -58,6 +58,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    key: "movie_server",
+    label: "MOVIE SERVER",
+    permissions: [
+      { key: "view_media_subscriptions", label: "View media subscriptions" },
+      { key: "manage_media_subscriptions", label: "Manage media subscriptions" },
+    ],
+  },
+  {
     key: "settings",
     label: "SETTINGS",
     permissions: [

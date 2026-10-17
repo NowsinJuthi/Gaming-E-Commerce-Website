@@ -43,6 +43,8 @@ export const PERMISSION_KEYS = [
   'publish_blog_posts',
   'delete_blog_posts',
   'manage_blog_categories',
+  'view_media_subscriptions',
+  'manage_media_subscriptions',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -210,6 +212,22 @@ export const PERMISSION_GROUPS: Array<{
         key: 'view_audit_logs',
         label: 'View audit logs',
         description: 'Read security and activity logs',
+      },
+    ],
+  },
+  {
+    key: 'movie_server',
+    label: 'MOVIE SERVER',
+    permissions: [
+      {
+        key: 'view_media_subscriptions',
+        label: 'View media subscriptions',
+        description: 'Browse movie server plan subscriptions',
+      },
+      {
+        key: 'manage_media_subscriptions',
+        label: 'Manage media subscriptions',
+        description: 'Grant, suspend, and edit media subscriptions',
       },
     ],
   },
