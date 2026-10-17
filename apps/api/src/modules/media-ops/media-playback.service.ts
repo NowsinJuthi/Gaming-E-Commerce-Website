@@ -86,6 +86,8 @@ type Session = {
   remote: SmbPlayback | null;
   incoming: SmbIncoming | null;
   ffmpeg: ChildProcess | null;
+  /** First segment index of the active Jellyfin-style continuous HLS transcode. */
+  mobileHlsFromSegment: number | null;
   touchedAt: number;
 };
 
@@ -439,6 +441,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       remote: null,
       incoming: null,
       ffmpeg: null,
+      mobileHlsFromSegment: null,
       touchedAt: Date.now(),
     };
   }
@@ -892,136 +895,95 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     const ext = fmp4 ? 'm4s' : 'ts';
     const name = `seg${String(index).padStart(5, '0')}.${ext}`;
     const full = join(session.dir, name);
+    const minSize = fmp4 ? 64 : 188;
     if (existsSync(full)) {
       const info = await stat(full).catch(() => null);
-      const minSize = fmp4 ? 64 : 188;
       if (info && info.size >= minSize) return;
     }
-    const lockKey = `${session.id}:${index}:${session.token}`;
-    await this.withMobileSegmentLock(lockKey, async () => {
+    await this.withMobileSegmentLock(`${session.id}:mobile-hls`, async () => {
       if (existsSync(full)) {
         const info = await stat(full).catch(() => null);
-        const minSize = fmp4 ? 64 : 188;
         if (info && info.size >= minSize) return;
       }
-      if (fmp4 && index > 0) await this.ensureMobileInit(session);
-      await this.renderMobileVodSegment(session, index, full, fmp4);
+      const running = Boolean(session.ffmpeg && session.ffmpeg.exitCode == null);
+      const from = session.mobileHlsFromSegment;
+      const mustRestart =
+        !running ||
+        from == null ||
+        index < from ||
+        index - from > 4;
+      if (mustRestart) {
+        this.stopFfmpeg(session);
+        this.startMobileContinuousHls(session, index);
+      }
+      if (!session.ffmpeg) {
+        throw new NotFoundException();
+      }
+      const ready = await this.waitForSegment(full, session.ffmpeg, 120_000);
+      if (!ready) {
+        throw new NotFoundException();
+      }
     });
   }
 
-  private async renderMobileVodSegment(
-    session: Session,
-    index: number,
-    outputPath: string,
-    fmp4: boolean,
-  ): Promise<void> {
+  /**
+   * Jellyfin Dynamic HLS: one ffmpeg run from segment N forward (6s segments, continuous timeline).
+   * The static VOD manifest is generated separately in mobileVodPlaylist().
+   */
+  private startMobileContinuousHls(session: Session, fromIndex: number): void {
     const file = session.sourceFile;
-    if (!file) throw new NotFoundException();
-    const start = index * MOBILE_VOD_SEGMENT_SECONDS;
-    const duration = Math.min(
-      MOBILE_VOD_SEGMENT_SECONDS,
-      Math.max(0.25, session.durationSeconds - start),
-    );
-    if (start >= session.durationSeconds) throw new NotFoundException();
-    const audio = session.audioTracks[session.audioIndex];
+    if (!file) return;
     const token = session.token;
-
-    if (fmp4 && index === 0) {
-      const playlist = join(session.dir, '_bootstrap.m3u8');
-      const segmentPattern = join(session.dir, 'seg%05d.m4s');
-      const args = [
-        '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-        ...this.ffmpegInputArgs(file, false, start, true),
-        '-t', duration.toFixed(3),
-        '-map', '0:v:0',
-        '-map', `0:a:${session.audioIndex}?`,
-        '-sn', '-dn',
-        '-muxdelay', '0',
-        '-muxpreload', '0',
-        ...this.mobileVideoArgs(session),
-        ...this.mobileAudioArgs(audio?.codec ?? ''),
-        '-max_muxing_queue_size', '9999',
-        '-f', 'hls',
-        '-hls_segment_type', 'fmp4',
-        '-hls_fmp4_init_filename', 'init.mp4',
-        '-hls_time', duration.toFixed(3),
-        '-hls_playlist_type', 'vod',
-        '-hls_list_size', '0',
-        '-start_number', '0',
-        '-hls_flags', 'temp_file',
-        '-hls_segment_filename', segmentPattern,
-        playlist,
-      ];
-      await this.runFfmpegOutput(args, outputPath, 120_000);
-      if (session.token !== token) return;
-      await unlink(playlist).catch(() => undefined);
-      return;
-    }
-
-    const formatArgs = fmp4
-      ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
-      : ['-f', 'mpegts'];
+    const startSeconds = fromIndex * MOBILE_VOD_SEGMENT_SECONDS;
+    const fmp4 = this.mobileUsesFmp4(session);
+    const segment = join(session.dir, fmp4 ? 'seg%05d.m4s' : 'seg%05d.ts');
+    const playlistTmp = join(session.dir, '_transcode.m3u8');
+    const audio = session.audioTracks[session.audioIndex];
     const args = [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-      ...this.ffmpegInputArgs(file, false, start, true),
-      '-t', duration.toFixed(3),
+      ...this.ffmpegInputArgs(file, false, startSeconds, true),
       '-map', '0:v:0',
       '-map', `0:a:${session.audioIndex}?`,
       '-sn', '-dn',
       '-muxdelay', '0',
       '-muxpreload', '0',
+      '-max_delay', '5000000',
+      '-max_interleave_delta', '0',
       ...this.mobileVideoArgs(session),
       ...this.mobileAudioArgs(audio?.codec ?? ''),
-      '-output_ts_offset', (index * MOBILE_VOD_SEGMENT_SECONDS).toFixed(3),
-      '-avoid_negative_ts', 'make_zero',
       '-max_muxing_queue_size', '9999',
-      ...formatArgs,
-      outputPath,
+      '-f', 'hls',
+      '-hls_time', String(MOBILE_VOD_SEGMENT_SECONDS),
+      '-hls_init_time', '2',
+      '-hls_list_size', '0',
+      '-start_number', String(fromIndex),
+      '-hls_playlist_type', 'event',
+      '-hls_flags', 'independent_segments+omit_endlist+temp_file',
+      ...(fmp4 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
+      '-avoid_negative_ts', 'make_zero',
+      '-hls_segment_filename', segment,
+      playlistTmp,
     ];
-    await this.runFfmpegOutput(args, outputPath, 120_000);
-  }
-
-  private runFfmpegOutput(args: string[], outputPath: string, timeoutMs: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
-      let stderr = '';
-      child.stderr?.on('data', (chunk: Buffer) => {
-        stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
-      });
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(new Error('Segment packaging timed out.'));
-      }, timeoutMs);
-      const waitFile = setInterval(() => {
-        if (existsSync(outputPath)) {
-          void stat(outputPath).then((info) => {
-            if (info.size > 64) {
-              clearInterval(waitFile);
-              clearTimeout(timer);
-              if (child.exitCode == null && !child.killed) child.kill('SIGTERM');
-              resolve();
-            }
-          }).catch(() => undefined);
-        }
-      }, 150);
-      child.on('close', (code) => {
-        clearInterval(waitFile);
-        clearTimeout(timer);
-        if (existsSync(outputPath)) {
-          resolve();
-          return;
-        }
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(this.shortMediaError(stderr)));
-      });
-      child.on('error', (error) => {
-        clearInterval(waitFile);
-        clearTimeout(timer);
-        reject(error);
-      });
+    const child = spawn(this.bin('ffmpeg'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    session.ffmpeg = child;
+    session.mobileHlsFromSegment = fromIndex;
+    if (child.pid && process.platform === 'linux') {
+      spawn('renice', ['-n', '10', '-p', String(child.pid)], { stdio: 'ignore' }).on('error', () => undefined);
+    }
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2000);
+    });
+    child.on('close', (code) => {
+      if (session.ffmpeg === child) session.ffmpeg = null;
+      if (session.token !== token) return;
+      if (code && code !== 0) {
+        this.logger.warn(`mobile continuous HLS ended ${code}: ${stderr.slice(0, 400)}`);
+      }
+    });
+    child.on('error', (error) => {
+      if (session.ffmpeg === child) session.ffmpeg = null;
+      this.logger.warn(`mobile continuous HLS failed: ${error.message}`);
     });
   }
 
@@ -1286,6 +1248,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     this.stopIncoming(session);
     const child = session.ffmpeg;
     session.ffmpeg = null;
+    session.mobileHlsFromSegment = null;
     if (!child || child.killed) return;
     child.kill('SIGTERM');
     setTimeout(() => {
