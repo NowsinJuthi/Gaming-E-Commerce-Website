@@ -149,40 +149,42 @@ export function MovieServerLiveVisitorsPanel() {
           )}
         </div>
 
-        <div className={styles.liveSection}>
-          <h3 className={styles.liveSectionTitle}>Active pages</h3>
-          {visitors.length === 0 ? (
-            <p className={styles.liveEmpty}>No active visitors in the last ~90 seconds.</p>
-          ) : (
-            <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
-              <table className={`${styles.table} ${styles.tableResponsive}`}>
-                <thead>
-                  <tr>
-                    <th>Visitor</th>
-                    <th>Page</th>
-                    <th>Last seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visitors.map((row) => (
-                    <tr key={row.visitorKey}>
-                      <td data-label="Visitor">{row.label}</td>
-                      <td data-label="Page" className={styles.nameCell}>
-                        <div className={styles.libName}>{row.pathLabel?.trim() || row.path}</div>
-                        {row.pathLabel?.trim() && row.path !== row.pathLabel ? (
-                          <div className={styles.libPath}>{row.path}</div>
-                        ) : null}
-                      </td>
-                      <td className={styles.tabularMuted} data-label="Last seen">
-                        {formatWhen(row.lastSeen)}
-                      </td>
+        <details className={styles.storageDetails}>
+          <summary className={styles.moreInfoBtn}>More info</summary>
+          <div className={styles.storageBlockInner}>
+            {visitors.length === 0 ? (
+              <p className={styles.liveEmpty}>No active visitors in the last ~90 seconds.</p>
+            ) : (
+              <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
+                <table className={`${styles.table} ${styles.tableResponsive}`}>
+                  <thead>
+                    <tr>
+                      <th>Visitor</th>
+                      <th>Page</th>
+                      <th>Last seen</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {visitors.map((row) => (
+                      <tr key={row.visitorKey}>
+                        <td data-label="Visitor">{row.label}</td>
+                        <td data-label="Page" className={styles.nameCell}>
+                          <div className={styles.libName}>{row.pathLabel?.trim() || row.path}</div>
+                          {row.pathLabel?.trim() && row.path !== row.pathLabel ? (
+                            <div className={styles.libPath}>{row.path}</div>
+                          ) : null}
+                        </td>
+                        <td className={styles.tabularMuted} data-label="Last seen">
+                          {formatWhen(row.lastSeen)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
     </section>
   );
