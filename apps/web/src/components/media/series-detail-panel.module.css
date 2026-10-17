@@ -192,11 +192,14 @@
   overflow: visible;
 }
 
-/* Live Support–style FAB + pill tail (gold) */
+/* Live Support–style circular FAB (gold) */
 .playBtn {
   position: relative;
-  display: inline-flex;
-  align-items: center;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 3.75rem;
+  height: 3.75rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -217,15 +220,6 @@
   outline: 2px solid rgb(255 215 90 / 0.85);
   outline-offset: 4px;
   border-radius: 999px;
-}
-
-.playFabWrap {
-  position: relative;
-  z-index: 2;
-  width: 3.75rem;
-  height: 3.75rem;
-  flex-shrink: 0;
-  overflow: visible;
 }
 
 .playFabAura {
@@ -374,25 +368,6 @@
   height: 1.1rem;
   margin-left: 0.14rem;
   color: #1a1000;
-}
-
-.playBtnTail {
-  position: relative;
-  z-index: 1;
-  margin-left: -0.5rem;
-  padding: 0.72rem 1.45rem 0.72rem 0.95rem;
-  border-radius: 0 999px 999px 0;
-  font-size: 0.94rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #1a1000;
-  background: linear-gradient(145deg, #ffe082 0%, #ffc107 45%, #ffb700 70%, #e6a800 100%);
-  border: 1px solid rgb(255 215 90 / 0.55);
-  border-left: 0;
-  box-shadow:
-    0 6px 22px rgb(255 183 0 / 0.35),
-    inset 0 1px 0 rgb(255 255 255 / 0.45);
 }
 
 @keyframes playFabAura {
