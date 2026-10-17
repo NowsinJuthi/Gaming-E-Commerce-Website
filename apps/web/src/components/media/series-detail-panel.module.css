@@ -100,21 +100,21 @@
   }
 }
 
-@keyframes mediaDetailCloseRing {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px rgb(255 183 0 / 0.3),
-      0 4px 14px rgb(255 183 0 / 0.28),
-      inset 0 1px 0 rgb(255 255 255 / 0.4);
+@keyframes mediaDetailCloseOrbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mediaDetailCloseRipple {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.75;
   }
 
-  50% {
-    box-shadow:
-      0 0 0 1px rgb(255 215 90 / 0.55),
-      0 6px 22px rgb(255 183 0 / 0.42),
-      0 0 20px rgb(255 183 0 / 0.35),
-      inset 0 1px 0 rgb(255 255 255 / 0.5);
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
   }
 }
 
@@ -129,29 +129,60 @@
   height: 2.35rem;
   width: 2.35rem;
   border-radius: 999px;
-  border: 1px solid rgb(255 215 90 / 0.45);
+  border: 1px solid rgb(255 215 90 / 0.55);
   background: linear-gradient(135deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
   color: #1a1000;
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
-  animation:
-    mediaDetailCloseEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both,
-    mediaDetailCloseRing 2.6s ease-in-out 0.5s infinite;
+  isolation: isolate;
+  overflow: visible;
+  box-shadow:
+    0 0 0 1px rgb(255 183 0 / 0.35),
+    0 4px 16px rgb(255 183 0 / 0.32),
+    inset 0 1px 0 rgb(255 255 255 / 0.45);
+  animation: mediaDetailCloseEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.22s ease;
+    filter 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.closeBtnRing {
+  position: absolute;
+  inset: -5px;
+  border-radius: 999px;
+  border: 2px solid rgb(255 183 0 / 0.18);
+  border-top-color: #ffb700;
+  border-right-color: rgb(255 215 90 / 0.65);
+  pointer-events: none;
+  animation: mediaDetailCloseOrbit 1.35s linear infinite;
+}
+
+.closeBtnRingAlt {
+  inset: -10px;
+  border-width: 1.5px;
+  border-color: rgb(255 183 0 / 0.45);
+  opacity: 0.85;
+  animation: mediaDetailCloseRipple 2.4s ease-out infinite;
 }
 
 .closeBtn:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
   filter: brightness(1.08);
-  animation: none;
   box-shadow:
     0 0 0 1px rgb(255 215 90 / 0.65),
     0 8px 24px rgb(255 183 0 / 0.5),
-    0 0 28px rgb(255 183 0 / 0.4),
+    0 0 28px rgb(255 183 0 / 0.38),
     inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
+
+.closeBtn:hover .closeBtnRing {
+  animation-duration: 0.75s;
+}
+
+.closeBtn:hover .closeBtnRingAlt {
+  animation-duration: 1.55s;
 }
 
 .closeBtn:active {
@@ -165,6 +196,8 @@
 }
 
 .closeBtnIcon {
+  position: relative;
+  z-index: 1;
   display: block;
   font-weight: 400;
   transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
@@ -177,6 +210,13 @@
 @media (prefers-reduced-motion: reduce) {
   .closeBtn {
     animation: none;
+  }
+
+  .closeBtnRing,
+  .closeBtnRingAlt {
+    animation: none;
+    border-color: rgb(255 183 0 / 0.45);
+    opacity: 0.65;
   }
 
   .closeBtnIcon {

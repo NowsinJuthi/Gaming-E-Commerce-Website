@@ -1020,6 +1020,8 @@ function MovieInfo({
             <img src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
           ) : null}
           <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
+            <span className={styles.closeBtnRing} aria-hidden />
+            <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
             <span className={styles.closeBtnIcon} aria-hidden>
               ×
             </span>
