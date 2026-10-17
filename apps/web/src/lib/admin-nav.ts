@@ -278,6 +278,12 @@ export const ADMIN_NAV: NavSection[] = [
             keywords: ["realtime", "visitors", "counter", "media", "watching", "analytics"],
           },
           {
+            href: "/admin/movie-server/plans",
+            label: "Plans",
+            icon: TagIcon,
+            keywords: ["subscription", "pricing", "tier", "movie", "streaming"],
+          },
+          {
             href: "/admin/collections",
             label: "Movie collections",
             icon: BoxIcon,
@@ -300,12 +306,6 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Samba file manager",
             icon: BoxIcon,
             keywords: ["smb", "share", "upload", "browse"],
-          },
-          {
-            href: "/admin/movie-server/plans",
-            label: "Plans",
-            icon: TagIcon,
-            keywords: ["subscription", "pricing", "tier", "movie", "streaming"],
           },
           {
             href: "/admin/movie-server/subscriptions",
