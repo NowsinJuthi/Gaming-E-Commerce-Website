@@ -129,17 +129,14 @@ export function CustomerPanelShell({
         />
       ) : null}
 
-      {/* Mobile header — hamburger opens the customer sidebar (< lg) */}
-      <div className="lg:hidden">
+      {/* Storefront header for account pages below lg (sidebar menu + shop nav) */}
+      <div className="customer-panel-mobile-store-header lg:hidden">
         <Header onOpenMobileMenu={() => setSidebarOpen(true)} />
       </div>
 
-      {/* Desktop customer topbar with logo on the left (>= lg) */}
-      <div className="hidden lg:block">
-        <CustomerTopbar
-          pathname={pathname}
-          onOpenMenu={() => {}}
-        />
+      {/* Customer topbar (>= lg) — no duplicate storefront nav */}
+      <div className="customer-panel-desktop-topbar hidden lg:block">
+        <CustomerTopbar pathname={pathname} onOpenMenu={() => {}} />
       </div>
 
       <CustomerSidebar

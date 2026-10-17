@@ -36454,6 +36454,26 @@
   box-shadow: none;
 }
 
+/* Theme-aware logos — stack variants so only one paints (no side-by-side ghost) */
+.site-logo-theme-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.site-logo-theme-stack .site-logo-img--light {
+  position: relative;
+  display: block;
+}
+
+.site-logo-theme-stack .site-logo-img--dark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+}
+
 /* Theme-aware header logos (light vs dark assets) */
 .site-logo-img--light {
   display: block;
@@ -36472,6 +36492,45 @@
 [data-theme="gaming"] .site-logo-img--dark,
 [data-theme="amoled"] .site-logo-img--dark {
   display: block;
+}
+
+.dark .site-logo-theme-stack .site-logo-img--light,
+[data-theme="dark"] .site-logo-theme-stack .site-logo-img--light,
+[data-theme="gaming"] .site-logo-theme-stack .site-logo-img--light,
+[data-theme="amoled"] .site-logo-theme-stack .site-logo-img--light {
+  visibility: hidden;
+}
+
+.dark .site-logo-theme-stack .site-logo-img--dark,
+[data-theme="dark"] .site-logo-theme-stack .site-logo-img--dark,
+[data-theme="gaming"] .site-logo-theme-stack .site-logo-img--dark,
+[data-theme="amoled"] .site-logo-theme-stack .site-logo-img--dark {
+  display: block;
+}
+
+/* Customer dashboard: one header logo slot (desktop left / mobile center) */
+@media (min-width: 1024px) {
+  .customer-panel .site-header-logo-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .customer-panel .site-header-logo-desktop {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .customer-panel .customer-panel-mobile-store-header {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .customer-panel .customer-panel-desktop-topbar {
+    display: none !important;
+  }
 }
 
 a:has(> .site-logo-img),

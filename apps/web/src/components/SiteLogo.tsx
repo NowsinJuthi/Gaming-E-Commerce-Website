@@ -178,7 +178,7 @@ export function SiteLogo({
   let content: React.ReactNode;
   if (lightUrl && darkUrl) {
     content = (
-      <>
+      <span className="site-logo-theme-stack">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={lightUrl}
@@ -188,10 +188,11 @@ export function SiteLogo({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={darkUrl}
-          alt={altText}
+          alt=""
+          aria-hidden
           className={`site-logo-img site-logo-img--dark w-auto object-contain ${imageSize}`}
         />
-      </>
+      </span>
     );
   } else {
     // Only one logo configured, or none — single img or text fallback

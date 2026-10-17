@@ -585,7 +585,7 @@ export function Header({
             ) : null}
 
             {/* Logo — desktop only */}
-            <div className="hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
+            <div className="site-header-logo-desktop hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (
@@ -602,7 +602,7 @@ export function Header({
           {/* ── Center column ──────────────────────────────────────────── */}
           <div className="flex min-w-0 items-center justify-center justify-self-stretch overflow-visible lg:justify-self-center">
             {/* Logo centered — mobile + tablet */}
-            <div className="lg:hidden [&_.site-logo-img]:h-12 [&_.site-logo-img]:max-w-[180px]">
+            <div className="site-header-logo-mobile lg:hidden [&_.site-logo-img]:h-12 [&_.site-logo-img]:max-w-[180px]">
               {isAdminRoute ? (
                 <AdminHeaderLogo />
               ) : (

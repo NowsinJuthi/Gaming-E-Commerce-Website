@@ -181,13 +181,13 @@ export function AdminTopbar({ pathname, adminName, adminRoleLabel = "Admin", onO
             <MenuIcon className="h-5 w-5" />
           </button>
 
-          <div className="hidden lg:block">
+          <div className="site-header-logo-desktop hidden lg:block">
             <AdminHeaderLogo />
           </div>
         </div>
 
         {/* Center column: logo centered on mobile/tablet, hidden on desktop */}
-        <div className="flex min-w-0 items-center justify-center lg:hidden">
+        <div className="site-header-logo-mobile flex min-w-0 items-center justify-center lg:hidden">
           <AdminHeaderLogo />
         </div>
 
