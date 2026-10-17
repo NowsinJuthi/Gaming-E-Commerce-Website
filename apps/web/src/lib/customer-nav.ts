@@ -46,6 +46,7 @@ const NAV_ICONS: Record<string, ComponentType<IconProps>> = {
   settings: SettingsIcon,
   profile: UsersIcon,
   reseller: StoreIcon,
+  movie_subscription: LayersIcon,
 };
 
 export function getCustomerNavAccentClass(
@@ -61,6 +62,7 @@ export function getCustomerNavIcon(key: string): ComponentType<IconProps> {
 /** Routes that use CustomerPanelShell — excludes storefront pages like `/` and `/products`. */
 export const CUSTOMER_PANEL_ROUTE_PREFIXES = [
   "/dashboard",
+  "/account",
   "/wallet",
   "/orders",
   "/downloads",

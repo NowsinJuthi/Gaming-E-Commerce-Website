@@ -111,6 +111,26 @@ export type PublicSubscription = {
   entitled: boolean;
 };
 
+export type PublicSubscriptionEvent = {
+  id: string;
+  subscriptionId: string;
+  type: string;
+  fromPlanSlug: string | null;
+  toPlanSlug: string | null;
+  fromStatus: SubscriptionStatus | null;
+  toStatus: SubscriptionStatus | null;
+  billingCycle: BillingCycle | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type SubscriptionEntitlement = {
+  entitled: boolean;
+  status: SubscriptionStatus | null;
+  planSlug: string | null;
+  currentPeriodEnd: string | null;
+};
+
 export type AdminSubscriptionRow = PublicSubscription & {
   userEmail: string;
   userDisplayName: string;

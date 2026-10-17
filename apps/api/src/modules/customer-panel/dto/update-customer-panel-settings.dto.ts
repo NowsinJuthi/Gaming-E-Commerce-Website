@@ -167,6 +167,11 @@ class NavDto {
   @IsOptional()
   @ValidateNested()
   @Type(() => NavItemDto)
+  movie_subscription?: NavItemDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NavItemDto)
   downloads?: NavItemDto;
 
   @IsOptional()

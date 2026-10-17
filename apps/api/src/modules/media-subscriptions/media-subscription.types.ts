@@ -146,6 +146,35 @@ export type AdminSubscriptionRow = PublicSubscription & {
   maxStreams: number;
 };
 
+export type PublicSubscriptionEvent = {
+  id: string;
+  subscriptionId: string;
+  type: SubscriptionEventType;
+  fromPlanSlug: string | null;
+  toPlanSlug: string | null;
+  fromStatus: SubscriptionStatus | null;
+  toStatus: SubscriptionStatus | null;
+  billingCycle: BillingCycle | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type SubscriptionEntitlement = {
+  entitled: boolean;
+  status: SubscriptionStatus | null;
+  planSlug: string | null;
+  currentPeriodEnd: string | null;
+};
+
+export function emptyEntitlement(): SubscriptionEntitlement {
+  return {
+    entitled: false,
+    status: null,
+    planSlug: null,
+    currentPeriodEnd: null,
+  };
+}
+
 export function isEntitledStatus(
   status: SubscriptionStatus,
   now: Date,

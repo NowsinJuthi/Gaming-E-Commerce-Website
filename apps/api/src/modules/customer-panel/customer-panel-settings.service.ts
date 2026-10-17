@@ -566,6 +566,7 @@ export class CustomerPanelSettingsService implements OnModuleInit {
       'checkout',
       'wallet',
       'orders',
+      'movie_subscription',
       'downloads',
       'wishlist',
       'referral',

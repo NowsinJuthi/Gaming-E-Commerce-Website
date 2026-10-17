@@ -96,6 +96,9 @@ export class CustomerNavSettings {
   @Prop({ type: NavItemSettings, default: () => ({}) })
   orders!: NavItemSettings;
 
+  @Prop({ type: NavItemSettings, default: () => ({}) })
+  movie_subscription!: NavItemSettings;
+
   @Prop({ type: NavItemSettings, default: () => ({ enabled: false }) })
   downloads!: NavItemSettings;
 

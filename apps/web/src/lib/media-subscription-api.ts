@@ -3,8 +3,10 @@ import type {
   BillingCycle,
   PublicPlan,
   PublicSubscription,
+  PublicSubscriptionEvent,
+  SubscriptionEntitlement,
 } from "@/lib/media-subscription-types";
-import { authRequest } from "@/lib/api";
+import { API_BASE, authRequest } from "@/lib/api";
 
 const CURRENCY_LOCALE: Record<string, string> = {
   BDT: "en-BD",
@@ -20,6 +22,57 @@ export function formatMediaPlanCents(cents: number, currency = "BDT"): string {
 }
 
 export const mediaSubscriptionApi = {
+  publicPlans: async (): Promise<PublicPlan[]> => {
+    const res = await fetch(`${API_BASE}/media/plans`, { credentials: "include" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { plans?: PublicPlan[] };
+    return data.plans ?? [];
+  },
+
+  me: () =>
+    authRequest<{ subscription: PublicSubscription | null; entitlement: SubscriptionEntitlement }>(
+      "/media/subscriptions/me",
+    ),
+
+  history: () =>
+    authRequest<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/history"),
+
+  changes: () =>
+    authRequest<{ events: PublicSubscriptionEvent[] }>("/media/subscriptions/me/changes"),
+
+  start: (planSlug: string, billingCycle: BillingCycle) =>
+    authRequest<{
+      subscription: PublicSubscription;
+      paymentRequired: boolean;
+      entitlement: SubscriptionEntitlement;
+    }>("/media/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planSlug, billingCycle }),
+    }),
+
+  change: (planSlug: string, billingCycle: BillingCycle) =>
+    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+      "/media/subscriptions/me/change",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planSlug, billingCycle }),
+      },
+    ),
+
+  cancel: () =>
+    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+      "/media/subscriptions/me/cancel",
+      { method: "POST" },
+    ),
+
+  resume: () =>
+    authRequest<{ subscription: PublicSubscription; entitlement: SubscriptionEntitlement }>(
+      "/media/subscriptions/me/resume",
+      { method: "POST" },
+    ),
+
   adminPlans: () => authRequest<{ plans: PublicPlan[] }>("/admin/media/plans"),
 
   createPlan: (input: Record<string, unknown>) =>

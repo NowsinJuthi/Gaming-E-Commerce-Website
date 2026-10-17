@@ -1,13 +1,17 @@
 import {
+  emptyEntitlement,
   isEntitledStatus,
   PlanTier,
   type PlanFeature,
   type PublicPlan,
   type PublicSubscription,
+  type PublicSubscriptionEvent,
+  type SubscriptionEntitlement,
   type VideoQuality,
 } from './media-subscription.types';
 import { MediaPlanDocument } from './schemas/media-plan.schema';
 import { MediaSubscriptionDocument } from './schemas/media-subscription.schema';
+import { MediaSubscriptionEventDocument } from './schemas/media-subscription-event.schema';
 
 export function toPublicPlan(plan: MediaPlanDocument): PublicPlan {
   return {
@@ -84,6 +88,34 @@ export function toPublicSubscription(
     lastRenewedAt: sub.lastRenewedAt?.toISOString() ?? null,
     isCurrent: sub.isCurrent,
     entitled: isEntitledStatus(sub.status, now, sub.currentPeriodEnd, sub.gracePeriodEndsAt),
+  };
+}
+
+export function toEntitlement(
+  sub: MediaSubscriptionDocument | null,
+  now = new Date(),
+): SubscriptionEntitlement {
+  if (!sub) return emptyEntitlement();
+  return {
+    entitled: isEntitledStatus(sub.status, now, sub.currentPeriodEnd, sub.gracePeriodEndsAt),
+    status: sub.status,
+    planSlug: sub.planSlug,
+    currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+  };
+}
+
+export function toPublicEvent(event: MediaSubscriptionEventDocument): PublicSubscriptionEvent {
+  return {
+    id: String(event._id),
+    subscriptionId: String(event.subscriptionId),
+    type: event.type,
+    fromPlanSlug: event.fromPlanSlug ?? null,
+    toPlanSlug: event.toPlanSlug ?? null,
+    fromStatus: event.fromStatus ?? null,
+    toStatus: event.toStatus ?? null,
+    billingCycle: event.billingCycle ?? null,
+    note: event.note ?? null,
+    createdAt: event.createdAt.toISOString(),
   };
 }
 
