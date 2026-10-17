@@ -96,6 +96,33 @@
   background: rgb(var(--bg-muted) / 0.65);
 }
 
+.catalogHeading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--fg-muted));
+  margin-bottom: 0.75rem;
+}
+
+.textareaInput {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--border));
+  background: rgb(var(--bg-muted) / 0.45);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: rgb(var(--fg));
+}
+
+.textareaInput:focus {
+  outline: 2px solid rgb(var(--brand) / 0.35);
+  outline-offset: 1px;
+}
+
 .tableWrap {
   overflow-x: auto;
   border-radius: 0.75rem;

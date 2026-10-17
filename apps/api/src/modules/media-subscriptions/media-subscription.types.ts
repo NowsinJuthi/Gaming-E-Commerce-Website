@@ -104,6 +104,7 @@ export type PublicPlan = {
   maxStreams: number;
   features: PlanFeature[];
   featureBullets: string[];
+  featuresHeading: string;
   trialDays: number;
   isActive: boolean;
   sortOrder: number;

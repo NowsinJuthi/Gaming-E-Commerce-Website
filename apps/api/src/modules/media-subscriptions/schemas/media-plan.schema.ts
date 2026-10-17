@@ -62,6 +62,9 @@ export class MediaPlan {
   @Prop({ type: [String], default: [] })
   featureBullets!: string[];
 
+  @Prop({ default: 'All features', trim: true, maxlength: 80 })
+  featuresHeading!: string;
+
   @Prop({ default: 0, min: 0, max: 365 })
   trialDays!: number;
 

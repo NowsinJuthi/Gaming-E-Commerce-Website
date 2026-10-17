@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PLAN_TIER_RANK, PlanTier } from './media-subscription.types';
-import { normalizeFeatureBullets } from './plan.util';
+import { normalizeFeatureBullets, normalizeFeaturesHeading } from './plan.util';
 import { AdminUpdateMediaPlanDto, AdminUpsertMediaPlanDto } from './dto/admin-plan.dto';
 import { MediaPlan, MediaPlanDocument } from './schemas/media-plan.schema';
 import { toPublicPlan } from './subscription.mapper';
@@ -63,6 +63,7 @@ export class MediaPlansService {
       rank: dto.rank ?? PLAN_TIER_RANK[dto.tier],
       features: dto.features ?? [],
       featureBullets: normalizeFeatureBullets(dto.featureBullets),
+      featuresHeading: normalizeFeaturesHeading(dto.featuresHeading),
       trialDays: dto.trialDays ?? 0,
       isActive: dto.isActive ?? true,
       sortOrder: dto.sortOrder ?? PLAN_TIER_RANK[dto.tier],
@@ -88,6 +89,9 @@ export class MediaPlansService {
     if (dto.features !== undefined) plan.features = dto.features;
     if (dto.featureBullets !== undefined) {
       plan.featureBullets = normalizeFeatureBullets(dto.featureBullets);
+    }
+    if (dto.featuresHeading !== undefined) {
+      plan.featuresHeading = normalizeFeaturesHeading(dto.featuresHeading);
     }
     if (dto.trialDays !== undefined) plan.trialDays = dto.trialDays;
     if (dto.isActive !== undefined) plan.isActive = dto.isActive;

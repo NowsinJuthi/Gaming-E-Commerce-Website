@@ -19,7 +19,24 @@ export type PlanFeatureLineInput = {
   maxDevices: number;
   features: PlanFeatureType[];
   featureBullets?: string[];
+  featuresHeading?: string;
 };
+
+export function featureBulletsToText(bullets: string[]): string {
+  return bullets.join("\n");
+}
+
+export function textToFeatureBullets(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+export function planFeaturesHeading(plan: { featuresHeading?: string }): string {
+  const trimmed = plan.featuresHeading?.trim();
+  return trimmed || "All features";
+}
 
 export function buildPlanFeatureLines(plan: PlanFeatureLineInput): string[] {
   const custom = (plan.featureBullets ?? []).map((line) => line.trim()).filter(Boolean);

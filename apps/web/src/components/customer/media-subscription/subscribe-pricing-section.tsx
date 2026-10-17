@@ -5,7 +5,7 @@ import {
   PlanTier,
   type PublicPlan,
 } from "@/lib/media-subscription-types";
-import { buildPlanFeatureLines } from "@/lib/media-plan-display";
+import { buildPlanFeatureLines, planFeaturesHeading } from "@/lib/media-plan-display";
 import { formatMediaPlanCents } from "@/lib/media-subscription-api";
 import { PlanTierIcon, planVisualVariant, type PlanVisualVariant } from "./plan-tier-icons";
 import styles from "./subscribe-pricing.module.css";
@@ -166,7 +166,7 @@ export function SubscribePricingSection({
               ) : null}
 
               <div className={styles.features}>
-                <p className={styles.featuresHeading}>All features</p>
+                <p className={styles.featuresHeading}>{planFeaturesHeading(plan)}</p>
                 <ul className={styles.featureList}>
                   {features.map((line) => (
                     <li key={line} className={styles.featureItem}>

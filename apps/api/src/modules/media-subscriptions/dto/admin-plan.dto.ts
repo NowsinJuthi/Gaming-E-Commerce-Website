@@ -84,6 +84,11 @@ export class AdminUpsertMediaPlanDto {
   featureBullets?: string[];
 
   @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  featuresHeading?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(365)
@@ -164,6 +169,11 @@ export class AdminUpdateMediaPlanDto {
   @IsString({ each: true })
   @MaxLength(200, { each: true })
   featureBullets?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  featuresHeading?: string;
 
   @IsOptional()
   @IsInt()

@@ -10,6 +10,12 @@ import {
   mediaSubscriptionApi,
 } from "@/lib/media-subscription-api";
 import {
+  buildPlanFeatureLines,
+  featureBulletsToText,
+  planFeaturesHeading,
+  textToFeatureBullets,
+} from "@/lib/media-plan-display";
+import {
   PLAN_FEATURES,
   PLAN_TIERS,
   VIDEO_QUALITIES,
@@ -33,6 +39,8 @@ export default function MovieServerPlansPage() {
     maxStreams: 2,
     trialDays: 0,
     features: ["catalog", "hd"] as string[],
+    featuresHeading: "All features",
+    featureBulletsText: "",
   });
 
   const query = useQuery({
@@ -52,14 +60,17 @@ export default function MovieServerPlansPage() {
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, "-")
         .replace(/^-|-$/g, "");
+      const { featureBulletsText, featuresHeading, ...rest } = form;
       return mediaSubscriptionApi.createPlan({
-        ...form,
+        ...rest,
         slug,
         monthlyPriceCents: Number(form.monthlyPriceCents),
         yearlyPriceCents: Number(form.yearlyPriceCents),
         maxDevices: Number(form.maxDevices),
         maxStreams: Number(form.maxStreams),
         trialDays: Number(form.trialDays),
+        featuresHeading: featuresHeading.trim() || "All features",
+        featureBullets: textToFeatureBullets(featureBulletsText),
       });
     },
     onSuccess: async () => {
@@ -187,8 +198,26 @@ export default function MovieServerPlansPage() {
             value={String(form.trialDays)}
             onChange={(v) => setForm({ ...form, trialDays: Number(v) })}
           />
+          <Field
+            label="Features heading"
+            hint='Shown above the bullet list on the customer subscription page (e.g. "All features").'
+            value={form.featuresHeading}
+            onChange={(v) => setForm({ ...form, featuresHeading: v })}
+          />
+          <label className="sm:col-span-2">
+            <span className={styles.fieldLabel}>Plan card details (one per line)</span>
+            <textarea
+              className={styles.textareaInput}
+              value={form.featureBulletsText}
+              placeholder={`Up to HD video quality\n2 simultaneous streams\n3 registered devices\nFull catalog access\nHD streaming included\nOffline downloads`}
+              onChange={(e) => setForm({ ...form, featureBulletsText: e.target.value })}
+            />
+            <span className="mt-1 block text-xs text-foreground-muted">
+              Leave empty to auto-build from max quality, streams, devices, and feature flags below.
+            </span>
+          </label>
           <div className={styles.features}>
-            <span className={styles.fieldLabel}>Features</span>
+            <span className={styles.fieldLabel}>Feature flags (auto bullets)</span>
             <div className={styles.featureList}>
               {PLAN_FEATURES.map((feature) => (
                 <label key={feature} className="flex items-center gap-2">
@@ -210,7 +239,7 @@ export default function MovieServerPlansPage() {
         </form>
 
         <section className={styles.card}>
-          <p className={styles.previewHeading}>Plan catalog</p>
+          <p className={styles.catalogHeading}>Plan catalog</p>
           <p className={styles.mobileHint}>Swipe sideways to see all columns.</p>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -395,6 +424,20 @@ function EditPlanModal({
   const [yearly, setYearly] = useState(plan.yearlyPriceCents);
   const [trialDays, setTrialDays] = useState(plan.trialDays);
   const [isActive, setIsActive] = useState(plan.isActive);
+  const [featuresHeading, setFeaturesHeading] = useState(
+    plan.featuresHeading?.trim() || "All features",
+  );
+  const [featureBulletsText, setFeatureBulletsText] = useState(
+    featureBulletsToText(plan.featureBullets ?? []),
+  );
+
+  const previewBullets = buildPlanFeatureLines({
+    maxVideoQuality: plan.maxVideoQuality,
+    maxStreams: plan.maxStreams,
+    maxDevices: plan.maxDevices,
+    features: plan.features,
+    featureBullets: textToFeatureBullets(featureBulletsText),
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -429,6 +472,34 @@ function EditPlanModal({
             value={String(trialDays)}
             onChange={(v) => setTrialDays(Number(v))}
           />
+          <Field
+            label="Features heading"
+            value={featuresHeading}
+            onChange={setFeaturesHeading}
+          />
+          <label className="block sm:col-span-2">
+            <span className={styles.fieldLabel}>Plan card details (one per line)</span>
+            <textarea
+              className={styles.textareaInput}
+              rows={7}
+              value={featureBulletsText}
+              placeholder="Leave empty to use auto-generated lines from plan limits."
+              onChange={(e) => setFeatureBulletsText(e.target.value)}
+            />
+          </label>
+          <div className="sm:col-span-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+              Storefront preview
+            </p>
+            <p className="mt-1 font-medium text-foreground">
+              {planFeaturesHeading({ featuresHeading })}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-foreground-muted">
+              {previewBullets.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -454,6 +525,8 @@ function EditPlanModal({
                 yearlyPriceCents: yearly,
                 trialDays,
                 isActive,
+                featuresHeading: featuresHeading.trim() || "All features",
+                featureBullets: textToFeatureBullets(featureBulletsText),
               })
             }
           >
