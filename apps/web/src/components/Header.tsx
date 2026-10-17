@@ -398,6 +398,8 @@ export function Header({
   const navItems = siteMenus.header;
   const headerOthers = siteMenus.headerOthers;
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
+  /** Panel shells embed the header (< lg only). Do not portal or it ignores parent `lg:hidden`. */
+  const shellEmbedded = Boolean(onOpenMobileMenu);
 
   function onSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -546,7 +548,9 @@ export function Header({
 
   const headerChrome = (
     <>
-      <header className="site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b">
+      <header
+        className={`site-header pointer-events-auto fixed top-0 left-0 right-0 z-[10000] border-b${shellEmbedded ? " site-header--shell-embedded" : ""}`}
+      >
         <div
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
@@ -857,7 +861,7 @@ export function Header({
     </>
   );
 
-  if (headerPortaled && typeof document !== "undefined") {
+  if (headerPortaled && !shellEmbedded && typeof document !== "undefined") {
     return createPortal(headerChrome, document.body);
   }
 

@@ -15,6 +15,7 @@ import {
   type CustomerPanelConfig,
 } from "@/lib/customer-panel";
 import { isCustomerCartRoute, isCustomerCheckoutRoute } from "@/lib/customer-nav";
+import { useLgScreen } from "@/hooks/useLgScreen";
 
 export function CustomerPanelShell({
   children,
@@ -31,6 +32,7 @@ export function CustomerPanelShell({
   );
   const [loggedIn, setLoggedIn] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isLgScreen = useLgScreen();
 
   useEffect(() => {
     const sync = () => setLoggedIn(hasAuthSession());
@@ -129,15 +131,11 @@ export function CustomerPanelShell({
         />
       ) : null}
 
-      {/* Storefront header for account pages below lg (sidebar menu + shop nav) */}
-      <div className="customer-panel-mobile-store-header lg:hidden">
+      {!isLgScreen ? (
         <Header onOpenMobileMenu={() => setSidebarOpen(true)} />
-      </div>
-
-      {/* Customer topbar (>= lg) — no duplicate storefront nav */}
-      <div className="customer-panel-desktop-topbar hidden lg:block">
+      ) : (
         <CustomerTopbar pathname={pathname} onOpenMenu={() => {}} />
-      </div>
+      )}
 
       <CustomerSidebar
         open={sidebarOpen}

@@ -36513,13 +36513,7 @@
 }
 
 @media (min-width: 1024px) {
-  .customer-panel .customer-panel-mobile-store-header {
-    display: none !important;
-  }
-}
-
-@media (max-width: 1023px) {
-  .customer-panel .customer-panel-desktop-topbar {
+  .site-header--shell-embedded {
     display: none !important;
   }
 }
