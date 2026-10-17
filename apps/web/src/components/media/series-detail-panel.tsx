@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { MediaCard } from "@/lib/media-home-api";
 import { getMediaTitleEpisodes, type MediaTitleEpisode } from "@/lib/media-home-api";
 import homeStyles from "./media-home.module.css";
+import playerStyles from "./media-player.module.css";
 import styles from "./series-detail-panel.module.css";
 
 type MediaDetails = {
@@ -210,19 +211,16 @@ export function SeriesDetailPanel({
                 ) : null}
                 <div className={styles.actions}>
                   <button type="button" className={styles.playBtn} aria-label="Play" onClick={() => onPlay(0)}>
-                    <span className={styles.playFabAura} aria-hidden />
-                    <span className={styles.playFabHalo} aria-hidden />
-                    <span className={`${styles.playFabHalo} ${styles.playFabHaloReverse}`} aria-hidden />
-                    <span className={styles.playFabRing} aria-hidden />
-                    <span className={`${styles.playFabRing} ${styles.playFabRingDelayed}`} aria-hidden />
-                    <span className={`${styles.playFabRing} ${styles.playFabRingSlow}`} aria-hidden />
-                    <span className={`${styles.playFabRing} ${styles.playFabRingOuter}`} aria-hidden />
-                    <span className={styles.playFabCore} aria-hidden>
-                      <span className={styles.playFabBorderSpin} />
-                      <span className={styles.playFabShimmer} />
-                      <span className={styles.playFabIcon}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 7.5v9l8-4.5-8-4.5z" />
+                    <span className={playerStyles.mark} aria-hidden>
+                      <span className={playerStyles.glow} />
+                      <svg className={playerStyles.rings} viewBox="0 0 80 80">
+                        <circle className={playerStyles.track} cx="40" cy="40" r="34" />
+                        <circle className={playerStyles.arc} cx="40" cy="40" r="34" />
+                        <circle className={playerStyles.arcInner} cx="40" cy="40" r="26" />
+                      </svg>
+                      <span className={playerStyles.core}>
+                        <svg viewBox="0 0 24 24" fill="#fff" aria-hidden>
+                          <path d="M8 5v14l11-7z" />
                         </svg>
                       </span>
                     </span>
