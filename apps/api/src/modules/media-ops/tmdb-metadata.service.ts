@@ -89,6 +89,17 @@ export class TmdbMetadataService {
     return this.details('tv', title, year);
   }
 
+  /** Search TMDB then load full details + poster (for library indexing). */
+  async enrichFromTmdb(
+    kind: 'movie' | 'tv',
+    title: string,
+    year?: number | null,
+  ): Promise<(TmdbDetails & { posterUrl: string | null }) | null> {
+    const hit = await this.searchHit(kind, title, year);
+    if (!hit?.id) return null;
+    return this.detailsById(kind, hit.id, true);
+  }
+
   async detailsMovieById(
     tmdbId: number,
     downloadPoster = true,

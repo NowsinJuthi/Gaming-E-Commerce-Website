@@ -181,9 +181,18 @@ export function MediaHome({
 
   useEffect(() => {
     let cancelled = false;
-    void getMediaGenres(libraryId).then((values) => {
-      if (!cancelled) setGenres(values);
-    });
+    let attempts = 0;
+    const loadGenres = () => {
+      void getMediaGenres(libraryId).then((values) => {
+        if (cancelled) return;
+        setGenres(values);
+        if (values.length === 0 && attempts < 8) {
+          attempts += 1;
+          window.setTimeout(loadGenres, 4000);
+        }
+      });
+    };
+    loadGenres();
     return () => {
       cancelled = true;
     };

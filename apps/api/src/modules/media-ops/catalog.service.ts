@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -155,7 +155,9 @@ function serializeAdmin(doc: CatalogTitleDocument) {
 
 @Injectable()
 export class CatalogService {
+  private readonly logger = new Logger(CatalogService.name);
   private readonly hydratingTitleIds = new Set<string>();
+  private genreBackfillBusy = false;
 
   constructor(
     @InjectModel(CatalogTitle.name)
@@ -279,6 +281,9 @@ export class CatalogService {
       this.publicYears('all'),
       this.publicBrowse({ offset: 0, limit, libraryId: 'all' }),
     ]);
+    if (this.tmdb.enabled()) {
+      this.scheduleGenreBackfill('all');
+    }
     return {
       libraries: libraries.map((library) => ({
         id: String(library._id),
@@ -302,11 +307,55 @@ export class CatalogService {
   }
 
   async publicGenres(libraryId?: string) {
+    const genres = await this.distinctPublishedGenres(libraryId);
+    if (genres.length === 0 && this.tmdb.enabled()) {
+      this.scheduleGenreBackfill(libraryId);
+    }
+    return genres;
+  }
+
+  private async distinctPublishedGenres(libraryId?: string): Promise<string[]> {
     const filter = publicCatalogFilter({ libraryId: libraryId?.trim() || 'all' });
-    const values = await this.titles.distinct('genres', filter).exec();
-    return values
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .sort((a, b) => a.localeCompare(b));
+    const rows = await this.titles
+      .aggregate<{ _id: string }>([
+        { $match: filter },
+        { $unwind: '$genres' },
+        { $match: { genres: { $type: 'string', $nin: [''] } } },
+        { $group: { _id: '$genres' } },
+        { $sort: { _id: 1 } },
+      ])
+      .exec();
+    return rows.map((row) => row._id.trim()).filter(Boolean);
+  }
+
+  private scheduleGenreBackfill(libraryId?: string): void {
+    if (this.genreBackfillBusy) return;
+    this.genreBackfillBusy = true;
+    void this.backfillMissingGenres(libraryId, 36)
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Genre backfill failed';
+        this.logger.warn(message);
+      })
+      .finally(() => {
+        this.genreBackfillBusy = false;
+      });
+  }
+
+  private async backfillMissingGenres(libraryId: string | undefined, limit: number): Promise<void> {
+    const filter = publicCatalogFilter({ libraryId: libraryId?.trim() || 'all' });
+    const rows = await this.titles
+      .find({
+        ...filter,
+        $or: [{ genres: { $exists: false } }, { genres: { $size: 0 } }],
+      })
+      .sort({ listedAt: -1, updatedAt: -1, createdAt: -1 })
+      .limit(Math.min(60, Math.max(1, limit)))
+      .select('_id')
+      .lean()
+      .exec();
+    for (const row of rows) {
+      await this.hydrateTitleDetails(String(row._id));
+    }
   }
 
   async publicBrowse(options: {

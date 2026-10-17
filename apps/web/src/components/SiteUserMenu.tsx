@@ -30,7 +30,7 @@ type Props = {
 const DRAWER_ITEM_CLS =
   "flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-sm font-bold text-foreground no-underline transition hover:bg-muted";
 
-function MobileProfileThemeToggle() {
+function ProfileMenuThemeToggle() {
   const theme = useThemeStore((s) => s.theme);
   const hydrated = useThemeStore((s) => s.hydrated);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -48,7 +48,7 @@ function MobileProfileThemeToggle() {
   return (
     <button
       type="button"
-      className={`shell-icon-btn profile-theme-toggle lg:hidden${animating ? " profile-theme-toggle--active" : ""}`}
+      className={`shell-icon-btn profile-theme-toggle${animating ? " profile-theme-toggle--active" : ""}`}
       aria-label={
         isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
       }
@@ -137,7 +137,7 @@ export function SiteUserMenu({
             <p className="admin-user-menu-name truncate">{displayName}</p>
             <p className="admin-user-menu-meta">{metaLabel}</p>
           </div>
-          <MobileProfileThemeToggle />
+          <ProfileMenuThemeToggle />
         </div>
       </div>
 

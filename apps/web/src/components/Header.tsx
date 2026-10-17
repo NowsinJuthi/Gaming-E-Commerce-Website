@@ -658,7 +658,7 @@ export function Header({
                   aria-hidden
                 />
               </button>
-            ) : (
+            ) : !loggedIn ? (
               <button
                 type="button"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -667,7 +667,7 @@ export function Header({
               >
                 {themeToggleIcon}
               </button>
-            )}
+            ) : null}
 
             {/* Search — desktop only (mobile search is on the left) */}
             <button

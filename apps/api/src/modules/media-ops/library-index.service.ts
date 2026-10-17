@@ -445,25 +445,29 @@ export class LibraryIndexService {
     bumpListedAt = false,
   ): Promise<boolean> {
     const parsed = this.parseTitle(file.name);
-    const meta = (await this.needsPoster(library, file.path)) && allowLookup()
-      ? await this.lookup(kind, parsed.title, parsed.year)
-      : null;
+    const enriched =
+      (await this.needsEnrichment(library, file.path)) && allowLookup()
+        ? await this.enrich(kind, parsed.title, parsed.year)
+        : null;
     await this.upsert(
       library,
       file.path,
       {
         kind,
-        title: meta?.title || parsed.title,
-        year: meta?.year || parsed.year || new Date().getFullYear(),
+        title: enriched?.title || parsed.title,
+        year: enriched?.year || parsed.year || new Date().getFullYear(),
         videoFileName: file.name,
         videoFileSizeBytes: file.sizeBytes,
-        posterUrl: meta?.posterUrl ?? null,
+        posterUrl: enriched?.posterUrl ?? null,
         seasonCount: null,
+        genres: enriched?.genres ?? [],
+        rating: enriched?.rating ?? null,
+        detailsLoaded: Boolean(enriched?.genres?.length),
       },
       bumpListedAt,
       file.modifiedAtMs ?? null,
     );
-    return Boolean(meta?.posterUrl);
+    return Boolean(enriched?.posterUrl);
   }
 
   private async upsertFromFolder(
@@ -474,34 +478,39 @@ export class LibraryIndexService {
     bumpListedAt = false,
   ): Promise<boolean> {
     const parsed = this.parseTitle(folder.name);
-    const meta = (await this.needsPoster(library, folder.path)) && allowLookup()
-      ? await this.lookup(kind, parsed.title, parsed.year)
-      : null;
+    const enriched =
+      (await this.needsEnrichment(library, folder.path)) && allowLookup()
+        ? await this.enrich(kind, parsed.title, parsed.year)
+        : null;
     await this.upsert(
       library,
       folder.path,
       {
         kind,
-        title: meta?.title || parsed.title,
-        year: meta?.year || parsed.year || new Date().getFullYear(),
+        title: enriched?.title || parsed.title,
+        year: enriched?.year || parsed.year || new Date().getFullYear(),
         videoFileName: folder.name,
         videoFileSizeBytes: null,
-        posterUrl: meta?.posterUrl ?? null,
+        posterUrl: enriched?.posterUrl ?? null,
         seasonCount: null,
+        genres: enriched?.genres ?? [],
+        rating: enriched?.rating ?? null,
+        detailsLoaded: Boolean(enriched?.genres?.length),
       },
       bumpListedAt,
       folder.modifiedAtMs ?? null,
     );
-    return Boolean(meta?.posterUrl);
+    return Boolean(enriched?.posterUrl);
   }
 
-  private async needsPoster(library: MediaLibraryDocument, relativePath: string): Promise<boolean> {
+  private async needsEnrichment(library: MediaLibraryDocument, relativePath: string): Promise<boolean> {
     const row = await this.titles
       .findOne({ sourceKey: this.sourceKey(library, relativePath) })
-      .select('posterUrl')
+      .select('posterUrl genres')
       .lean()
       .exec();
-    return !row?.posterUrl;
+    const genreCount = Array.isArray(row?.genres) ? row.genres.filter(Boolean).length : 0;
+    return !row?.posterUrl || genreCount === 0;
   }
 
   private allowLookup(force: boolean, used: number, deadline: number): boolean {
@@ -509,8 +518,10 @@ export class LibraryIndexService {
     return used < (force ? MAX_TITLES : 8);
   }
 
-  private lookup(kind: CatalogKind, title: string, year: number | null) {
-    return kind === 'series' ? this.tmdb.searchSeries(title, year) : this.tmdb.searchMovie(title, year);
+  private enrich(kind: CatalogKind, title: string, year: number | null) {
+    return kind === 'series'
+      ? this.tmdb.enrichFromTmdb('tv', title, year)
+      : this.tmdb.enrichFromTmdb('movie', title, year);
   }
 
   private listedAtFromDisk(
@@ -546,6 +557,9 @@ export class LibraryIndexService {
       videoFileSizeBytes: number | null;
       posterUrl: string | null;
       seasonCount: number | null;
+      genres?: string[];
+      rating?: number | null;
+      detailsLoaded?: boolean;
     },
     bumpListedAt = false,
     diskModifiedAtMs: number | null = null,
@@ -578,6 +592,15 @@ export class LibraryIndexService {
       trending: false,
       seasonCount: fields.seasonCount,
     };
+    if (fields.genres?.length) {
+      set.genres = fields.genres;
+    }
+    if (fields.rating != null && fields.rating > 0) {
+      set.rating = fields.rating;
+    }
+    if (fields.detailsLoaded) {
+      set.detailsLoaded = true;
+    }
     if (fields.posterUrl) {
       set.title = fields.title;
       set.year = fields.year;
