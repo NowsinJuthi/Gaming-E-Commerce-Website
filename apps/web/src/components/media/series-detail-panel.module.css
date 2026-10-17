@@ -184,23 +184,134 @@
 }
 
 .playBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  border: 0;
+  gap: 0.55rem;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgb(255 215 90 / 0.45);
   border-radius: 999px;
-  padding: 0.55rem 1.15rem;
+  padding: 0.5rem 1.25rem 0.5rem 0.5rem;
   font-size: 0.92rem;
-  font-weight: 700;
-  background: #fff;
-  color: #0a0a0a;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
+  color: #1a1000;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow:
+    0 0 0 1px rgb(255 183 0 / 0.25),
+    0 6px 22px rgb(255 183 0 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.45);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    filter 0.22s ease;
+  animation: playBtnGlow 2.8s ease-in-out infinite;
 }
 
 .playBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgb(0 0 0 / 0.35);
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgb(255 215 90 / 0.55),
+    0 10px 32px rgb(255 183 0 / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
+
+.playBtn:active {
+  transform: translateY(0) scale(0.98);
+  filter: brightness(0.98);
+}
+
+.playBtn:focus-visible {
+  outline: 2px solid rgb(255 215 90 / 0.85);
+  outline-offset: 3px;
+}
+
+.playBtnIcon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgb(26 16 0 / 0.22);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.playBtnIcon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.12rem;
+}
+
+.playBtn:hover .playBtnIcon {
+  transform: scale(1.08);
+}
+
+.playBtnLabel {
+  position: relative;
+  z-index: 1;
+  padding-right: 0.15rem;
+}
+
+.playBtnShine {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgb(255 255 255 / 0.45) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.playBtn:hover .playBtnShine {
+  animation: playBtnShine 0.85s ease;
+}
+
+@keyframes playBtnGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(255 183 0 / 0.22),
+      0 6px 20px rgb(255 183 0 / 0.32),
+      inset 0 1px 0 rgb(255 255 255 / 0.45);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(255 215 90 / 0.4),
+      0 8px 28px rgb(255 183 0 / 0.45),
+      inset 0 1px 0 rgb(255 255 255 / 0.5);
+  }
+}
+
+@keyframes playBtnShine {
+  from {
+    transform: translateX(-120%);
+  }
+
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playBtn {
+    animation: none;
+  }
+
+  .playBtn:hover .playBtnShine {
+    animation: none;
+  }
 }
 
 .iconBtn {

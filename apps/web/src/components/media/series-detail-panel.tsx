@@ -208,7 +208,13 @@ export function SeriesDetailPanel({
                 ) : null}
                 <div className={styles.actions}>
                   <button type="button" className={styles.playBtn} onClick={() => onPlay(0)}>
-                    <span aria-hidden>▶</span> Play
+                    <span className={styles.playBtnIcon} aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 7.5v9l8-4.5-8-4.5z" />
+                      </svg>
+                    </span>
+                    <span className={styles.playBtnLabel}>Play</span>
+                    <span className={styles.playBtnShine} aria-hidden />
                   </button>
                 </div>
               </div>

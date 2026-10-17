@@ -1146,12 +1146,36 @@
 }
 
 .play {
-  border: 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgb(255 215 90 / 0.45);
   cursor: pointer;
   pointer-events: auto;
-  background: #26bfb0;
-  color: #04211d;
+  background: linear-gradient(135deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
+  color: #1a1000;
   text-decoration: none;
+  box-shadow:
+    0 0 0 1px rgb(255 183 0 / 0.25),
+    0 6px 20px rgb(255 183 0 / 0.32),
+    inset 0 1px 0 rgb(255 255 255 / 0.45);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    filter 0.22s ease;
+}
+
+.play:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgb(255 215 90 / 0.55),
+    0 10px 28px rgb(255 183 0 / 0.45),
+    inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
+
+.play:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .ghost {
