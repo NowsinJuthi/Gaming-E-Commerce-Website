@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { MediaCard } from "@/lib/media-home-api";
 import { getMediaTitleEpisodes, type MediaTitleEpisode } from "@/lib/media-home-api";
 import homeStyles from "./media-home.module.css";
-import playerStyles from "./media-player.module.css";
 import styles from "./series-detail-panel.module.css";
 
 type MediaDetails = {
@@ -211,15 +210,15 @@ export function SeriesDetailPanel({
                 ) : null}
                 <div className={styles.actions}>
                   <button type="button" className={styles.playBtn} aria-label="Play" onClick={() => onPlay(0)}>
-                    <span className={playerStyles.mark} aria-hidden>
-                      <span className={playerStyles.glow} />
-                      <svg className={playerStyles.rings} viewBox="0 0 80 80">
-                        <circle className={playerStyles.track} cx="40" cy="40" r="34" />
-                        <circle className={playerStyles.arc} cx="40" cy="40" r="34" />
-                        <circle className={playerStyles.arcInner} cx="40" cy="40" r="26" />
+                    <span className={styles.playMark} aria-hidden>
+                      <span className={styles.playMarkGlow} />
+                      <svg className={styles.playMarkRings} viewBox="0 0 80 80">
+                        <circle className={styles.playMarkTrack} cx="40" cy="40" r="34" />
+                        <circle className={styles.playMarkArc} cx="40" cy="40" r="34" />
+                        <circle className={styles.playMarkArcInner} cx="40" cy="40" r="26" />
                       </svg>
-                      <span className={playerStyles.core}>
-                        <svg viewBox="0 0 24 24" fill="#fff" aria-hidden>
+                      <span className={styles.playMarkCore}>
+                        <svg viewBox="0 0 24 24" fill="#1a1000" aria-hidden>
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </span>

@@ -192,7 +192,7 @@
   overflow: visible;
 }
 
-/* Same BusyMark as movie player buffer overlay */
+/* Movie-player BusyMark layout, golden palette + slower motion */
 .playBtn {
   display: inline-flex;
   padding: 0;
@@ -212,9 +212,121 @@
 }
 
 .playBtn:focus-visible {
-  outline: 2px solid rgb(38 191 176 / 0.85);
+  outline: 2px solid rgb(255 193 7 / 0.85);
   outline-offset: 4px;
   border-radius: 999px;
+}
+
+.playMark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6.25rem;
+  height: 6.25rem;
+}
+
+.playMarkGlow {
+  position: absolute;
+  inset: 12%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(255 193 7 / 0.5) 0%, transparent 70%);
+  animation: playMarkGlow 2.8s ease-in-out infinite;
+}
+
+.playMarkRings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.playMarkTrack {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.14);
+  stroke-width: 3.5;
+}
+
+.playMarkArc,
+.playMarkArcInner {
+  fill: none;
+  stroke-linecap: round;
+  transform-origin: center;
+}
+
+.playMarkArc {
+  stroke: #ffb700;
+  stroke-width: 3.5;
+  stroke-dasharray: 58 160;
+  filter: drop-shadow(0 0 6px rgb(255 183 0 / 0.75));
+  animation: playMarkSpin 1.65s linear infinite;
+}
+
+.playMarkArcInner {
+  stroke: rgb(255 235 150 / 0.65);
+  stroke-width: 2;
+  stroke-dasharray: 28 140;
+  animation: playMarkSpinReverse 2.6s linear infinite;
+}
+
+.playMarkCore {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ffe082 0%, #ffc107 45%, #ffb700 70%, #d49200 100%);
+  box-shadow:
+    0 0 0 3px rgb(255 255 255 / 0.12),
+    0 0 22px rgb(255 183 0 / 0.55);
+}
+
+.playMarkCore svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.12rem;
+}
+
+@keyframes playMarkGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes playMarkSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes playMarkSpinReverse {
+  from {
+    transform: rotate(360deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playMarkGlow,
+  .playMarkArc,
+  .playMarkArcInner {
+    animation: none;
+  }
 }
 
 .iconBtn {
