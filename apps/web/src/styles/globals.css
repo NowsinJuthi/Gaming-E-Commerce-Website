@@ -37010,7 +37010,10 @@ html.media-catalog-route .media-page-root :where(
 }
 
 .product-pdp-packages-card .product-pdp-package-radio {
-  @apply h-4 w-4 shrink-0 rounded-full border-2 border-border-strong bg-elevated transition;
+  @apply h-[1.125rem] w-[1.125rem] shrink-0 rounded-full border-2 transition;
+  border-color: rgb(var(--brand) / 0.52);
+  background: rgb(var(--bg-elevated));
+  box-shadow: 0 0 0 1px rgb(var(--border-strong) / 0.65);
 }
 
 .product-pdp-packages-card .product-pdp-package-thumb {
@@ -37031,7 +37034,9 @@ html.media-catalog-route .media-page-root :where(
 .product-pdp-packages-card .product-pdp-package-radio--on {
   border-color: rgb(var(--brand));
   background: rgb(var(--brand));
-  box-shadow: inset 0 0 0 3px rgb(var(--bg-sunken));
+  box-shadow:
+    inset 0 0 0 3px rgb(var(--bg-elevated)),
+    0 0 0 1px rgb(var(--brand) / 0.35);
 }
 
 .product-pdp-packages-card .admin-order-view-section-copy {
