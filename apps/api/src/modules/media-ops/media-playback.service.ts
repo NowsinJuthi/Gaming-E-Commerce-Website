@@ -191,7 +191,15 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.touchedAt = Date.now();
     if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
-    // One continuous ffmpeg HLS timeline — Safari jumps when each segment is encoded separately (on-demand VOD).
+    const vodDuration =
+      session.durationSeconds > 0 ? session.durationSeconds : session.runtimeSeconds;
+    if (vodDuration > 0) {
+      if (session.durationSeconds <= 0) session.durationSeconds = vodDuration;
+      this.stopFfmpeg(session);
+      const stalePack = join(session.dir, 'index.m3u8');
+      if (existsSync(stalePack)) await unlink(stalePack).catch(() => undefined);
+      return this.mobileVodPlaylist(session);
+    }
     const playlist = join(session.dir, 'index.m3u8');
     if (!existsSync(playlist)) {
       if (!session.ffmpeg) {
@@ -282,9 +290,11 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       out.push(line);
     }
     let body = out.join('\n');
-    body = body.replace('#EXT-X-PLAYLIST-TYPE:EVENT', '#EXT-X-PLAYLIST-TYPE:VOD');
-    if (session?.complete && !body.includes('#EXT-X-ENDLIST')) {
-      body = `${body.trimEnd()}\n#EXT-X-ENDLIST\n`;
+    if (session?.complete) {
+      body = body.replace('#EXT-X-PLAYLIST-TYPE:EVENT', '#EXT-X-PLAYLIST-TYPE:VOD');
+      if (!body.includes('#EXT-X-ENDLIST')) {
+        body = `${body.trimEnd()}\n#EXT-X-ENDLIST\n`;
+      }
     }
     return body;
   }
@@ -298,17 +308,17 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (!resolved) throw new NotFoundException();
     const { session, dir } = resolved;
     const full = join(dir, baseName);
-    if (session?.sourceFile) {
-      const packedHls = existsSync(join(dir, 'index.m3u8'));
-      if (packedHls && !existsSync(full) && session.ffmpeg) {
-        await this.waitForSegment(full, session.ffmpeg, 120_000);
-      } else if (!packedHls && session.durationSeconds > 0) {
+    if (session?.sourceFile && session.durationSeconds > 0) {
+      const onDemandVod = !existsSync(join(dir, 'index.m3u8'));
+      if (onDemandVod) {
         if (baseName === 'init.mp4') {
           await this.ensureMobileInit(session);
         } else {
           const index = this.parseMobileSegmentIndex(baseName);
           if (index != null) await this.ensureMobileSegmentOnDemand(session, index);
         }
+      } else if (!existsSync(full) && session.ffmpeg) {
+        await this.waitForSegment(full, session.ffmpeg, 120_000);
       }
     }
     const root = resolve(dir);
@@ -689,7 +699,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-hls_init_time', String(Math.min(2, segmentSeconds)),
       '-hls_list_size', '0',
       '-start_number', '0',
-      '-hls_playlist_type', 'vod',
+      '-hls_playlist_type', 'event',
       '-hls_flags', 'independent_segments+omit_endlist+temp_file',
       ...(fmp4 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : []),
       '-avoid_negative_ts', 'make_zero',
@@ -842,7 +852,6 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     ];
     if (fmp4) lines.push(`#EXT-X-MAP:URI="init.mp4?g=${gen}"`);
     for (let index = 0; index < count; index += 1) {
-      if (index > 0) lines.push('#EXT-X-DISCONTINUITY');
       const remaining = duration - index * segLen;
       const piece = Math.min(segLen, remaining);
       lines.push(`#EXTINF:${piece.toFixed(6)},`);
@@ -963,7 +972,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-muxpreload', '0',
       ...this.mobileVideoArgs(session),
       ...this.mobileAudioArgs(audio?.codec ?? ''),
-      ...(index > 0 && !fmp4 ? ['-mpegts_flags', '+initial_discontinuity'] : []),
+      '-output_ts_offset', (index * MOBILE_VOD_SEGMENT_SECONDS).toFixed(3),
       '-avoid_negative_ts', 'make_zero',
       '-max_muxing_queue_size', '9999',
       ...formatArgs,
