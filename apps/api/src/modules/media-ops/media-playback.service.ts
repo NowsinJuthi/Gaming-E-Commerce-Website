@@ -810,8 +810,9 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
 
   private parseMobileSegmentIndex(baseName: string): number | null {
     const match = /^seg(\d{5})\.(?:m2ts|ts|m4s)$/i.exec(baseName);
-    if (!match) return null;
-    return Number.parseInt(match[1], 10);
+    const segmentIndex = match?.[1];
+    if (!segmentIndex) return null;
+    return Number.parseInt(segmentIndex, 10);
   }
 
   /** Jellyfin-style VOD manifest: full timeline, segments generated on first GET. */
