@@ -44,10 +44,11 @@ export default function MovieServerDashboardPage() {
       title="Dashboard"
       description="Catalog overview, live visitors, playback, and server resources in one place."
       icon={ChartIcon}
+      heroClassName={styles.pageHero}
       action={
         <button
           type="button"
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium hover:bg-white/10"
+          className={`${styles.refreshBtn} rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium hover:bg-white/10`}
           disabled={loading}
           onClick={() => {
             setLoading(true);
@@ -119,8 +120,8 @@ export default function MovieServerDashboardPage() {
               <Link href="/admin/libraries">add a library</Link>.
             </p>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
+            <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
+              <table className={`${styles.table} ${styles.tableResponsive}`}>
                 <thead>
                   <tr>
                     <th>Library</th>
@@ -134,13 +135,13 @@ export default function MovieServerDashboardPage() {
                 <tbody>
                   {libraries.map((library) => (
                     <tr key={library.id}>
-                      <td className={styles.nameCell}>
+                      <td className={styles.nameCell} data-label="Library">
                         <div className={styles.libName}>{library.name}</div>
                         <div className={styles.libPath} title={library.rootPath}>
                           {library.rootPath}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Type">
                         <span
                           className={`${styles.badge} ${
                             library.kind === "tv" ? styles.badgeTv : styles.badgeMovies
@@ -149,10 +150,12 @@ export default function MovieServerDashboardPage() {
                           {library.kind === "tv" ? "Series" : "Movies"}
                         </span>
                       </td>
-                      <td className={styles.countCell}>{library.catalogCount.toLocaleString()}</td>
-                      <td>{library.itemCount.toLocaleString()}</td>
-                      <td>{library.unmatchedCount.toLocaleString()}</td>
-                      <td>
+                      <td className={styles.countCell} data-label="Catalog count">
+                        {library.catalogCount.toLocaleString()}
+                      </td>
+                      <td data-label="Scan items">{library.itemCount.toLocaleString()}</td>
+                      <td data-label="Unmatched">{library.unmatchedCount.toLocaleString()}</td>
+                      <td data-label="Actions" className={styles.actionsCell}>
                         <Link href="/admin/libraries" className={styles.linkBtn}>
                           Manage
                         </Link>

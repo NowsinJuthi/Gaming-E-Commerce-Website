@@ -105,8 +105,8 @@ export function MovieServerLiveVisitorsPanel() {
           {mediaSessions.length === 0 ? (
             <p className={styles.liveEmpty}>No active playback sessions.</p>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
+            <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
+              <table className={`${styles.table} ${styles.tableResponsive}`}>
                 <thead>
                   <tr>
                     <th>Customer</th>
@@ -118,8 +118,8 @@ export function MovieServerLiveVisitorsPanel() {
                 <tbody>
                   {mediaSessions.map((row) => (
                     <tr key={row.visitorKey}>
-                      <td>{row.label}</td>
-                      <td>
+                      <td data-label="Customer">{row.label}</td>
+                      <td data-label="Title">
                         <Link
                           href={`/media/watch/${row.titleId}`}
                           className={styles.linkBtn}
@@ -129,8 +129,12 @@ export function MovieServerLiveVisitorsPanel() {
                           {row.titleName}
                         </Link>
                       </td>
-                      <td className={styles.meterHint}>{row.episodeName ?? "—"}</td>
-                      <td className={styles.tabularMuted}>{formatWhen(row.lastSeen)}</td>
+                      <td className={styles.meterHint} data-label="Episode">
+                        {row.episodeName ?? "—"}
+                      </td>
+                      <td className={styles.tabularMuted} data-label="Last seen">
+                        {formatWhen(row.lastSeen)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -144,8 +148,8 @@ export function MovieServerLiveVisitorsPanel() {
           {visitors.length === 0 ? (
             <p className={styles.liveEmpty}>No active visitors in the last ~90 seconds.</p>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
+            <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
+              <table className={`${styles.table} ${styles.tableResponsive}`}>
                 <thead>
                   <tr>
                     <th>Visitor</th>
@@ -156,14 +160,16 @@ export function MovieServerLiveVisitorsPanel() {
                 <tbody>
                   {visitors.map((row) => (
                     <tr key={row.visitorKey}>
-                      <td>{row.label}</td>
-                      <td>
+                      <td data-label="Visitor">{row.label}</td>
+                      <td data-label="Page" className={styles.nameCell}>
                         <div className={styles.libName}>{row.pathLabel?.trim() || row.path}</div>
                         {row.pathLabel?.trim() && row.path !== row.pathLabel ? (
                           <div className={styles.libPath}>{row.path}</div>
                         ) : null}
                       </td>
-                      <td className={styles.tabularMuted}>{formatWhen(row.lastSeen)}</td>
+                      <td className={styles.tabularMuted} data-label="Last seen">
+                        {formatWhen(row.lastSeen)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

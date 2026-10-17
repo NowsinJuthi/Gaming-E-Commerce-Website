@@ -490,3 +490,239 @@
   color: var(--muted-foreground);
   font-size: 0.82rem;
 }
+
+.pageHero :global(.admin-page-hero-main) {
+  align-items: flex-start;
+}
+
+.refreshBtn {
+  min-height: 2.5rem;
+}
+
+.actionsCell {
+  text-align: right;
+}
+
+.tableWrapResponsive {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 639px) {
+  .layout {
+    gap: 0.9rem;
+  }
+
+  .pageHero :global(.admin-page-description) {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .pageHero :global(.admin-page-hero-main) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .pageHero :global(.admin-page-hero-actions) {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .refreshBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stat {
+    padding: 0.72rem 0.8rem;
+    border-radius: 0.85rem;
+  }
+
+  .statLabel {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+  }
+
+  .statValue {
+    font-size: 1.15rem;
+    margin-top: 0.25rem;
+  }
+
+  .panel {
+    border-radius: 1rem;
+  }
+
+  .panelHead {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .panelTitle {
+    font-size: 0.95rem;
+  }
+
+  .panelHint {
+    font-size: 0.76rem;
+    line-height: 1.4;
+  }
+
+  .hostBody {
+    padding: 0.85rem 0.9rem 0.95rem;
+    gap: 0.85rem;
+  }
+
+  .hostHeadRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .liveBadge {
+    align-self: flex-start;
+  }
+
+  .liveStatRow {
+    grid-template-columns: 1fr;
+  }
+
+  .liveStat .statValue {
+    font-size: 1.35rem;
+  }
+
+  .storageSummary {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .storageBig {
+    font-size: 1.1rem;
+  }
+
+  .breakdownRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .breakdownName {
+    flex-wrap: wrap;
+  }
+
+  .pathMono {
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.35;
+  }
+
+  .meterHint {
+    font-size: 0.68rem;
+  }
+
+  .meterHead {
+    flex-wrap: wrap;
+  }
+
+  .quickLink {
+    padding: 0.9rem 1rem;
+  }
+
+  .libPath {
+    max-width: none;
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .tableWrapResponsive {
+    overflow-x: visible;
+  }
+
+  .tableResponsive {
+    display: block;
+    min-width: 0;
+  }
+
+  .tableResponsive thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .tableResponsive tbody {
+    display: block;
+  }
+
+  .tableResponsive tbody tr {
+    display: block;
+    margin-bottom: 0.65rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(0 0 0 / 0.14);
+  }
+
+  .tableResponsive tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .tableResponsive tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.4rem 0;
+    border-bottom: none;
+    text-align: right;
+    font-size: 0.8125rem;
+  }
+
+  .tableResponsive tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    padding-top: 0.12rem;
+  }
+
+  .tableResponsive tbody td[data-label="Library"],
+  .tableResponsive tbody td[data-label="Page"] {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .tableResponsive tbody td[data-label="Library"]::before,
+  .tableResponsive tbody td[data-label="Page"]::before {
+    margin-bottom: 0.15rem;
+  }
+
+  .tableResponsive tbody td[data-label="Actions"] {
+    justify-content: flex-end;
+    padding-top: 0.55rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .tableResponsive tbody td[data-label="Actions"]::before {
+    display: none;
+  }
+
+  .tableResponsive .countCell {
+    font-size: 0.95rem;
+  }
+
+  .empty {
+    padding: 1.75rem 0.9rem;
+  }
+}
