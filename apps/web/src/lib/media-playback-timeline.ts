@@ -80,8 +80,16 @@ export function seekVideoTo(
   applyVideoSeek(video, target);
 }
 
-function applyVideoSeek(video: HTMLVideoElement, target: number): void {
-  if (typeof video.fastSeek === "function") {
+function isAppleMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+/** Precise seek — Safari fastSeek snaps to sync samples (~1–2s) and causes visible jumps. */
+export function applyVideoSeek(video: HTMLVideoElement, target: number): void {
+  if (!isAppleMobileDevice() && typeof video.fastSeek === "function") {
     try {
       video.fastSeek(target);
       return;

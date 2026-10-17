@@ -191,7 +191,11 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     session.touchedAt = Date.now();
     if (!session.dir) session.dir = this.mobilePackDir(session.id);
     await mkdir(session.dir, { recursive: true });
-    if (session.durationSeconds > 0) {
+    const vodDuration =
+      session.durationSeconds > 0 ? session.durationSeconds : session.runtimeSeconds;
+    if (vodDuration > 0) {
+      if (session.durationSeconds <= 0) session.durationSeconds = vodDuration;
+      this.stopFfmpeg(session);
       return this.mobileVodPlaylist(session);
     }
     const playlist = join(session.dir, 'index.m3u8');
@@ -791,7 +795,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     if (codec === 'aac' || codec === 'mp3' || codec === 'ac3' || codec === 'eac3') {
       return ['-c:a', 'copy'];
     }
-    return ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1:first_pts=0'];
+    return ['-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-ar', '48000', '-af', 'aresample=async=1'];
   }
 
   private mobileUsesFmp4(session: Session): boolean {
@@ -832,6 +836,7 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     ];
     if (fmp4) lines.push(`#EXT-X-MAP:URI="init.mp4?g=${gen}"`);
     for (let index = 0; index < count; index += 1) {
+      if (index > 0) lines.push('#EXT-X-DISCONTINUITY');
       const remaining = duration - index * segLen;
       const piece = Math.min(segLen, remaining);
       lines.push(`#EXTINF:${piece.toFixed(6)},`);
@@ -952,6 +957,8 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
       '-muxpreload', '0',
       ...this.mobileVideoArgs(session),
       ...this.mobileAudioArgs(audio?.codec ?? ''),
+      ...(index > 0 && !fmp4 ? ['-mpegts_flags', '+initial_discontinuity'] : []),
+      '-avoid_negative_ts', 'make_zero',
       '-max_muxing_queue_size', '9999',
       ...formatArgs,
       outputPath,

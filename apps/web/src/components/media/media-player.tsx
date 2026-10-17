@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type Hls from "hls.js";
 import { API_BASE } from "@/lib/api";
 import {
+  applyVideoSeek,
   displayTimelineSeconds,
   isLocalTimeInPack,
   localTimelineSeconds,
@@ -164,18 +165,6 @@ function sliderRatioFromClient(el: HTMLElement, clientX: number, clientY: number
   const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
   const width = el.offsetWidth || 1;
   return Math.min(1, Math.max(0, localX / width + 0.5));
-}
-
-function applyVideoSeek(video: HTMLVideoElement, target: number) {
-  if (typeof video.fastSeek === "function") {
-    try {
-      video.fastSeek(target);
-      return;
-    } catch {
-      /* fall through to currentTime */
-    }
-  }
-  video.currentTime = target;
 }
 
 function SeekTrack({
