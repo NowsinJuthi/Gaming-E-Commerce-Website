@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { getRegistrationEmailPolicy, registerUser } from "@/lib/api";
 import { getRecaptchaToken, warmupRecaptcha } from "@/lib/recaptcha";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/password-rules";
@@ -10,10 +11,8 @@ import {
   LoginFieldKeyIcon,
   LoginFieldMailIcon,
   LoginSubmitIcon,
-  RegisterAnimatedIcon,
   SignUpButtonIcon,
 } from "@/components/auth/LoginAnimatedIcon";
-import { MarketingHeroBubbles } from "@/components/marketing/MarketingHeroBubbles";
 import { EyeIcon } from "@/components/admin/icons";
 
 function EyeOffIcon({ className }: { className?: string }) {
@@ -70,104 +69,96 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="login-page">
-      <MarketingHeroBubbles />
+    <AuthPageShell>
+      <header className="login-page__header">
+        <h1 className="login-page__title">Create Your Account</h1>
+        <p className="login-page__subtitle">
+          Join UniQbd and start shopping digital goods in seconds.
+        </p>
+        {allowlistActive ? (
+          <p className="login-page__hint mt-2">
+            Only approved email providers can register.
+          </p>
+        ) : null}
+      </header>
 
-      <div className="login-page__inner">
-        <div className="login-page__card">
-          <RegisterAnimatedIcon />
+      {error ? (
+        <div className="login-page__alert login-page__alert--error" role="alert">
+          {error}
+        </div>
+      ) : null}
 
-          <header className="login-page__header">
-            <h1 className="login-page__title">Create Your Account</h1>
-            <p className="login-page__subtitle">
-              Join UniQbd and start shopping digital goods in seconds.
-            </p>
-            {allowlistActive ? (
-              <p className="login-page__hint mt-2 text-center">
-                Only approved email providers can register.
-              </p>
-            ) : null}
-          </header>
-
-          {error && (
-            <div className="login-page__alert login-page__alert--error" role="alert">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={onSubmit} className="login-page__form">
-            <div>
-              <label className="login-page__label" htmlFor="register-email">
-                Email
-              </label>
-              <div className="login-page__field">
-                <LoginFieldMailIcon className="login-page__field-icon" />
-                <input
-                  id="register-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`${inputClass} login-page__input`}
-                  autoComplete="email"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="login-page__label" htmlFor="register-password">
-                Password
-              </label>
-              <div className="login-page__field">
-                <LoginFieldKeyIcon className="login-page__field-icon" />
-                <input
-                  id="register-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={PASSWORD_MIN_LENGTH}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${inputClass} login-page__input pr-12`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-foreground-muted transition hover:text-foreground"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <EyeOffIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-              <p className="login-page__hint">{PASSWORD_HINT}</p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full disabled:opacity-50"
-            >
-              {!loading ? <SignUpButtonIcon /> : null}
-              {loading ? "Creating account…" : "Sign up"}
-            </button>
-          </form>
-
-          <div className="login-page__signup">
-            <div className="login-page__signup-icon">
-              <LoginSubmitIcon className="h-5 w-5" />
-            </div>
-            <p className="login-page__signup-text">Already have an account?</p>
-            <Link href="/login" className="btn-secondary login-page__signup-btn">
-              <LoginSubmitIcon />
-              Log in
-            </Link>
+      <form onSubmit={onSubmit} className="login-page__form">
+        <div>
+          <label className="login-page__label" htmlFor="register-email">
+            Email
+          </label>
+          <div className="login-page__field">
+            <LoginFieldMailIcon className="login-page__field-icon" />
+            <input
+              id="register-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={`${inputClass} login-page__input`}
+              autoComplete="email"
+            />
           </div>
         </div>
+
+        <div>
+          <label className="login-page__label" htmlFor="register-password">
+            Password
+          </label>
+          <div className="login-page__field">
+            <LoginFieldKeyIcon className="login-page__field-icon" />
+            <input
+              id="register-password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={PASSWORD_MIN_LENGTH}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${inputClass} login-page__input pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-foreground-muted transition hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOffIcon className="h-5 w-5" />
+              ) : (
+                <EyeIcon className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+          <p className="login-page__hint">{PASSWORD_HINT}</p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn-primary w-full disabled:opacity-50"
+        >
+          {!loading ? <SignUpButtonIcon /> : null}
+          {loading ? "Creating account…" : "Sign up"}
+        </button>
+      </form>
+
+      <div className="login-page__signup">
+        <div className="login-page__signup-icon">
+          <LoginSubmitIcon className="h-5 w-5" />
+        </div>
+        <p className="login-page__signup-text">Already have an account?</p>
+        <Link href="/login" className="btn-secondary login-page__signup-btn">
+          <LoginSubmitIcon />
+          Log in
+        </Link>
       </div>
-    </main>
+    </AuthPageShell>
   );
 }
