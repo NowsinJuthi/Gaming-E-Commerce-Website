@@ -255,13 +255,8 @@ export function SeriesDetailPanel({
                   </span>
                 </label>
               </div>
-              {seasonEpisodes.length > 0 || episodeParts.length > 0 ? (
+              {episodeParts.length > 0 ? (
                 <div className={styles.episodesMeta}>
-                  {seasonEpisodes.length > 0 ? (
-                    <span className={styles.episodeCountPill}>
-                      {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
-                    </span>
-                  ) : null}
                   {episodeParts.length > 1 ? (
                     <select
                       className={styles.partSelect}
