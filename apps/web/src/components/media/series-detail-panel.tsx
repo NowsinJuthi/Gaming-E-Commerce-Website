@@ -208,6 +208,7 @@ export function SeriesDetailPanel({
                 ) : null}
                 <div className={styles.actions}>
                   <button type="button" className={styles.playBtn} onClick={() => onPlay(0)}>
+                    <span className={styles.playBtnRing} aria-hidden />
                     <span className={styles.playBtnIcon} aria-hidden>
                       <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9 7.5v9l8-4.5-8-4.5z" />
@@ -232,26 +233,28 @@ export function SeriesDetailPanel({
           </section>
 
           <section className={`${styles.section} ${styles.episodesSection}`}>
-            <h3 className={styles.episodesTitle}>Episodes</h3>
             <div className={styles.episodesToolbar}>
-              <label className={styles.seasonField}>
-                <span className="sr-only">Season</span>
-                <span className={homeStyles.selectWrap}>
-                  <select
-                    className={`${homeStyles.control} ${styles.seasonControl}`}
-                    value={season}
-                    disabled={episodesLoading || seasons.length === 0}
-                    aria-label="Season"
-                    onChange={(event) => setSeason(Number(event.target.value))}
-                  >
-                    {(seasons.length > 0 ? seasons : [{ season: 1, items: [] }]).map((row) => (
-                      <option key={row.season} value={row.season}>
-                        Season {row.season}
-                      </option>
-                    ))}
-                  </select>
-                </span>
-              </label>
+              <div className={styles.episodesHeadLeft}>
+                <h3 className={styles.episodesTitle}>Episodes</h3>
+                <label className={styles.seasonField}>
+                  <span className="sr-only">Season</span>
+                  <span className={homeStyles.selectWrap}>
+                    <select
+                      className={`${homeStyles.control} ${styles.seasonControl}`}
+                      value={season}
+                      disabled={episodesLoading || seasons.length === 0}
+                      aria-label="Season"
+                      onChange={(event) => setSeason(Number(event.target.value))}
+                    >
+                      {(seasons.length > 0 ? seasons : [{ season: 1, items: [] }]).map((row) => (
+                        <option key={row.season} value={row.season}>
+                          Season {row.season}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </label>
+              </div>
               {seasonEpisodes.length > 0 || episodeParts.length > 0 ? (
                 <div className={styles.episodesMeta}>
                   {seasonEpisodes.length > 0 ? (
