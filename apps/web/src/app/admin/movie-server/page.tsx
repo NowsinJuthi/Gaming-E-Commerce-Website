@@ -84,8 +84,6 @@ export default function MovieServerDashboardPage() {
       }
     >
       <div className={styles.layout}>
-        <div className={styles.ambientGlow} aria-hidden />
-
         {error ? (
           <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
             {error}

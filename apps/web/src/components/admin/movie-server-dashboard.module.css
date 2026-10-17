@@ -48,41 +48,10 @@
   }
 }
 
-@keyframes msAmbientDrift {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    opacity: 0.65;
-    transform: translate(2%, -1%) scale(1.04);
-  }
-}
-
 .layout {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  isolation: isolate;
-}
-
-.ambientGlow {
-  pointer-events: none;
-  position: absolute;
-  inset: -1rem -0.5rem auto;
-  height: 12rem;
-  z-index: 0;
-  background:
-    radial-gradient(ellipse 55% 80% at 12% 0%, rgb(38 191 176 / 0.14), transparent 70%),
-    radial-gradient(ellipse 45% 70% at 88% 8%, rgb(147 130 255 / 0.12), transparent 72%);
-  animation: msAmbientDrift 12s ease-in-out infinite;
-}
-
-.layout > *:not(.ambientGlow) {
-  position: relative;
-  z-index: 1;
 }
 
 .sectionAnim {
@@ -94,7 +63,6 @@
   .sectionAnim,
   .statValueReady,
   .hostCardEnter,
-  .ambientGlow,
   .liveDot,
   .meterFill,
   .quickLinkArrow,
