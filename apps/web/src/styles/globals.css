@@ -38001,19 +38001,6 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-@keyframes siteHeaderProfileGlow {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-
-  50% {
-    transform: scale(1.06);
-    opacity: 0.82;
-  }
-}
-
 .site-header.site-header--storefront .site-header-profile-ring {
   position: relative;
   display: inline-flex;
@@ -38023,25 +38010,15 @@ html.media-catalog-route .media-page-root :where(
   isolation: isolate;
 }
 
-.site-header.site-header--storefront .site-header-profile-ringOrbit,
-.site-header.site-header--storefront .site-header-profile-ringRipple {
+.site-header.site-header--storefront .site-header-profile-ringOrbit {
   position: absolute;
+  inset: -2px;
   border-radius: 999px;
   pointer-events: none;
-}
-
-.site-header.site-header--storefront .site-header-profile-ringOrbit {
-  inset: -2px;
   border: 1.5px solid rgb(255 183 0 / 0.18);
   border-top-color: rgb(255 183 0 / 0.82);
   border-right-color: rgb(255 215 90 / 0.48);
   animation: siteHeaderProfileOrbit 2.6s linear infinite;
-}
-
-.site-header.site-header--storefront .site-header-profile-ringRipple {
-  inset: -4px;
-  border: 1px solid rgb(255 183 0 / 0.32);
-  animation: siteHeaderProfileGlow 2.2s ease-in-out infinite;
 }
 
 .site-header.site-header--storefront button:hover .site-header-profile-ringOrbit,
@@ -38055,8 +38032,7 @@ html.media-catalog-route .media-page-root :where(
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-header.site-header--storefront .site-header-profile-ringOrbit,
-  .site-header.site-header--storefront .site-header-profile-ringRipple {
+  .site-header.site-header--storefront .site-header-profile-ringOrbit {
     animation: none;
     border-color: rgb(255 183 0 / 0.42);
     opacity: 0.72;

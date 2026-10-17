@@ -391,7 +391,6 @@ export function Header({
   const AvatarInner = () => (
     <span className="site-header-profile-ring">
       <span className="site-header-profile-ringOrbit" aria-hidden />
-      <span className="site-header-profile-ringRipple" aria-hidden />
       <span className="admin-topbar-avatar overflow-hidden">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
