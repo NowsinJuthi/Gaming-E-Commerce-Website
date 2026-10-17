@@ -218,43 +218,48 @@ export function MovieServerHostMetricsPanel() {
               </div>
             </div>
 
-            <div className={styles.storageBlock}>
-              <div className={styles.storageSummary}>
-                <div>
-                  <span className={styles.statLabel}>Website uploads</span>
-                  <span className={styles.storageBig}>
-                    {formatBytes(metrics.storage.uploadsBytes)}
-                  </span>
+            <details className={styles.storageDetails}>
+              <summary className={styles.moreInfoBtn}>
+                More info
+              </summary>
+              <div className={styles.storageBlockInner}>
+                <div className={styles.storageSummary}>
+                  <div>
+                    <span className={styles.statLabel}>Website uploads</span>
+                    <span className={styles.storageBig}>
+                      {formatBytes(metrics.storage.uploadsBytes)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={styles.statLabel}>Playback temp</span>
+                    <span className={styles.storageBig}>
+                      {formatBytes(metrics.storage.tempPlaybackBytes)}
+                    </span>
+                    <span className={styles.meterHint}>HLS cache / transcode scratch</span>
+                  </div>
                 </div>
-                <div>
-                  <span className={styles.statLabel}>Playback temp</span>
-                  <span className={styles.storageBig}>
-                    {formatBytes(metrics.storage.tempPlaybackBytes)}
-                  </span>
-                  <span className={styles.meterHint}>HLS cache / transcode scratch</span>
-                </div>
-              </div>
 
-              {metrics.storage.breakdown.length > 0 ? (
-                <ul className={styles.breakdownList}>
-                  {metrics.storage.breakdown.map((row) => (
-                    <li key={row.name} className={styles.breakdownRow}>
-                      <span className={styles.breakdownName}>
-                        {row.name}
-                        {row.external ? (
-                          <span className={styles.breakdownTag}>Samba mount</span>
-                        ) : null}
-                      </span>
-                      <span className={styles.breakdownBytes}>
-                        {row.external ? "—" : formatBytes(row.bytes)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={styles.meterHint}>No folders under uploads yet.</p>
-              )}
-            </div>
+                {metrics.storage.breakdown.length > 0 ? (
+                  <ul className={styles.breakdownList}>
+                    {metrics.storage.breakdown.map((row) => (
+                      <li key={row.name} className={styles.breakdownRow}>
+                        <span className={styles.breakdownName}>
+                          {row.name}
+                          {row.external ? (
+                            <span className={styles.breakdownTag}>Samba mount</span>
+                          ) : null}
+                        </span>
+                        <span className={styles.breakdownBytes}>
+                          {row.external ? "—" : formatBytes(row.bytes)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={styles.meterHint}>No folders under uploads yet.</p>
+                )}
+              </div>
+            </details>
           </>
         ) : null}
       </div>
