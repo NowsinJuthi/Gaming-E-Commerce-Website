@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { MediaCard } from "@/lib/media-home-api";
 import { getMediaTitleEpisodes, type MediaTitleEpisode } from "@/lib/media-home-api";
+import homeStyles from "./media-home.module.css";
 import styles from "./series-detail-panel.module.css";
 
 type MediaDetails = {
@@ -227,25 +228,31 @@ export function SeriesDetailPanel({
           <section className={`${styles.section} ${styles.episodesSection}`}>
             <div className={styles.episodesHead}>
               <h3>Episodes</h3>
-              <div className={styles.episodesTools}>
-                {seasonEpisodes.length > 0 ? (
-                  <span className={styles.episodeCountPill}>
-                    {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
-                  </span>
-                ) : null}
-                {seasons.length > 1 ? (
+              <label className={styles.seasonField}>
+                <span className="sr-only">Season</span>
+                <span className={homeStyles.selectWrap}>
                   <select
-                    className={styles.seasonSelect}
+                    className={`${homeStyles.control} ${styles.seasonControl}`}
                     value={season}
-                    onChange={(event) => setSeason(Number(event.target.value))}
+                    disabled={episodesLoading || seasons.length === 0}
                     aria-label="Season"
+                    onChange={(event) => setSeason(Number(event.target.value))}
                   >
-                    {seasons.map((row) => (
+                    {(seasons.length > 0 ? seasons : [{ season: 1, items: [] }]).map((row) => (
                       <option key={row.season} value={row.season}>
                         Season {row.season}
                       </option>
                     ))}
                   </select>
+                </span>
+              </label>
+            </div>
+            {seasonEpisodes.length > 0 || episodeParts.length > 0 ? (
+              <div className={styles.episodesMeta}>
+                {seasonEpisodes.length > 0 ? (
+                  <span className={styles.episodeCountPill}>
+                    {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
+                  </span>
                 ) : null}
                 {episodeParts.length > 1 ? (
                   <select
@@ -268,7 +275,7 @@ export function SeriesDetailPanel({
                   })()
                 ) : null}
               </div>
-            </div>
+            ) : null}
             {episodesLoading ? (
               <p className={styles.overviewMuted}>Loading episodes…</p>
             ) : seasonEpisodes.length === 0 ? (
