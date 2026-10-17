@@ -226,9 +226,6 @@ export function SeriesDetailPanel({
                   <button type="button" className={homeStyles.ghost}>
                     + My List
                   </button>
-                  <button type="button" className={homeStyles.ghost}>
-                    Mark watched
-                  </button>
                 </div>
               </div>
             </div>

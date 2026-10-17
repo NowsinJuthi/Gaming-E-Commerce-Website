@@ -1053,9 +1053,6 @@ function MovieInfo({
               <button type="button" className={styles.ghost}>
                 + My List
               </button>
-              <button type="button" className={styles.ghost}>
-                Mark watched
-              </button>
             </div>
           </div>
         </div>
