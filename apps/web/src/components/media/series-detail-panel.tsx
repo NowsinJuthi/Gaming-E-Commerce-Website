@@ -221,11 +221,15 @@ export function SeriesDetailPanel({
                     ) : null}
                   </div>
                 ) : null}
-                <div className={`${homeStyles.actions} ${styles.heroActions}`}>
-                  <button type="button" className={homeStyles.play} onClick={() => onPlay(0)}>
+                <div className={`${homeStyles.actions} ${styles.heroActions} ${styles.heroActionsRow}`}>
+                  <button
+                    type="button"
+                    className={`${homeStyles.play} ${styles.heroActionBtn}`}
+                    onClick={() => onPlay(0)}
+                  >
                     <span aria-hidden>▶</span> Play
                   </button>
-                  <button type="button" className={homeStyles.ghost}>
+                  <button type="button" className={`${homeStyles.ghost} ${styles.heroActionBtn}`}>
                     + My List
                   </button>
                 </div>
