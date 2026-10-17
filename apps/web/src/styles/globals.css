@@ -36518,7 +36518,8 @@
 }
 
 @media (min-width: 1024px) {
-  .site-header--shell-embedded {
+  /* Mobile storefront header embedded in admin shell — desktop uses AdminTopbar */
+  .admin-panel:not(.customer-panel) .site-header--shell-embedded {
     display: none !important;
   }
 }
