@@ -10,6 +10,37 @@
   padding: 24px 20px;
   background: rgb(var(--bg));
   color: rgb(var(--fg));
+  --login-art-deep: #0a6258;
+  --login-art-brand: #0d9488;
+  --login-art-accent: #0f766e;
+  --login-art-highlight: #115e59;
+  --login-art-dot: #0d9488;
+  --login-art-ring-a: 0.58;
+  --login-art-ring-b: 0.82;
+  --login-art-ring-c: 0.62;
+  --login-art-satellite: 0.78;
+  --login-art-inner-shield: 0.55;
+  --login-art-dots-pattern: 0.42;
+  --login-art-scribble: 0.62;
+  --login-art-scan-peak: 0.55;
+}
+
+:global(.dark) .page,
+:global([data-theme="dark"]) .page,
+:global([data-theme="gaming"]) .page,
+:global([data-theme="amoled"]) .page {
+  --login-art-brand: #26bfb0;
+  --login-art-accent: #5eead4;
+  --login-art-highlight: #5eead4;
+  --login-art-dot: #5eead4;
+  --login-art-ring-a: 0.35;
+  --login-art-ring-b: 0.7;
+  --login-art-ring-c: 0.35;
+  --login-art-satellite: 0.55;
+  --login-art-inner-shield: 0.4;
+  --login-art-dots-pattern: 0.22;
+  --login-art-scribble: 0.35;
+  --login-art-scan-peak: 0.45;
 }
 
 .page::before,
@@ -19,9 +50,9 @@
   height: 280px;
   content: "";
   pointer-events: none;
-  background-image: radial-gradient(#26bfb0 1.2px, transparent 1.4px);
+  background-image: radial-gradient(var(--login-art-brand) 1.2px, transparent 1.4px);
   background-size: 18px 18px;
-  opacity: 0.22;
+  opacity: var(--login-art-dots-pattern);
 }
 
 .page::before {
@@ -39,8 +70,24 @@
 .scribble {
   position: absolute;
   pointer-events: none;
-  opacity: 0.35;
+  opacity: var(--login-art-scribble);
   animation: scribbleFloat 7s ease-in-out infinite;
+}
+
+.scribbleStrokeBrand {
+  stroke: var(--login-art-brand);
+}
+
+.scribbleStrokeDeep {
+  stroke: var(--login-art-deep);
+}
+
+.scribbleFillBrand {
+  fill: var(--login-art-brand);
+}
+
+.scribbleFillAccent {
+  fill: var(--login-art-accent);
 }
 
 .scribble path {

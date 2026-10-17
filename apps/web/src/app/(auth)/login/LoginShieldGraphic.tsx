@@ -18,9 +18,13 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id="loginShieldScan" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#5EEAD4" stopOpacity="0" />
-          <stop offset="50%" stopColor="#5EEAD4" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#5EEAD4" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--login-art-highlight)" stopOpacity="0" />
+          <stop
+            offset="50%"
+            stopColor="var(--login-art-highlight)"
+            stopOpacity="var(--login-art-scan-peak)"
+          />
+          <stop offset="100%" stopColor="var(--login-art-highlight)" stopOpacity="0" />
         </linearGradient>
         <clipPath id="loginShieldClip">
           <path d="M200 168 L262 198 L262 276 C262 328 230 364 200 388 C170 364 138 328 138 276 L138 198 Z" />
@@ -32,18 +36,18 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
           cx="200"
           cy="255"
           r="78"
-          stroke="#0A6258"
-          strokeWidth="0.6"
-          opacity="0.35"
+          stroke="var(--login-art-deep)"
+          strokeWidth="0.75"
+          opacity="var(--login-art-ring-a)"
         />
         <circle
           cx="200"
           cy="255"
           r="78"
-          stroke="#26BFB0"
-          strokeWidth="1.1"
+          stroke="var(--login-art-brand)"
+          strokeWidth="1.25"
           strokeDasharray="6 14"
-          opacity="0.7"
+          opacity="var(--login-art-ring-b)"
         />
       </g>
       <g className={styles.ringMid}>
@@ -51,10 +55,10 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
           cx="200"
           cy="255"
           r="112"
-          stroke="#26BFB0"
-          strokeWidth="0.8"
+          stroke="var(--login-art-brand)"
+          strokeWidth="0.95"
           strokeDasharray="2 10"
-          opacity="0.45"
+          opacity="var(--login-art-ring-c)"
         />
       </g>
       <g className={styles.ringFast}>
@@ -62,10 +66,10 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
           cx="200"
           cy="255"
           r="148"
-          stroke="#5EEAD4"
-          strokeWidth="0.7"
+          stroke="var(--login-art-accent)"
+          strokeWidth="0.85"
           strokeDasharray="18 22"
-          opacity="0.35"
+          opacity="var(--login-art-ring-c)"
         />
       </g>
 
@@ -83,8 +87,8 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
               cx={200 + orbit.radius}
               cy="255"
               r={index % 3 === 0 ? 2.4 : 1.5}
-              fill="#5EEAD4"
-              opacity="0.85"
+              fill="var(--login-art-dot)"
+              opacity="0.92"
             />
           </g>
         )),
@@ -92,23 +96,38 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
 
       <g className={styles.satellite}>
         <g transform="translate(68 92)">
-          <circle r="16" stroke="#26BFB0" strokeWidth="1" opacity="0.55" />
-          <circle r="7" stroke="#5EEAD4" strokeWidth="1.1" />
-          <circle r="2.2" fill="#5EEAD4" />
+          <circle
+            r="16"
+            stroke="var(--login-art-brand)"
+            strokeWidth="1.1"
+            opacity="var(--login-art-satellite)"
+          />
+          <circle r="7" stroke="var(--login-art-accent)" strokeWidth="1.2" />
+          <circle r="2.2" fill="var(--login-art-accent)" />
         </g>
       </g>
       <g className={styles.satelliteRev}>
         <g transform="translate(332 118)">
-          <circle r="14" stroke="#26BFB0" strokeWidth="1" opacity="0.5" />
-          <circle r="6" stroke="#5EEAD4" strokeWidth="1.1" />
-          <circle r="2" fill="#5EEAD4" />
+          <circle
+            r="14"
+            stroke="var(--login-art-brand)"
+            strokeWidth="1.1"
+            opacity="var(--login-art-satellite)"
+          />
+          <circle r="6" stroke="var(--login-art-accent)" strokeWidth="1.2" />
+          <circle r="2" fill="var(--login-art-accent)" />
         </g>
       </g>
       <g className={styles.satellite} style={{ animationDuration: "22s" }}>
         <g transform="translate(86 408)">
-          <circle r="13" stroke="#26BFB0" strokeWidth="1" opacity="0.5" />
-          <circle r="5.5" stroke="#5EEAD4" strokeWidth="1" />
-          <circle r="1.8" fill="#5EEAD4" />
+          <circle
+            r="13"
+            stroke="var(--login-art-brand)"
+            strokeWidth="1.1"
+            opacity="var(--login-art-satellite)"
+          />
+          <circle r="5.5" stroke="var(--login-art-accent)" strokeWidth="1.05" />
+          <circle r="1.8" fill="var(--login-art-accent)" />
         </g>
       </g>
 
@@ -116,15 +135,15 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
         <path
           className={styles.shieldStroke}
           d="M200 168 L262 198 L262 276 C262 328 230 364 200 388 C170 364 138 328 138 276 L138 198 Z"
-          stroke="#5EEAD4"
-          strokeWidth="2.4"
+          stroke="var(--login-art-accent)"
+          strokeWidth="2.6"
           pathLength="1"
         />
         <path
           d="M200 182 L248 206 L248 272 C248 314 224 344 200 364 C176 344 152 314 152 272 L152 206 Z"
-          stroke="#26BFB0"
-          strokeWidth="0.8"
-          opacity="0.4"
+          stroke="var(--login-art-brand)"
+          strokeWidth="0.95"
+          opacity="var(--login-art-inner-shield)"
         />
         <g clipPath="url(#loginShieldClip)">
           <rect
@@ -139,8 +158,8 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
         <g className={styles.padlock}>
           <path
             d="M184 248 C184 232 216 232 216 248"
-            stroke="#5EEAD4"
-            strokeWidth="4.2"
+            stroke="var(--login-art-accent)"
+            strokeWidth="4.4"
             strokeLinecap="round"
           />
           <rect
@@ -149,14 +168,14 @@ export function LoginShieldGraphic({ className }: { className?: string }) {
             width="48"
             height="38"
             rx="7"
-            stroke="#5EEAD4"
-            strokeWidth="2.6"
+            stroke="var(--login-art-accent)"
+            strokeWidth="2.8"
           />
-          <circle cx="200" cy="262" r="3.4" fill="#5EEAD4" />
+          <circle cx="200" cy="262" r="3.4" fill="var(--login-art-accent)" />
           <path
             d="M200 265.5 V276"
-            stroke="#5EEAD4"
-            strokeWidth="2.6"
+            stroke="var(--login-art-accent)"
+            strokeWidth="2.8"
             strokeLinecap="round"
           />
         </g>

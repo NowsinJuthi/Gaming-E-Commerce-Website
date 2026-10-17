@@ -13,11 +13,11 @@ export function AuthPageShell({ children }: { children: ReactNode }) {
       >
         <path
           d="M8 42 C28 8, 58 62, 88 22 S138 8, 152 36"
-          stroke="#26BFB0"
+          className={styles.scribbleStrokeBrand}
           strokeWidth="1.4"
         />
-        <circle cx="24" cy="18" r="3" fill="#26BFB0" />
-        <circle cx="118" cy="12" r="2.2" fill="#5EEAD4" />
+        <circle cx="24" cy="18" r="3" className={styles.scribbleFillBrand} />
+        <circle cx="118" cy="12" r="2.2" className={styles.scribbleFillAccent} />
       </svg>
       <svg
         className={`${styles.scribble} ${styles.scribbleBottom}`}
@@ -27,10 +27,14 @@ export function AuthPageShell({ children }: { children: ReactNode }) {
       >
         <path
           d="M10 48 C40 8, 70 72, 110 28 S160 18, 172 50"
-          stroke="#0A6258"
+          className={styles.scribbleStrokeDeep}
           strokeWidth="1.4"
         />
-        <polygon points="150,18 158,32 142,32" stroke="#26BFB0" fill="none" />
+        <polygon
+          points="150,18 158,32 142,32"
+          className={styles.scribbleStrokeBrand}
+          fill="none"
+        />
       </svg>
 
       <div className={styles.card}>
