@@ -1055,8 +1055,15 @@ function MovieInfo({
             <p className={styles.overviewMuted}>No description available.</p>
           )}
           <div className={styles.actions}>
-            <span className={styles.ghost}>+ My List</span>
-            <span className={styles.ghost}>Mark watched</span>
+            <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
+              <span aria-hidden>▶</span> Play
+            </WatchPlayButton>
+            <button type="button" className={styles.ghost}>
+              + My List
+            </button>
+            <button type="button" className={styles.ghost}>
+              Mark watched
+            </button>
           </div>
           {details && (details.directors.length > 0 || details.writers.length > 0 || details.cast.length > 0) ? (
             <section className={styles.castSection}>
