@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { getRegistrationEmailPolicy, registerUser } from "@/lib/api";
 import { getRecaptchaToken, warmupRecaptcha } from "@/lib/recaptcha";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/password-rules";
@@ -69,7 +68,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthPageShell>
+    <>
       <header className="login-page__header">
         <h1 className="login-page__title">Create Your Account</h1>
         <p className="login-page__subtitle">
@@ -154,11 +153,15 @@ export default function RegisterPage() {
           <LoginSubmitIcon className="h-5 w-5" />
         </div>
         <p className="login-page__signup-text">Already have an account?</p>
-        <Link href="/login" className="btn-secondary login-page__signup-btn">
+        <Link
+          href="/login"
+          scroll={false}
+          className="btn-secondary login-page__signup-btn"
+        >
           <LoginSubmitIcon />
           Log in
         </Link>
       </div>
-    </AuthPageShell>
+    </>
   );
 }

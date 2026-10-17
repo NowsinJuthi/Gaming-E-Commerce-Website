@@ -29,8 +29,6 @@ import {
   VerifyLoginIcon,
 } from "@/components/auth/LoginAnimatedIcon";
 import { EyeIcon } from "@/components/admin/icons";
-import { AuthPageShell } from "@/components/auth/AuthPageShell";
-
 type Mode = "password" | "otp";
 
 type LoginFormProps = {
@@ -259,7 +257,7 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
 
   return (
     <>
-      <AuthPageShell>
+      <>
               <header className="login-page__header">
                 <h1 className="login-page__title">Welcome back</h1>
                 <p className="login-page__subtitle">
@@ -510,13 +508,14 @@ export function LoginForm({ nextPath, resetSuccess = false }: LoginFormProps) {
                 </p>
                 <Link
                   href="/register"
+                  scroll={false}
                   className="btn-secondary login-page__signup-btn"
                 >
                   <SignUpButtonIcon />
                   Create an account
                 </Link>
               </div>
-      </AuthPageShell>
+      </>
 
       <LoginWrongPasswordModal
         open={wrongPasswordOpen}

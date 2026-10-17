@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { LoginShieldGraphic } from "@/app/login/LoginShieldGraphic";
-import styles from "@/app/login/login.module.css";
+import { LoginShieldGraphic } from "@/app/(auth)/login/LoginShieldGraphic";
+import styles from "@/app/(auth)/login/login.module.css";
 
 export function AuthPageShell({ children }: { children: ReactNode }) {
   return (
