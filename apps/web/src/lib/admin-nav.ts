@@ -78,13 +78,6 @@ export const ADMIN_NAV: NavSection[] = [
     icon: GridIcon,
     items: [
       { href: "/admin", label: "Dashboard", icon: GridIcon, accent: "brand" },
-      {
-        href: "/admin/live-analytics",
-        label: "Live visitors",
-        icon: PulseIcon,
-        accent: "success",
-        keywords: ["realtime", "visitors", "counter", "media", "watching", "analytics"],
-      },
     ],
   },
   {
@@ -277,6 +270,12 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Dashboard",
             icon: ChartIcon,
             keywords: ["overview", "stats", "count", "libraries"],
+          },
+          {
+            href: "/admin/live-analytics",
+            label: "Live visitors",
+            icon: PulseIcon,
+            keywords: ["realtime", "visitors", "counter", "media", "watching", "analytics"],
           },
           {
             href: "/admin/collections",

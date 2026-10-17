@@ -59,7 +59,7 @@ export default function LiveAnalyticsAdminPage() {
 
   return (
     <AdminPageLayout
-      section="Administration"
+      section="Movie Server"
       title="Live visitors & media"
       description="Real-time site visitors and who is watching movies or series right now."
       icon={PulseIcon}
