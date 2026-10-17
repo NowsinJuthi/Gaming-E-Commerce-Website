@@ -176,3 +176,42 @@
   color: #26bfb0;
   font-weight: 600;
 }
+
+.quickLinks {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .quickLinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.quickLink {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgb(38 191 176 / 0.22);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  padding: 1rem 1.1rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.quickLink:hover {
+  border-color: rgb(38 191 176 / 0.45);
+  background: color-mix(in srgb, var(--card) 98%, rgb(38 191 176 / 8%));
+}
+
+.quickLinkLabel {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.quickLinkHint {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+}

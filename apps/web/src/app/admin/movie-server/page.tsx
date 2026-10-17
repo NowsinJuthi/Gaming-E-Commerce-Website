@@ -86,6 +86,17 @@ export default function MovieServerDashboardPage() {
           </div>
         </div>
 
+        <div className={styles.quickLinks}>
+          <Link href="/admin/movie-server/plans" className={styles.quickLink}>
+            <span className={styles.quickLinkLabel}>Plans</span>
+            <span className={styles.quickLinkHint}>Subscription tiers & pricing</span>
+          </Link>
+          <Link href="/admin/movie-server/subscriptions" className={styles.quickLink}>
+            <span className={styles.quickLinkLabel}>Subscriptions</span>
+            <span className={styles.quickLinkHint}>Grant access & manage subscribers</span>
+          </Link>
+        </div>
+
         <section className={styles.panel}>
           <div className={styles.panelHead}>
             <h2 className={styles.panelTitle}>Libraries</h2>

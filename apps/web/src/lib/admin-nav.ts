@@ -313,7 +313,6 @@ export const ADMIN_NAV: NavSection[] = [
             label: "Subscriptions",
             icon: ReceiptIcon,
             keywords: ["subscription", "grant", "trial", "movie", "access"],
-            requiredPermission: "view_media_subscriptions",
           },
         ],
       },

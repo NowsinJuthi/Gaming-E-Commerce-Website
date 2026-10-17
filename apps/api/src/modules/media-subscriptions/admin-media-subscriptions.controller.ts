@@ -10,10 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import {
@@ -25,13 +23,12 @@ import {
 import { MediaSubscriptionsService } from './media-subscriptions.service';
 
 @Controller('admin/media/subscriptions')
-@UseGuards(RolesGuard, PermissionsGuard)
+@UseGuards(RolesGuard)
 @Roles(Role.Administrator, Role.Admin)
 export class AdminMediaSubscriptionsController {
   constructor(private readonly subscriptions: MediaSubscriptionsService) {}
 
   @Get()
-  @Permissions('view_media_subscriptions')
   async list(@Query('userId') userId?: string, @Query('status') status?: string) {
     const rows = await this.subscriptions.listForAdmin(userId, status);
     return {
@@ -42,7 +39,6 @@ export class AdminMediaSubscriptionsController {
   }
 
   @Post()
-  @Permissions('manage_media_subscriptions')
   async grant(@Body() dto: AdminGrantMediaSubscriptionDto) {
     const sub = await this.subscriptions.grantComplimentary({
       userId: dto.userId,
@@ -54,7 +50,6 @@ export class AdminMediaSubscriptionsController {
   }
 
   @Patch(':id')
-  @Permissions('manage_media_subscriptions')
   async patch(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() dto: AdminPatchMediaSubscriptionDto,
@@ -64,7 +59,6 @@ export class AdminMediaSubscriptionsController {
   }
 
   @Post(':id/activate')
-  @Permissions('manage_media_subscriptions')
   async activate(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() dto: AdminActivateMediaPaymentDto,
@@ -77,7 +71,6 @@ export class AdminMediaSubscriptionsController {
   }
 
   @Post(':id/suspend')
-  @Permissions('manage_media_subscriptions')
   async suspend(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() dto: AdminSuspendMediaSubscriptionDto,
@@ -87,14 +80,12 @@ export class AdminMediaSubscriptionsController {
   }
 
   @Post(':id/unsuspend')
-  @Permissions('manage_media_subscriptions')
   async unsuspend(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
     const sub = await this.subscriptions.unsuspend(String(id));
     return { subscription: await this.subscriptions.toResponse(sub) };
   }
 
   @Delete(':id')
-  @Permissions('manage_media_subscriptions')
   async remove(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
     const result = await this.subscriptions.adminDelete(String(id));
     return { message: 'Subscription deleted.', ...result };

@@ -8,7 +8,6 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { ReceiptIcon } from "@/components/admin/icons";
 import { getCustomerDisplayName } from "@/lib/admin-order-view";
 import { adminListCustomers } from "@/lib/api";
-import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import {
   formatMediaPlanCents,
   mediaSubscriptionApi,
@@ -43,10 +42,6 @@ function statusClass(status: string): string {
 export default function MovieServerSubscriptionsPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const { can } = useAdminPermissions();
-  const canManage = can("manage_media_subscriptions");
-  const canView = can("view_media_subscriptions");
-
   const [filterUserId, setFilterUserId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
@@ -80,13 +75,11 @@ export default function MovieServerSubscriptionsPage() {
         userId: filterUserId || undefined,
         status: statusFilter || undefined,
       }),
-    enabled: canView,
   });
 
   const plansQuery = useQuery({
     queryKey: ["admin-media-plans"],
     queryFn: mediaSubscriptionApi.adminPlans,
-    enabled: canView,
   });
 
   const customerSearch = useQuery({
@@ -141,22 +134,6 @@ export default function MovieServerSubscriptionsPage() {
     },
   });
 
-  if (!canView) {
-    return (
-      <AdminPageLayout
-        section="Movie Server"
-        title="Subscriptions"
-        icon={ReceiptIcon}
-        description="You need the “View media subscriptions” permission."
-      >
-        <p className="text-sm text-white/60">
-          Ask an administrator to enable{" "}
-          <code className="text-white/80">view_media_subscriptions</code> for your role.
-        </p>
-      </AdminPageLayout>
-    );
-  }
-
   const plans = plansQuery.data?.plans ?? [];
   const rows = query.data?.subscriptions ?? [];
 
@@ -196,8 +173,7 @@ export default function MovieServerSubscriptionsPage() {
         </select>
       </div>
 
-      {canManage ? (
-        <section className="mb-8 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <section className="mb-8 rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <h2 className="text-base font-semibold text-white">Grant complimentary access</h2>
           <p className="mt-1 text-sm text-white/50">
             Replaces the customer&apos;s current movie subscription.
@@ -289,8 +265,7 @@ export default function MovieServerSubscriptionsPage() {
           {customerQuery ? (
             <p className="mt-2 text-xs text-white/40">Selected: {customerQuery}</p>
           ) : null}
-        </section>
-      ) : null}
+      </section>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="min-w-full text-left text-sm">
@@ -308,7 +283,6 @@ export default function MovieServerSubscriptionsPage() {
               <SubscriptionRow
                 key={row.id}
                 row={row}
-                canManage={canManage}
                 onAction={(action) => setPendingAction({ id: row.id, action })}
               />
             ))}
@@ -364,11 +338,9 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function SubscriptionRow({
   row,
-  canManage,
   onAction,
 }: {
   row: AdminSubscriptionRow;
-  canManage: boolean;
   onAction: (action: "suspend" | "unsuspend" | "activate" | "delete") => void;
 }) {
   const end = new Date(row.currentPeriodEnd).toLocaleString();
@@ -400,21 +372,17 @@ function SubscriptionRow({
       </td>
       <td className="px-4 py-3 text-white/70">{end}</td>
       <td className="px-4 py-3">
-        {canManage ? (
-          <div className="flex flex-wrap justify-end gap-1">
-            {row.status === SubscriptionStatus.Pending ? (
-              <ActionBtn label="Activate" onClick={() => onAction("activate")} />
-            ) : null}
-            {row.status === SubscriptionStatus.Suspended ? (
-              <ActionBtn label="Unsuspend" onClick={() => onAction("unsuspend")} />
-            ) : (
-              <ActionBtn label="Suspend" onClick={() => onAction("suspend")} />
-            )}
-            <ActionBtn label="Delete" onClick={() => onAction("delete")} danger />
-          </div>
-        ) : (
-          <span className="text-xs text-white/40">View only</span>
-        )}
+        <div className="flex flex-wrap justify-end gap-1">
+          {row.status === SubscriptionStatus.Pending ? (
+            <ActionBtn label="Activate" onClick={() => onAction("activate")} />
+          ) : null}
+          {row.status === SubscriptionStatus.Suspended ? (
+            <ActionBtn label="Unsuspend" onClick={() => onAction("unsuspend")} />
+          ) : (
+            <ActionBtn label="Suspend" onClick={() => onAction("suspend")} />
+          )}
+          <ActionBtn label="Delete" onClick={() => onAction("delete")} danger />
+        </div>
       </td>
     </tr>
   );
