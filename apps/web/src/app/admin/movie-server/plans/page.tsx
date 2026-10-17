@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminMediaPlanPackages } from "@/components/admin/media-plans/AdminMediaPlanPackages";
+import styles from "@/components/admin/media-plans/admin-media-plans.module.css";
 import { TagIcon } from "@/components/admin/icons";
 import {
   formatMediaPlanCents,
@@ -38,6 +40,11 @@ export default function MovieServerPlansPage() {
     queryKey: ["admin-media-plans"],
     queryFn: mediaSubscriptionApi.adminPlans,
   });
+
+  const plans = useMemo(
+    () => [...(query.data?.plans ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [query.data?.plans],
+  );
 
   const create = useMutation({
     mutationFn: () =>
@@ -94,187 +101,195 @@ export default function MovieServerPlansPage() {
     }));
   };
 
-  const plans = query.data?.plans ?? [];
-
   return (
     <AdminPageLayout
       section="Movie Server"
-      title="Plans"
-      description="Movie server subscription tiers. Prices are stored in minor units (e.g. poisha for BDT). Disabling blocks new signups."
+      title="Subscription plans"
+      description="Admin-only plan catalog. Prices are stored in cents. Disabling a plan blocks new signups."
       icon={TagIcon}
       loading={query.isLoading}
     >
-      {error ? (
-        <p className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-          {error}
-        </p>
-      ) : null}
+      <div className={styles.section}>
+        {error ? (
+          <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+            {error}
+          </p>
+        ) : null}
 
-      <form
-        className="mb-8 grid gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          create.mutate();
-        }}
-      >
-        <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} />
-        <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-        <label className="space-y-1 text-sm sm:col-span-2">
-          <span className="text-white/70">Description</span>
-          <input
-            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+        <AdminMediaPlanPackages plans={plans} />
+
+        <form
+          className={`${styles.card} ${styles.formGrid}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            create.mutate();
+          }}
+        >
+          <Field label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} />
+          <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+          <label className="sm:col-span-2">
+            <span className={styles.fieldLabel}>Description</span>
+            <input
+              className={styles.fieldInput}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </label>
+          <SelectField
+            label="Tier"
+            value={form.tier}
+            options={PLAN_TIERS.map((t) => ({ value: t, label: t }))}
+            onChange={(tier) => setForm({ ...form, tier })}
           />
-        </label>
-        <SelectField
-          label="Tier"
-          value={form.tier}
-          options={PLAN_TIERS.map((t) => ({ value: t, label: t }))}
-          onChange={(tier) => setForm({ ...form, tier })}
-        />
-        <SelectField
-          label="Max quality"
-          value={form.maxVideoQuality}
-          options={VIDEO_QUALITIES.map((q) => ({ value: q, label: q.toUpperCase() }))}
-          onChange={(maxVideoQuality) => setForm({ ...form, maxVideoQuality })}
-        />
-        <Field
-          label="Monthly price (minor units)"
-          type="number"
-          value={String(form.monthlyPriceCents)}
-          onChange={(v) => setForm({ ...form, monthlyPriceCents: Number(v) })}
-        />
-        <Field
-          label="Yearly price (minor units)"
-          type="number"
-          value={String(form.yearlyPriceCents)}
-          onChange={(v) => setForm({ ...form, yearlyPriceCents: Number(v) })}
-        />
-        <Field
-          label="Max devices"
-          type="number"
-          value={String(form.maxDevices)}
-          onChange={(v) => setForm({ ...form, maxDevices: Number(v) })}
-        />
-        <Field
-          label="Max streams"
-          type="number"
-          value={String(form.maxStreams)}
-          onChange={(v) => setForm({ ...form, maxStreams: Number(v) })}
-        />
-        <div className="sm:col-span-2">
-          <span className="text-sm text-white/70">Features</span>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {PLAN_FEATURES.map((feature) => (
-              <label key={feature} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.features.includes(feature)}
-                  onChange={() => toggleFeature(feature)}
-                />
-                {feature}
-              </label>
-            ))}
+          <SelectField
+            label="Max quality"
+            value={form.maxVideoQuality}
+            options={VIDEO_QUALITIES.map((q) => ({ value: q, label: q }))}
+            onChange={(maxVideoQuality) => setForm({ ...form, maxVideoQuality })}
+          />
+          <Field
+            label="Monthly price (cents)"
+            type="number"
+            value={String(form.monthlyPriceCents)}
+            onChange={(v) => setForm({ ...form, monthlyPriceCents: Number(v) })}
+          />
+          <Field
+            label="Yearly price (cents)"
+            type="number"
+            value={String(form.yearlyPriceCents)}
+            onChange={(v) => setForm({ ...form, yearlyPriceCents: Number(v) })}
+          />
+          <Field
+            label="Max devices"
+            type="number"
+            value={String(form.maxDevices)}
+            onChange={(v) => setForm({ ...form, maxDevices: Number(v) })}
+          />
+          <Field
+            label="Max streams"
+            type="number"
+            value={String(form.maxStreams)}
+            onChange={(v) => setForm({ ...form, maxStreams: Number(v) })}
+          />
+          <Field
+            label="Trial days"
+            type="number"
+            value={String(form.trialDays)}
+            onChange={(v) => setForm({ ...form, trialDays: Number(v) })}
+          />
+          <div className={styles.features}>
+            <span className={styles.fieldLabel}>Features</span>
+            <div className={styles.featureList}>
+              {PLAN_FEATURES.map((feature) => (
+                <label key={feature} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.features.includes(feature)}
+                    onChange={() => toggleFeature(feature)}
+                  />
+                  {feature}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            disabled={create.isPending}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
-          >
-            {create.isPending ? "Creating…" : "Create plan"}
-          </button>
-        </div>
-      </form>
+          <div className="sm:col-span-2">
+            <button type="submit" disabled={create.isPending} className={styles.primaryBtn}>
+              {create.isPending ? "Creating…" : "Create plan"}
+            </button>
+          </div>
+        </form>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-white/10 bg-white/[0.04] text-white/60">
-            <tr>
-              <th className="px-4 py-3 font-medium">Plan</th>
-              <th className="px-4 py-3 font-medium">Price</th>
-              <th className="px-4 py-3 font-medium">Limits</th>
-              <th className="px-4 py-3 font-medium">Active</th>
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plans.map((plan) => (
-              <tr key={plan.id} className="border-b border-white/5">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-white">{plan.name}</div>
-                  <div className="text-white/50">{plan.slug}</div>
-                </td>
-                <td className="px-4 py-3">
-                  {formatMediaPlanCents(plan.monthlyPriceCents, plan.currency)} / mo
-                </td>
-                <td className="px-4 py-3 text-white/70">
-                  {plan.maxVideoQuality.toUpperCase()} · {plan.maxStreams} streams ·{" "}
-                  {plan.maxDevices} devices
-                </td>
-                <td className="px-4 py-3">{plan.isActive ? "Yes" : "No"}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded-md border border-white/15 px-2 py-1 text-xs hover:bg-white/5"
-                      onClick={() => setEditPlan(plan)}
-                    >
-                      Edit
-                    </button>
-                    {plan.isActive ? (
-                      <button
-                        type="button"
-                        className="rounded-md border border-white/15 px-2 py-1 text-xs hover:bg-white/5"
-                        onClick={() => setPendingDisable(plan.id)}
-                      >
-                        Disable
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="rounded-md border border-white/15 px-2 py-1 text-xs hover:bg-white/5"
-                        disabled={enable.isPending}
-                        onClick={() => enable.mutate(plan.id)}
-                      >
-                        Enable
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!plans.length && !query.isLoading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-white/50">
-                  No plans yet. Defaults seed on API startup when the collection is empty.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+        <section className={styles.card}>
+          <p className={styles.previewHeading}>Plan catalog</p>
+          <p className={styles.mobileHint}>Swipe sideways to see all columns.</p>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Plan</th>
+                  <th>Price</th>
+                  <th>Limits</th>
+                  <th>Active</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((plan) => (
+                  <tr key={plan.id}>
+                    <td>
+                      <div className={styles.planTitle}>{plan.name}</div>
+                      <div className={styles.planSlug}>{plan.slug}</div>
+                    </td>
+                    <td className="tabular-nums">
+                      {formatMediaPlanCents(plan.monthlyPriceCents, plan.currency)} / mo
+                    </td>
+                    <td>
+                      {plan.maxVideoQuality.toUpperCase()} · {plan.maxStreams} streams ·{" "}
+                      {plan.maxDevices} devices
+                    </td>
+                    <td>{plan.isActive ? "Yes" : "No"}</td>
+                    <td>
+                      <div className={styles.actions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => setEditPlan(plan)}
+                        >
+                          Edit
+                        </button>
+                        {plan.isActive ? (
+                          <button
+                            type="button"
+                            className={styles.secondaryBtn}
+                            onClick={() => setPendingDisable(plan.id)}
+                          >
+                            Disable
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.secondaryBtn}
+                            disabled={enable.isPending}
+                            onClick={() => enable.mutate(plan.id)}
+                          >
+                            Enable
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!plans.length && !query.isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-foreground-muted">
+                      No plans yet. Basic, Standard, and Premium sync on API startup.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
       {pendingDisable ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-w-md rounded-xl border border-white/10 bg-[#1a1a24] p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Disable this plan?</h3>
-            <p className="mt-2 text-sm text-white/60">
-              Existing subscribers keep access. New signups will not see this plan.
+          <div className="max-w-md rounded-xl border border-border bg-elevated p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground">Disable this plan?</h3>
+            <p className="mt-2 text-sm text-foreground-muted">
+              Existing subscribers keep access. The plan will no longer be offered for new signups.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-white/15 px-3 py-1.5 text-sm"
+                className={styles.secondaryBtn}
                 onClick={() => setPendingDisable(null)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm hover:bg-rose-500 disabled:opacity-50"
+                className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
                 disabled={disable.isPending}
                 onClick={() => disable.mutate(pendingDisable)}
               >
@@ -309,11 +324,11 @@ function Field({
   type?: string;
 }) {
   return (
-    <label className="space-y-1 text-sm">
-      <span className="text-white/70">{label}</span>
+    <label>
+      <span className={styles.fieldLabel}>{label}</span>
       <input
         type={type}
-        className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+        className={styles.fieldInput}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -333,10 +348,10 @@ function SelectField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-1 text-sm">
-      <span className="text-white/70">{label}</span>
+    <label>
+      <span className={styles.fieldLabel}>{label}</span>
       <select
-        className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+        className={styles.fieldInput}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -370,27 +385,27 @@ function EditPlanModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a24] p-5">
-        <h3 className="text-lg font-semibold text-white">Edit {plan.slug}</h3>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-elevated p-5">
+        <h3 className="text-lg font-semibold text-foreground">Edit {plan.slug}</h3>
         <div className="mt-4 space-y-3">
           <Field label="Name" value={name} onChange={setName} />
-          <label className="block space-y-1 text-sm">
-            <span className="text-white/70">Description</span>
+          <label className="block">
+            <span className={styles.fieldLabel}>Description</span>
             <textarea
-              className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+              className={styles.fieldInput}
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>
           <Field
-            label="Monthly (minor units)"
+            label="Monthly price (cents)"
             type="number"
             value={String(monthly)}
             onChange={(v) => setMonthly(Number(v))}
           />
           <Field
-            label="Yearly (minor units)"
+            label="Yearly price (cents)"
             type="number"
             value={String(yearly)}
             onChange={(v) => setYearly(Number(v))}
@@ -411,17 +426,13 @@ function EditPlanModal({
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm"
-            onClick={onClose}
-          >
+          <button type="button" className={styles.secondaryBtn} onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
             disabled={pending}
-            className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm hover:bg-violet-500 disabled:opacity-50"
+            className={styles.primaryBtn}
             onClick={() =>
               onSave({
                 name: name.trim(),
