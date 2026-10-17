@@ -24,6 +24,7 @@ import { MEDIA_LIBRARY_KINDS, type MediaLibraryKind } from '../../database/schem
 import { smbVideoUploadMulterOptions } from '../../shared/uploads/smb-video-upload.multer';
 import { LibraryIndexService } from './library-index.service';
 import { MediaOpsService } from './media-ops.service';
+import { MovieServerHostMetricsService } from './movie-server-host-metrics.service';
 
 class LibraryBody {
   @IsString()
@@ -161,6 +162,7 @@ export class MediaOpsController {
   constructor(
     private readonly media: MediaOpsService,
     private readonly index: LibraryIndexService,
+    private readonly hostMetrics: MovieServerHostMetricsService,
   ) {}
 
   @Get('admin/libraries')
@@ -171,6 +173,11 @@ export class MediaOpsController {
   @Get('admin/movie-server/dashboard')
   movieServerDashboard() {
     return this.media.movieServerDashboard();
+  }
+
+  @Get('admin/movie-server/host-metrics')
+  movieServerHostMetrics() {
+    return this.hostMetrics.snapshot();
   }
 
   @Post('admin/libraries')

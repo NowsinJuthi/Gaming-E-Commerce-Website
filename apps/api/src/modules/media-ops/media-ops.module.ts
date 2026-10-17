@@ -20,6 +20,7 @@ import { MediaPlaybackService } from './media-playback.service';
 import { SmbClientService } from './smb-client.service';
 import { SmbMountService } from './smb-mount.service';
 import { TmdbMetadataService } from './tmdb-metadata.service';
+import { MovieServerHostMetricsService } from './movie-server-host-metrics.service';
 
 @Module({
   imports: [
@@ -31,6 +32,15 @@ import { TmdbMetadataService } from './tmdb-metadata.service';
     CryptoModule,
   ],
   controllers: [MediaOpsController, CatalogController, MediaPlaybackController],
-  providers: [MediaOpsService, SmbClientService, SmbMountService, CatalogService, LibraryIndexService, TmdbMetadataService, MediaPlaybackService],
+  providers: [
+    MediaOpsService,
+    SmbClientService,
+    SmbMountService,
+    CatalogService,
+    LibraryIndexService,
+    TmdbMetadataService,
+    MediaPlaybackService,
+    MovieServerHostMetricsService,
+  ],
 })
 export class MediaOpsModule {}

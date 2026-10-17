@@ -61,6 +61,44 @@ export function getMovieServerDashboard() {
   }>("/admin/movie-server/dashboard");
 }
 
+export type MovieServerStorageBreakdown = {
+  name: string;
+  bytes: number;
+  external?: boolean;
+};
+
+export type MovieServerHostMetrics = {
+  timestamp: string;
+  cpu: {
+    usagePercent: number | null;
+    cores: number;
+    load1: number;
+    load5: number;
+    load15: number;
+  };
+  memory: {
+    totalMb: number;
+    usedMb: number;
+    freeMb: number;
+    usedPercent: number;
+    apiRssMb: number;
+  };
+  storage: {
+    uploadsPath: string;
+    diskTotalGb: number;
+    diskUsedGb: number;
+    diskFreeGb: number;
+    diskUsedPercent: number;
+    uploadsBytes: number;
+    breakdown: MovieServerStorageBreakdown[];
+    tempPlaybackBytes: number;
+  };
+};
+
+export function getMovieServerHostMetrics() {
+  return authRequest<MovieServerHostMetrics>("/admin/movie-server/host-metrics");
+}
+
 export function createMediaLibrary(body: {
   name: string;
   kind: MediaLibraryKind;

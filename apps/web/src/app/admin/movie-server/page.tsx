@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { ChartIcon } from "@/components/admin/icons";
 import styles from "@/components/admin/movie-server-dashboard.module.css";
+import { MovieServerHostMetricsPanel } from "@/components/admin/MovieServerHostMetricsPanel";
 import {
   getMovieServerDashboard,
   type MovieServerDashboardLibrary,
@@ -85,6 +86,8 @@ export default function MovieServerDashboardPage() {
             <span className={styles.statValue}>{loading ? "—" : totals.catalog.toLocaleString()}</span>
           </div>
         </div>
+
+        <MovieServerHostMetricsPanel />
 
         <div className={styles.quickLinks}>
           <Link href="/admin/movie-server/plans" className={styles.quickLink}>
