@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  CloudUploadIcon,
+  GridIcon,
+  ZapIcon,
+} from "@/components/admin/icons";
+import {
   getMovieServerHostMetrics,
   type MovieServerHostMetrics,
 } from "@/lib/media-ops-api";
@@ -136,14 +141,19 @@ export function MovieServerHostMetricsPanel() {
   const memHistory = history.map((s) => s.mem);
 
   return (
-    <section className={styles.panel}>
+    <section className={`${styles.panel} ${styles.panelServer}`}>
       <div className={styles.panelHead}>
         <div className={styles.hostHeadRow}>
-          <div>
-            <h2 className={styles.panelTitle}>Server resources</h2>
-            <p className={styles.panelHint}>
-              Live CPU, RAM, and website storage on the API host — updates every {POLL_MS / 1000}s.
-            </p>
+          <div className={styles.panelTitleBlock}>
+            <span className={`${styles.panelIcon} ${styles.panelIconServer}`} aria-hidden>
+              <ZapIcon className={styles.panelIconSvg} />
+            </span>
+            <div>
+              <h2 className={styles.panelTitle}>Server resources</h2>
+              <p className={styles.panelHint}>
+                Live CPU, RAM, and website storage on the API host — updates every {POLL_MS / 1000}s.
+              </p>
+            </div>
           </div>
           <span className={styles.liveBadge} title={metrics?.timestamp ?? ""}>
             <span className={styles.liveDot} aria-hidden />
@@ -166,8 +176,11 @@ export function MovieServerHostMetricsPanel() {
         {metrics ? (
           <>
             <div className={styles.hostGrid}>
-              <div className={styles.hostCard}>
-                <h3 className={styles.hostCardTitle}>CPU</h3>
+              <div className={`${styles.hostCard} ${styles.hostCardEnter}`}>
+                <h3 className={styles.hostCardTitle}>
+                  <ZapIcon className={styles.hostCardIcon} aria-hidden />
+                  CPU
+                </h3>
                 <Meter
                   label="Usage"
                   value={metrics.cpu.usagePercent}
@@ -175,8 +188,11 @@ export function MovieServerHostMetricsPanel() {
                 />
                 <Sparkline values={cpuHistory} color="#26bfb0" />
               </div>
-              <div className={styles.hostCard}>
-                <h3 className={styles.hostCardTitle}>Memory</h3>
+              <div className={`${styles.hostCard} ${styles.hostCardEnter}`}>
+                <h3 className={styles.hostCardTitle}>
+                  <GridIcon className={styles.hostCardIcon} aria-hidden />
+                  Memory
+                </h3>
                 <Meter
                   label="Host RAM used"
                   value={metrics.memory.usedPercent}
@@ -185,8 +201,11 @@ export function MovieServerHostMetricsPanel() {
                 />
                 <Sparkline values={memHistory} color="#a89bff" />
               </div>
-              <div className={styles.hostCard}>
-                <h3 className={styles.hostCardTitle}>Disk (uploads volume)</h3>
+              <div className={`${styles.hostCard} ${styles.hostCardEnter}`}>
+                <h3 className={styles.hostCardTitle}>
+                  <CloudUploadIcon className={styles.hostCardIcon} aria-hidden />
+                  Disk (uploads volume)
+                </h3>
                 <Meter
                   label="Filesystem used"
                   value={metrics.storage.diskUsedPercent}

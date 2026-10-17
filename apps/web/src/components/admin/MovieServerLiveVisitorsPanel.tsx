@@ -8,6 +8,7 @@ import {
   type LiveAnalyticsSnapshot,
 } from "@/lib/live-analytics-api";
 import { getLiveAnalyticsSocket } from "@/lib/live-analytics-socket";
+import { PulseIcon } from "@/components/admin/icons";
 import styles from "@/components/admin/movie-server-dashboard.module.css";
 
 function formatWhen(ms: number): string {
@@ -58,14 +59,19 @@ export function MovieServerLiveVisitorsPanel() {
   const mediaSessions = snapshot?.mediaSessions ?? [];
 
   return (
-    <section className={styles.panel}>
+    <section className={`${styles.panel} ${styles.panelLive}`}>
       <div className={styles.panelHead}>
         <div className={styles.hostHeadRow}>
-          <div>
-            <h2 className={styles.panelTitle}>Live visitors & playback</h2>
-            <p className={styles.panelHint}>
-              Real-time site presence and who is watching movies or series right now.
-            </p>
+          <div className={styles.panelTitleBlock}>
+            <span className={`${styles.panelIcon} ${styles.panelIconLive}`} aria-hidden>
+              <PulseIcon className={styles.panelIconSvg} />
+            </span>
+            <div>
+              <h2 className={styles.panelTitle}>Live visitors & playback</h2>
+              <p className={styles.panelHint}>
+                Real-time site presence and who is watching movies or series right now.
+              </p>
+            </div>
           </div>
           <span className={styles.liveBadge} title={snapshot ? formatWhen(snapshot.updatedAt) : ""}>
             <span className={styles.liveDot} aria-hidden />

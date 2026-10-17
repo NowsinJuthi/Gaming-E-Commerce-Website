@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
-import { ChartIcon } from "@/components/admin/icons";
+import {
+  ArrowRightIcon,
+  BoxIcon,
+  ChartIcon,
+  LayersIcon,
+  ReceiptIcon,
+  RefreshIcon,
+  TagIcon,
+} from "@/components/admin/icons";
 import styles from "@/components/admin/movie-server-dashboard.module.css";
 import { MovieServerHostMetricsPanel } from "@/components/admin/MovieServerHostMetricsPanel";
 import { MovieServerLiveVisitorsPanel } from "@/components/admin/MovieServerLiveVisitorsPanel";
@@ -11,6 +19,17 @@ import {
   getMovieServerDashboard,
   type MovieServerDashboardLibrary,
 } from "@/lib/media-ops-api";
+
+const CATALOG_STATS = [
+  { key: "libraries" as const, label: "Libraries", icon: LayersIcon, tone: "teal" },
+  { key: "movies" as const, label: "Total movies", icon: BoxIcon, tone: "cyan" },
+  { key: "series" as const, label: "Total series", icon: ChartIcon, tone: "violet" },
+  { key: "catalog" as const, label: "Catalog titles", icon: TagIcon, tone: "gold" },
+] as const;
+
+function staggerStyle(index: number): CSSProperties {
+  return { "--ms-stagger": index } as CSSProperties;
+}
 
 export default function MovieServerDashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -48,7 +67,7 @@ export default function MovieServerDashboardPage() {
       action={
         <button
           type="button"
-          className={`${styles.refreshBtn} rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium hover:bg-white/10`}
+          className={`${styles.refreshBtn} ${loading ? styles.refreshBtnLoading : ""}`}
           disabled={loading}
           onClick={() => {
             setLoading(true);
@@ -59,57 +78,94 @@ export default function MovieServerDashboardPage() {
               .finally(() => setLoading(false));
           }}
         >
+          <RefreshIcon className={styles.refreshIcon} aria-hidden />
           Refresh
         </button>
       }
     >
       <div className={styles.layout}>
+        <div className={styles.ambientGlow} aria-hidden />
+
         {error ? (
           <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
             {error}
           </p>
         ) : null}
 
-        <div className={styles.stats}>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Libraries</span>
-            <span className={styles.statValue}>{loading ? "—" : totals.libraries}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Total movies</span>
-            <span className={styles.statValue}>{loading ? "—" : totals.movies.toLocaleString()}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Total series</span>
-            <span className={styles.statValue}>{loading ? "—" : totals.series.toLocaleString()}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Catalog titles</span>
-            <span className={styles.statValue}>{loading ? "—" : totals.catalog.toLocaleString()}</span>
-          </div>
+        <div className={`${styles.stats} ${styles.sectionAnim}`} style={staggerStyle(0)}>
+          {CATALOG_STATS.map((item) => {
+            const Icon = item.icon;
+            const raw = totals[item.key];
+            const display =
+              loading ? "—" : item.key === "libraries" ? String(raw) : raw.toLocaleString();
+            return (
+              <div
+                key={item.key}
+                className={`${styles.stat} ${styles.statCard} ${styles[`statTone_${item.tone}`]}`}
+              >
+                <span className={styles.statIconWrap} aria-hidden>
+                  <Icon className={styles.statIcon} />
+                </span>
+                <div className={styles.statBody}>
+                  <span className={styles.statLabel}>{item.label}</span>
+                  <span
+                    className={`${styles.statValue} ${loading ? "" : styles.statValueReady}`}
+                  >
+                    {display}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <MovieServerHostMetricsPanel />
+        <div className={styles.sectionAnim} style={staggerStyle(1)}>
+          <MovieServerHostMetricsPanel />
+        </div>
 
-        <MovieServerLiveVisitorsPanel />
+        <div className={styles.sectionAnim} style={staggerStyle(2)}>
+          <MovieServerLiveVisitorsPanel />
+        </div>
 
-        <div className={styles.quickLinks}>
+        <div className={`${styles.quickLinks} ${styles.sectionAnim}`} style={staggerStyle(3)}>
           <Link href="/admin/movie-server/plans" className={styles.quickLink}>
-            <span className={styles.quickLinkLabel}>Subscription plans</span>
-            <span className={styles.quickLinkHint}>Subscription tiers & pricing</span>
+            <span className={`${styles.quickLinkIcon} ${styles.quickLinkIconPlans}`}>
+              <TagIcon className={styles.quickLinkSvg} aria-hidden />
+            </span>
+            <span className={styles.quickLinkText}>
+              <span className={styles.quickLinkLabel}>Subscription plans</span>
+              <span className={styles.quickLinkHint}>Subscription tiers & pricing</span>
+            </span>
+            <ArrowRightIcon className={styles.quickLinkArrow} aria-hidden />
           </Link>
           <Link href="/admin/movie-server/subscriptions" className={styles.quickLink}>
-            <span className={styles.quickLinkLabel}>Subscriptions</span>
-            <span className={styles.quickLinkHint}>Grant access & manage subscribers</span>
+            <span className={`${styles.quickLinkIcon} ${styles.quickLinkIconSubs}`}>
+              <ReceiptIcon className={styles.quickLinkSvg} aria-hidden />
+            </span>
+            <span className={styles.quickLinkText}>
+              <span className={styles.quickLinkLabel}>Subscriptions</span>
+              <span className={styles.quickLinkHint}>Grant access & manage subscribers</span>
+            </span>
+            <ArrowRightIcon className={styles.quickLinkArrow} aria-hidden />
           </Link>
         </div>
 
-        <section className={styles.panel}>
+        <section
+          className={`${styles.panel} ${styles.panelLibraries} ${styles.sectionAnim}`}
+          style={staggerStyle(4)}
+        >
           <div className={styles.panelHead}>
-            <h2 className={styles.panelTitle}>Libraries</h2>
-            <p className={styles.panelHint}>
-              Counts come from published catalog entries linked to each library folder.
-            </p>
+            <div className={styles.panelTitleBlock}>
+              <span className={`${styles.panelIcon} ${styles.panelIconLibraries}`} aria-hidden>
+                <LayersIcon className={styles.panelIconSvg} />
+              </span>
+              <div>
+                <h2 className={styles.panelTitle}>Libraries</h2>
+                <p className={styles.panelHint}>
+                  Counts come from published catalog entries linked to each library folder.
+                </p>
+              </div>
+            </div>
           </div>
           {loading ? (
             <p className={styles.empty}>Loading…</p>
