@@ -8,7 +8,8 @@
   overflow: hidden;
   box-sizing: border-box;
   padding: 24px 20px;
-  background: #01131a;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
 }
 
 .page::before,
@@ -71,10 +72,12 @@
   min-height: 590px;
   justify-content: flex-end;
   overflow: hidden;
-  border: 1px solid rgb(38 191 176 / 0.16);
+  border: 1px solid rgb(var(--border) / 0.4);
   border-radius: 18px;
-  background: #01131a;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.35);
+  background: rgb(var(--bg-elevated));
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.12),
+    0 0 0 1px rgb(var(--brand) / 0.06);
   animation:
     cardIn 0.85s ease both,
     cardGlow 4.5s ease-in-out infinite 0.85s;
@@ -131,35 +134,7 @@
 }
 
 .formPanel :global(.login-page__title) {
-  color: #e8f6f8;
   font-size: 28px;
-}
-
-.formPanel :global(.login-page__subtitle) {
-  color: #8aa3aa;
-}
-
-.formPanel :global(.login-page__tabs) {
-  margin-top: 20px;
-  border-color: rgb(38 191 176 / 0.24);
-  background: rgb(2 31 39 / 0.72);
-}
-
-.formPanel :global(.login-page__tab) {
-  color: #78969c;
-}
-
-.formPanel :global(.login-page__tab:hover:not(.login-page__tab--active)) {
-  color: #c7e9e8;
-  background: rgb(38 191 176 / 0.07);
-}
-
-.formPanel :global(.login-page__tab--active) {
-  color: #5eead4;
-  background: rgb(38 191 176 / 0.13);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.18),
-    0 0 0 1px rgb(38 191 176 / 0.22);
 }
 
 .formPanel :global(.login-page__alert) {
@@ -170,26 +145,22 @@
   margin-top: 20px;
 }
 
-.formPanel :global(.login-page__label) {
-  color: #9bb8be;
-}
-
 .formPanel :global(.login-page__field) {
-  border: 1px solid rgb(38 191 176 / 0.52);
+  border: 1px solid rgb(var(--border) / 0.55);
   border-radius: 10px;
-  background: rgb(1 19 26 / 0.76);
+  background: rgb(var(--bg-elevated));
   transition:
     border-color 0.25s ease,
     box-shadow 0.25s ease;
 }
 
 .formPanel :global(.login-page__field:focus-within) {
-  border-color: #5eead4;
-  box-shadow: 0 0 0 3px rgb(38 191 176 / 0.2);
+  border-color: rgb(var(--brand));
+  box-shadow: 0 0 0 3px rgb(var(--brand) / 0.2);
 }
 
 .formPanel :global(.login-page__field-icon) {
-  color: #49cfc1;
+  color: rgb(var(--brand));
 }
 
 .formPanel :global(.input-field.login-page__input) {
@@ -197,7 +168,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #e8f6f8;
+  color: rgb(var(--fg));
   box-shadow: none;
 }
 
@@ -208,54 +179,11 @@
 }
 
 .formPanel :global(.input-field.login-page__input::placeholder) {
-  color: #5f7a80;
-}
-
-.formPanel :global(.login-page__forgot-link) {
-  color: #5eead4;
+  color: rgb(var(--fg-muted));
 }
 
 .formPanel :global(.btn-primary) {
   min-height: 44px;
-  border: 1px solid #26bfb0;
-  border-radius: 0.75rem;
-  background: #26bfb0;
-  color: #fff;
-  box-shadow: none;
-}
-
-.formPanel :global(.btn-primary:hover) {
-  filter: brightness(1.07);
-}
-
-.formPanel :global(.btn-ghost) {
-  color: #9bb8be;
-}
-
-.formPanel :global(.login-page__signup) {
-  margin-top: 22px;
-  gap: 8px;
-  border-color: rgb(38 191 176 / 0.2);
-  background: rgb(2 31 39 / 0.56);
-  padding: 15px 18px;
-}
-
-.formPanel :global(.login-page__signup-icon) {
-  width: 38px;
-  height: 38px;
-  border-color: rgb(38 191 176 / 0.3);
-  background: rgb(38 191 176 / 0.12);
-  color: #5eead4;
-}
-
-.formPanel :global(.login-page__signup-text) {
-  color: #8aa3aa;
-}
-
-.formPanel :global(.btn-secondary) {
-  border-color: rgb(38 191 176 / 0.42);
-  background: rgb(38 191 176 / 0.08);
-  color: #5eead4;
 }
 
 .ringSlow,
@@ -337,7 +265,7 @@
     min-height: calc(100dvh - 4rem);
     border: 0;
     border-radius: 0;
-    background: #01131a;
+    background: rgb(var(--bg));
     box-shadow: none;
     animation: cardIn 0.6s ease both;
   }
@@ -381,13 +309,13 @@
   0%,
   100% {
     box-shadow:
-      0 24px 60px rgb(0 0 0 / 0.35),
-      0 0 18px rgb(38 191 176 / 0.08);
+      0 24px 60px rgb(0 0 0 / 0.12),
+      0 0 18px rgb(var(--brand) / 0.08);
   }
   50% {
     box-shadow:
-      0 24px 60px rgb(0 0 0 / 0.35),
-      0 0 36px rgb(38 191 176 / 0.2);
+      0 24px 60px rgb(0 0 0 / 0.12),
+      0 0 36px rgb(var(--brand) / 0.2);
   }
 }
 

@@ -16192,6 +16192,11 @@
     @apply border text-sm leading-relaxed;
     border-color: rgb(244 63 94 / 0.45);
     background: rgb(244 63 94 / 0.12);
+    color: rgb(190 18 60);
+  }
+
+  :is(.dark, [data-theme="dark"], [data-theme="gaming"], [data-theme="amoled"])
+    .login-page__alert--error {
     color: rgb(254 205 211);
   }
 
