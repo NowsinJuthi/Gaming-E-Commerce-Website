@@ -1,0 +1,10 @@
+.root {
+  --primary: rgb(var(--brand));
+  --primary-foreground: rgb(255 255 255);
+  --foreground: rgb(var(--fg));
+  --muted-foreground: rgb(var(--fg-muted));
+  --card: rgb(var(--bg-elevated));
+  --border: rgb(var(--border));
+  --background: rgb(var(--bg));
+  --muted: rgb(var(--bg-muted));
+}

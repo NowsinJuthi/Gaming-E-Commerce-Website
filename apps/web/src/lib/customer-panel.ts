@@ -167,7 +167,7 @@ export const PANEL_NAV: PanelNavItem[] = [
   },
   {
     key: "movie_subscription",
-    label: "Movie subscription",
+    label: "Subscription",
     href: "/dashboard/subscription",
     section: "account",
     accountCategory: "wallet-orders",

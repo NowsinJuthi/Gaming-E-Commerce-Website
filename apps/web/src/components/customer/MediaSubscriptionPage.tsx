@@ -1,48 +1,82 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CustomerPageLayout } from "@/components/customer/CustomerPageLayout";
+import { SubscribePricingSection } from "@/components/customer/media-subscription/subscribe-pricing-section";
+import themeStyles from "@/components/customer/media-subscription/media-subscription-theme.module.css";
+import styles from "@/components/customer/media-subscription/subscription-page.module.css";
 import { hasAuthSession } from "@/lib/access-token";
 import {
   formatMediaPlanCents,
   mediaSubscriptionApi,
 } from "@/lib/media-subscription-api";
 import {
-  BILLING_CYCLES,
   BillingCycle,
-  PLAN_TIERS,
   SubscriptionStatus,
-  type PublicPlan,
   type PublicSubscription,
 } from "@/lib/media-subscription-types";
+
+function cn(...parts: (string | false | undefined)[]) {
+  return parts.filter(Boolean).join(" ");
+}
 
 function formatStatus(status: string) {
   return status.replaceAll("_", " ");
 }
 
-function planFeatures(plan: PublicPlan): string[] {
-  if (plan.featureBullets?.length) return plan.featureBullets;
-  const lines: string[] = [];
-  lines.push(`${plan.maxVideoQuality.toUpperCase()} streaming`);
-  lines.push(`${plan.maxStreams} stream${plan.maxStreams === 1 ? "" : "s"} · ${plan.maxDevices} devices`);
-  if (plan.trialDays > 0) lines.push(`${plan.trialDays}-day free trial`);
-  return lines;
+function CreditCardIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M2 10h20" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <circle cx="17" cy="13" r="1.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M8 5v14l11-7L8 5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function MediaSubscriptionPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [cycle, setCycle] = useState<BillingCycle>(BillingCycle.Monthly);
   const [planError, setPlanError] = useState<string | null>(null);
 
+  const loginNext = encodeURIComponent(pathname || "/dashboard/subscription");
+
   useEffect(() => {
     if (!hasAuthSession()) {
-      router.replace("/login?next=/dashboard/subscription");
+      router.replace(`/login?next=${loginNext}`);
     }
-  }, [router]);
+  }, [router, loginNext]);
 
   const plansQuery = useQuery({
     queryKey: ["media-plans-public"],
@@ -61,8 +95,14 @@ export function MediaSubscriptionPage() {
     enabled: hasAuthSession(),
   });
 
+  const changesQuery = useQuery({
+    queryKey: ["media-subscription-changes"],
+    queryFn: mediaSubscriptionApi.changes,
+    enabled: hasAuthSession(),
+  });
+
   const sub = meQuery.data?.subscription;
-  const entitled = Boolean(meQuery.data?.entitlement?.entitled);
+  const entitlement = meQuery.data?.entitlement;
 
   useEffect(() => {
     if (sub?.billingCycle) setCycle(sub.billingCycle);
@@ -91,7 +131,7 @@ export function MediaSubscriptionPage() {
       await queryClient.invalidateQueries({ queryKey: ["media-subscription-history"] });
     },
     onError: (err: unknown) => {
-      setPlanError(err instanceof Error ? err.message : "Could not start subscription.");
+      setPlanError(err instanceof Error ? err.message : "Unable to start a subscription.");
     },
   });
 
@@ -100,9 +140,10 @@ export function MediaSubscriptionPage() {
     onSuccess: async () => {
       setPlanError(null);
       await queryClient.invalidateQueries({ queryKey: ["media-subscription-me"] });
+      await queryClient.invalidateQueries({ queryKey: ["media-subscription-changes"] });
     },
     onError: (err: unknown) => {
-      setPlanError(err instanceof Error ? err.message : "Could not change plan.");
+      setPlanError(err instanceof Error ? err.message : "Unable to change plan.");
     },
   });
 
@@ -111,137 +152,92 @@ export function MediaSubscriptionPage() {
     [plansQuery.data],
   );
 
-  const handleSelect = (slug: string) => {
+  const handleSelectPlan = (slug: string) => {
     setPlanError(null);
     if (sub) change.mutate({ slug });
     else start.mutate({ slug });
   };
 
-  const busy = start.isPending || change.isPending;
+  const manageError =
+    cancel.error instanceof Error
+      ? cancel.error.message
+      : resume.error instanceof Error
+        ? resume.error.message
+        : null;
+
   const loading = meQuery.isLoading || plansQuery.isLoading;
 
   return (
     <CustomerPageLayout
       section="Account"
-      title="Movie Server subscription"
-      description="Choose a plan, manage renewal, and stream from the media library."
+      title="Subscription"
+      description="Your plan, renewal dates, and switches — all on one page."
       iconKey="movie_subscription"
       loading={loading}
+      loadingText="Loading subscription…"
       action={
-        entitled ? (
-          <Link
-            href="/media"
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-medium hover:bg-white/10"
-          >
-            Open Movie Server
+        <div className={cn(themeStyles.root, styles.quickLinks)}>
+          <Link href="/wallet" className={styles.quickLink}>
+            <WalletIcon className="h-3.5 w-3.5" />
+            Wallet
           </Link>
-        ) : null
+          <Link href="/media" className={styles.quickLink}>
+            <PlayIcon className="h-3.5 w-3.5" />
+            Movie Server
+          </Link>
+        </div>
       }
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+      <div className={cn(themeStyles.root, styles.wrap)}>
+        {manageError ? (
+          <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+            {manageError}
+          </p>
+        ) : null}
+
         {sub ? (
-          <StatusBar sub={sub} entitled={entitled} cancel={cancel} resume={resume} />
+          <SubscriptionStatusBar
+            sub={sub}
+            entitled={Boolean(entitlement?.entitled)}
+            cancel={cancel}
+            resume={resume}
+          />
         ) : (
-          <div className="rounded-xl border border-border bg-elevated p-6 text-center">
-            <p className="text-lg font-semibold text-foreground">No subscription yet</p>
-            <p className="mt-2 text-sm text-foreground-muted">
-              Pick a plan below. Trial applies when available; otherwise the fee is charged from your
-              wallet balance.
+          <section className={styles.emptyCard}>
+            <CreditCardIcon className="mx-auto h-10 w-10 text-[var(--primary)]" />
+            <h2 className={styles.emptyTitle}>No subscription yet</h2>
+            <p className={styles.emptyLead}>
+              Choose a plan below — the card you pick becomes your account plan after checkout.
             </p>
-            <Link href="/wallet" className="mt-3 inline-block text-sm font-medium text-brand hover:underline">
-              Top up wallet
-            </Link>
-          </div>
+          </section>
         )}
 
-        <section aria-labelledby="media-plans-heading">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 id="media-plans-heading" className="text-lg font-semibold text-foreground">
-                Plans
-              </h2>
-              <p className="text-sm text-foreground-muted">
-                Monthly or yearly billing — your current plan is highlighted.
-              </p>
-            </div>
-            <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="Billing cycle">
-              {BILLING_CYCLES.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={`rounded-md px-3 py-1.5 text-sm capitalize ${
-                    cycle === item ? "bg-brand text-white" : "text-foreground-muted hover:text-foreground"
-                  }`}
-                  onClick={() => setCycle(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {planError ? (
-            <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-              {planError}
-            </p>
-          ) : null}
-
-          {plans.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No plans are available right now.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => {
-                const isCurrent = sub?.plan.slug === plan.slug;
-                const price =
-                  cycle === BillingCycle.Yearly ? plan.yearlyPriceCents : plan.monthlyPriceCents;
-                const featured = plan.tier === PLAN_TIERS[1];
-                return (
-                  <article
-                    key={plan.id}
-                    className={`flex flex-col rounded-xl border p-5 ${
-                      isCurrent ? "border-brand ring-1 ring-brand/40" : "border-border bg-elevated"
-                    }`}
-                  >
-                    {featured ? (
-                      <span className="mb-2 w-fit rounded-full bg-brand/15 px-2 py-0.5 text-xs font-semibold text-brand">
-                        Popular
-                      </span>
-                    ) : null}
-                    <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                      {formatMediaPlanCents(price, plan.currency)}
-                      <span className="text-sm font-normal text-foreground-muted">
-                        /{cycle === BillingCycle.Yearly ? "yr" : "mo"}
-                      </span>
-                    </p>
-                    <p className="mt-2 text-sm text-foreground-muted">{plan.description}</p>
-                    <ul className="mt-4 flex-1 space-y-1.5 text-sm text-foreground-muted">
-                      {planFeatures(plan).map((line) => (
-                        <li key={line}>• {line}</li>
-                      ))}
-                    </ul>
-                    <button
-                      type="button"
-                      disabled={busy || isCurrent}
-                      className="mt-5 w-full rounded-lg bg-brand px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => handleSelect(plan.slug)}
-                    >
-                      {isCurrent ? "Your plan" : sub ? "Switch plan" : "Subscribe"}
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {plansQuery.isLoading ? (
+          <p className="text-center text-sm text-foreground-muted">Loading plans…</p>
+        ) : plans.length === 0 ? (
+          <p className="text-center text-sm text-foreground-muted">No plans available yet.</p>
+        ) : (
+          <SubscribePricingSection
+            layout="account"
+            plans={plans}
+            cycle={cycle}
+            onCycleChange={setCycle}
+            error={planError}
+            currentSlug={sub?.plan.slug}
+            entitled={Boolean(entitlement?.entitled)}
+            busy={start.isPending || change.isPending}
+            onSelectPlan={handleSelectPlan}
+          />
+        )}
 
         <HistoryBlock title="Subscription activity" events={historyQuery.data?.events ?? []} />
+        <HistoryBlock title="Plan changes" events={changesQuery.data?.events ?? []} />
       </div>
     </CustomerPageLayout>
   );
 }
 
-function StatusBar({
+function SubscriptionStatusBar({
   sub,
   entitled,
   cancel,
@@ -253,31 +249,64 @@ function StatusBar({
   resume: { mutate: () => void; isPending: boolean };
 }) {
   return (
-    <section className="rounded-xl border border-border bg-elevated p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand">You are on {sub.plan.name}</p>
-          <p className="mt-1 text-sm text-foreground-muted">
-            <span className="capitalize">{formatStatus(sub.status)}</span>
-            {" · "}
-            {formatMediaPlanCents(sub.priceCents, sub.currency)}
-            {" · "}
-            <span className="capitalize">{sub.billingCycle}</span>
-          </p>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Period ends {new Date(sub.currentPeriodEnd).toLocaleString()}
-            {sub.trialEnd ? <> · Trial ends {new Date(sub.trialEnd).toLocaleString()}</> : null}
-          </p>
-        </div>
-        <span
-          className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-            entitled ? "bg-emerald-500/15 text-emerald-400" : "bg-muted text-foreground-muted"
-          }`}
-        >
-          {entitled ? "Streaming active" : "No access"}
-        </span>
+    <section className={styles.statusBar} aria-label="Current subscription status">
+      <div className={styles.statusMain}>
+        <p className={styles.statusEyebrow}>
+          <span className="text-[var(--primary)]" aria-hidden>
+            ✦
+          </span>
+          You are on {sub.plan.name}
+        </p>
+        <p className={styles.statusMeta}>
+          <span className={cn(styles.statusChip, "capitalize")}>{formatStatus(sub.status)}</span>
+          <span className={styles.statusDot} aria-hidden>
+            ·
+          </span>
+          <span>{formatMediaPlanCents(sub.priceCents, sub.currency)}</span>
+          <span className={styles.statusDot} aria-hidden>
+            ·
+          </span>
+          <span className="capitalize">{sub.billingCycle} billing</span>
+        </p>
+        <p className={styles.statusRenewal}>
+          Period ends {new Date(sub.currentPeriodEnd).toLocaleString()}
+          {sub.trialEnd ? <> · Trial ends {new Date(sub.trialEnd).toLocaleString()}</> : null}
+          {sub.scheduledPlanId ? (
+            <>
+              {" "}
+              · Downgrade scheduled{" "}
+              {sub.scheduledChangeAt
+                ? new Date(sub.scheduledChangeAt).toLocaleString()
+                : "at period end"}
+            </>
+          ) : null}
+        </p>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <span
+        className={cn(
+          styles.statusPill,
+          entitled ? styles.statusActive : styles.statusMuted,
+        )}
+      >
+        {entitled ? "Streaming active" : "No access"}
+      </span>
+      <div className={styles.statusActions}>
+        {sub.status === SubscriptionStatus.Pending ? (
+          <Link
+            href="/wallet"
+            className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-sm font-semibold text-[var(--primary-foreground)] hover:opacity-90"
+          >
+            Top up wallet
+          </Link>
+        ) : null}
+        {sub.status === SubscriptionStatus.Suspended || sub.status === SubscriptionStatus.Expired ? (
+          <Link
+            href="/wallet"
+            className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-sm font-semibold text-[var(--primary-foreground)] hover:opacity-90"
+          >
+            Pay to renew
+          </Link>
+        ) : null}
         {sub.status === SubscriptionStatus.Cancelled ? (
           <button
             type="button"
@@ -287,6 +316,13 @@ function StatusBar({
           >
             Resume subscription
           </button>
+        ) : sub.status === SubscriptionStatus.Expired ? (
+          <a
+            href="#account-plans-heading"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted/50"
+          >
+            Choose a new plan
+          </a>
         ) : sub.status !== SubscriptionStatus.Pending ? (
           <button
             type="button"
@@ -307,25 +343,32 @@ function HistoryBlock({
   events,
 }: {
   title: string;
-  events: { id: string; type: string; note: string | null; createdAt: string; toPlanSlug: string | null }[];
+  events: {
+    id: string;
+    type: string;
+    note: string | null;
+    createdAt: string;
+    toPlanSlug: string | null;
+  }[];
 }) {
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold text-foreground">{title}</h2>
+    <section className={styles.historySection}>
+      <div className={styles.historyHead}>
+        <h2 className={styles.historyTitle}>{title}</h2>
+        <span className={styles.historyCount}>{events.length} events</span>
+      </div>
       {events.length === 0 ? (
         <p className="text-sm text-foreground-muted">No events yet.</p>
       ) : (
-        <ol className="space-y-3 border-l border-border pl-4">
+        <ol className={styles.timeline}>
           {events.map((event) => (
-            <li key={event.id} className="text-sm">
-              <p className="font-medium capitalize text-foreground">
-                {event.type.replaceAll("_", " ")}
-              </p>
+            <li key={event.id} className={styles.timelineItem}>
+              <p className={styles.eventType}>{event.type.replaceAll("_", " ")}</p>
               {event.toPlanSlug ? (
-                <p className="text-foreground-muted">Plan: {event.toPlanSlug}</p>
+                <p className={styles.eventMeta}>Plan: {event.toPlanSlug}</p>
               ) : null}
-              <p className="text-foreground-muted">{new Date(event.createdAt).toLocaleString()}</p>
-              {event.note ? <p className="text-foreground-muted">{event.note}</p> : null}
+              <p className={styles.eventMeta}>{new Date(event.createdAt).toLocaleString()}</p>
+              {event.note ? <p className={styles.eventMeta}>{event.note}</p> : null}
             </li>
           ))}
         </ol>

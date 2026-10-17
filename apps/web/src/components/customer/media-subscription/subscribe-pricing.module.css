@@ -1,0 +1,664 @@
+/* UniQbd-style website pricing — adapted for AmarPin subscription plans */
+
+.pricing {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, var(--primary) 10%, transparent) 0%,
+    color-mix(in oklch, var(--card) 94%, transparent) 100%
+  );
+  padding: 1.5rem 1.25rem 2.5rem;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+@media (min-width: 640px) {
+  .pricing {
+    padding: 2.5rem 2rem 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pricing {
+    padding: 3rem 2.5rem 3.5rem;
+  }
+}
+
+.pricingAccount {
+  padding: 1.35rem 1.15rem 2rem;
+}
+
+@media (min-width: 640px) {
+  .pricingAccount {
+    padding: 1.75rem 1.5rem 2.25rem;
+  }
+}
+
+.subtitleStrong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.gridBg {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary) 6%, transparent) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(ellipse 88% 80% at 50% 40%, black 30%, transparent 100%);
+}
+
+.header {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.75rem;
+  text-align: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.title {
+  margin-top: 1rem;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  margin: 0.85rem auto 0;
+  max-width: 42rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--muted-foreground);
+}
+
+.cycleWrap {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.cycleToggle {
+  display: inline-flex;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  background: color-mix(in oklch, var(--card) 85%, transparent);
+  padding: 0.25rem;
+}
+
+.cycleBtn {
+  min-height: 2.5rem;
+  touch-action: manipulation;
+  border-radius: 9999px;
+  border: 0;
+  background: transparent;
+  padding: 0.45rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.cycleBtnActive {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.alertWrap {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: center;
+}
+
+.cards {
+  position: relative;
+  z-index: 1;
+  margin-top: 2rem;
+  display: grid;
+  gap: 2rem;
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.25rem;
+    align-items: center;
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
+  background: color-mix(in oklch, var(--card) 88%, transparent);
+  padding: 1.35rem 1.15rem 1.25rem;
+  box-shadow: 0 16px 36px -24px rgb(0 0 0 / 0.55);
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklch, var(--primary) 28%, transparent);
+}
+
+.cardCurrent {
+  z-index: 2;
+  border-color: color-mix(in oklch, var(--primary) 72%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 22%, transparent) 0%,
+    color-mix(in oklch, var(--card) 92%, transparent) 42%,
+    color-mix(in oklch, var(--card) 88%, transparent) 100%
+  );
+  box-shadow:
+    0 0 0 2px color-mix(in oklch, var(--primary) 38%, transparent),
+    0 24px 48px -22px color-mix(in oklch, var(--primary) 45%, transparent);
+}
+
+.cardCurrent:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--primary) 80%, transparent);
+}
+
+@media (min-width: 900px) {
+  .cardCurrent {
+    transform: scale(1.04);
+  }
+
+  .cardCurrent:hover {
+    transform: scale(1.04) translateY(-2px);
+  }
+}
+
+.currentGlow {
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+
+.badgeCurrent {
+  left: 0.85rem;
+  right: auto;
+  border-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 6px 16px -6px color-mix(in oklch, var(--primary) 55%, transparent);
+}
+
+.cardFeatured {
+  border-color: color-mix(in oklch, var(--primary) 45%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 14%, transparent) 0%,
+    color-mix(in oklch, var(--card) 95%, transparent) 38%,
+    color-mix(in oklch, var(--card) 90%, transparent) 100%
+  );
+  box-shadow:
+    0 22px 44px -20px color-mix(in oklch, var(--primary) 35%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+@media (min-width: 900px) {
+  .cardFeatured {
+    transform: scale(1.03);
+    padding-top: 1.65rem;
+    padding-bottom: 1.45rem;
+  }
+
+  .cardFeatured:hover {
+    transform: scale(1.03) translateY(-3px);
+  }
+}
+
+.badge {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--primary) 35%, transparent);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.cardTop {
+  text-align: center;
+}
+
+.planIcon {
+  position: relative;
+  display: inline-flex;
+  height: 3.75rem;
+  width: 3.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--primary) 32%, transparent);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, var(--primary) 18%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 8%, transparent) 100%
+  );
+  color: var(--primary);
+  box-shadow:
+    0 0 0 6px color-mix(in oklch, var(--primary) 6%, transparent),
+    0 10px 24px -12px color-mix(in oklch, var(--primary) 40%, transparent);
+}
+
+.planIconRing {
+  pointer-events: none;
+  position: absolute;
+  inset: -5px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--primary) 22%, transparent);
+  animation: planIconRingPulse 3s ease-in-out infinite;
+}
+
+.planIconRing2 {
+  inset: -10px;
+  border-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  animation-delay: 0.85s;
+}
+
+.planIconFeatured {
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, var(--primary) 28%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 12%, transparent) 100%
+  );
+  box-shadow:
+    0 0 0 6px color-mix(in oklch, var(--primary) 10%, transparent),
+    0 0 28px color-mix(in oklch, var(--primary) 28%, transparent);
+}
+
+.iconSvg {
+  position: relative;
+  z-index: 1;
+  height: 1.85rem;
+  width: 1.85rem;
+  filter: drop-shadow(0 4px 10px color-mix(in oklch, var(--primary) 22%, transparent));
+}
+
+.planIcon--basic .iconSvg {
+  animation: planIconFloat 4.2s ease-in-out infinite;
+}
+
+.planIcon--standard .iconSvg {
+  animation: planIconBob 3.6s ease-in-out infinite;
+}
+
+.planIcon--premium .iconSvg {
+  animation: planIconFloat 4.8s ease-in-out infinite;
+}
+
+.iconStarterScreen {
+  fill: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.iconStarterSpark {
+  transform-origin: 36px 12px;
+  animation: planIconSpin 3.8s ease-in-out infinite;
+}
+
+.iconStarterLine {
+  animation: planIconLine 2.8s ease-in-out infinite;
+}
+
+.iconBusinessBar1 {
+  opacity: 0.55;
+  animation: planIconBarGrow 2.6s ease-in-out infinite;
+}
+
+.iconBusinessBar2 {
+  opacity: 0.75;
+  animation: planIconBarGrow 2.6s ease-in-out 0.25s infinite;
+}
+
+.iconBusinessTrend {
+  animation: planIconTrend 3s ease-in-out infinite;
+}
+
+.iconBusinessSpark {
+  animation: planIconSparkle 2.2s ease-in-out infinite;
+}
+
+.iconEnterpriseCrown {
+  fill: color-mix(in oklch, var(--primary) 12%, transparent);
+  animation: planIconGlow 3.4s ease-in-out infinite;
+}
+
+.iconEnterpriseLayer1 {
+  opacity: 0.7;
+  animation: planIconGlow 3.4s ease-in-out infinite;
+}
+
+.iconEnterpriseLayer2 {
+  opacity: 0.55;
+  animation: planIconGlow 3.4s ease-in-out 0.2s infinite;
+}
+
+.iconEnterpriseOrbit {
+  animation: planIconSparkle 2.2s ease-in-out infinite;
+}
+
+.iconEnterpriseStar {
+  transform-origin: 8px 30px;
+  animation: planIconSpin 4.5s ease-in-out infinite;
+}
+
+.planName {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.planTagline {
+  margin-top: 0.45rem;
+  min-height: 2.4rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.priceWrap {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.price {
+  font-size: clamp(1.85rem, 4vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.cardFeatured .price {
+  color: var(--primary);
+}
+
+.priceLabel {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.trialNote {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.features {
+  margin-top: 1.15rem;
+  flex: 1;
+}
+
+.featuresHeading {
+  margin-bottom: 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.featureList {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.featureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.check {
+  display: inline-flex;
+  height: 1.15rem;
+  width: 1.15rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  color: var(--primary);
+  margin-top: 0.1rem;
+}
+
+.cta {
+  margin-top: 1.25rem;
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.85rem;
+  touch-action: manipulation;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklch, var(--primary) 35%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 20%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 10%, transparent) 100%
+  );
+  padding: 0.72rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.cta:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
+  box-shadow: 0 10px 24px color-mix(in oklch, var(--primary) 18%, transparent);
+  transform: translateY(-1px);
+}
+
+.cardFeatured .cta {
+  border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 34%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 18%, transparent) 100%
+  );
+  color: var(--foreground);
+}
+
+.cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.ctaCurrent:disabled {
+  opacity: 1;
+  cursor: default;
+  border-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 42%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 24%, transparent) 100%
+  );
+  color: var(--foreground);
+  box-shadow: 0 8px 20px -10px color-mix(in oklch, var(--primary) 40%, transparent);
+}
+
+.ctaCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: color-mix(in oklch, var(--primary-foreground) 18%, transparent);
+  padding: 0.15rem;
+}
+
+@keyframes planIconRingPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes planIconFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes planIconBob {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.02);
+  }
+}
+
+@keyframes planIconSpin {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+
+@keyframes planIconLine {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes planIconBarGrow {
+  0%,
+  100% {
+    transform: scaleY(0.85);
+    transform-origin: bottom;
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes planIconTrend {
+  0%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes planIconSparkle {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes planIconGlow {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planIconRing,
+  .iconSvg,
+  .iconStarterSpark,
+  .iconStarterLine,
+  .iconBusinessBar1,
+  .iconBusinessBar2,
+  .iconBusinessTrend,
+  .iconBusinessSpark,
+  .iconEnterpriseCrown,
+  .iconEnterpriseLayer1,
+  .iconEnterpriseLayer2,
+  .iconEnterpriseOrbit,
+  .iconEnterpriseStar {
+    animation: none !important;
+  }
+}

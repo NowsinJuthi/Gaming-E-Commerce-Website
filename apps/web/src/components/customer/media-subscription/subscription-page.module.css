@@ -1,0 +1,265 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .wrap {
+    gap: 1.75rem;
+  }
+}
+
+.statusBar {
+  display: grid;
+  gap: 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklch, var(--primary) 28%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--primary) 12%, transparent) 0%,
+    color-mix(in oklch, var(--card) 92%, transparent) 100%
+  );
+  padding: 1.15rem 1.1rem;
+  animation: cardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (min-width: 768px) {
+  .statusBar {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    padding: 1.25rem 1.35rem;
+  }
+}
+
+.statusMain {
+  min-width: 0;
+}
+
+.statusEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.statusMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+
+.statusChip {
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
+  background: color-mix(in oklch, var(--background) 50%, transparent);
+  padding: 0.12rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.statusDot {
+  opacity: 0.45;
+}
+
+.statusRenewal {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.statusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+  padding-top: 0.35rem;
+  border-top: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+@media (min-width: 768px) {
+  .statusActions {
+    grid-column: 1 / -1;
+  }
+}
+
+.statusPill {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusActive {
+  border: 1px solid color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  color: var(--primary);
+}
+
+.statusMuted {
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  background: color-mix(in oklch, var(--muted) 45%, transparent);
+  color: var(--muted-foreground);
+}
+
+.quickLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.quickLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.quickLink:hover {
+  border-color: color-mix(in oklch, var(--primary) 35%, transparent);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+.emptyCard {
+  border-radius: 1.15rem;
+  border: 1px dashed color-mix(in oklch, var(--border) 85%, transparent);
+  background: color-mix(in oklch, var(--card) 70%, transparent);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.emptyLead {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted-foreground);
+}
+
+.historySection {
+  animation: cardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.historyTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.historyCount {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.timelineItem {
+  position: relative;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border) 72%, transparent);
+  background: color-mix(in oklch, var(--background) 60%, transparent);
+  padding: 0.75rem 0.85rem 0.75rem 1.1rem;
+}
+
+.timelineItem::before {
+  content: "";
+  position: absolute;
+  left: 0.45rem;
+  top: 0.85rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 22%, transparent);
+}
+
+.eventType {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.eventMeta {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklch, var(--primary) 20%, transparent);
+  border-top-color: var(--primary);
+  animation: spin 0.85s linear infinite;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusBar,
+  .historySection {
+    animation: none;
+  }
+}
