@@ -1004,16 +1004,17 @@ function MovieInfo({
     (!details.detailsLoaded &&
       !details.overview?.trim() &&
       (details.cast?.length ?? 0) === 0);
-  const meta = [
+  const metaParts = [
+    details?.rating ? `★ ${details.rating}` : null,
     year ? String(year) : null,
     details?.runtimeMinutes ? `${details.runtimeMinutes} min` : null,
-    details?.rating ? `★ ${details.rating}` : null,
+    kind === "series" ? "Series" : "Movie",
   ].filter(Boolean);
 
   return (
     <div className={styles.infoOverlay} role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className={styles.infoBackdrop} aria-label="Close" onClick={onClose} />
-      <div className={`${styles.infoSheet}${backdrop ? "" : ` ${styles.infoSheetCompactHero}`}`}>
+      <div className={`${styles.infoSheet}${backdrop ? "" : ` ${styles.infoSheetNoBackdrop}`}`}>
         <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
           <span className={styles.closeBtnRing} aria-hidden />
           <span className={`${styles.closeBtnRing} ${styles.closeBtnRingAlt}`} aria-hidden />
@@ -1021,80 +1022,89 @@ function MovieInfo({
             ×
           </span>
         </button>
-        <div className={`${styles.hero}${backdrop ? "" : ` ${styles.heroCompact}`}`}>
-          {backdrop ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
-          ) : null}
-        </div>
-        <div className={styles.headerBlock}>
-          <div className={styles.poster}>
-            {poster ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={poster} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async" />
-            ) : null}
-            <WatchPlayButton id={card.id} className={styles.posterPlayHit} onBeforeNavigate={onClose}>
-              <MediaPosterPlayMark size="detail" />
-            </WatchPlayButton>
-          </div>
-          <div className={styles.headerCopy}>
-            <p className={styles.kicker}>{kind === "series" ? "Series" : "Movie"}</p>
-            <h2>{title}</h2>
-            {meta.length > 0 ? <p className={styles.meta}>{meta.join(" · ")}</p> : null}
-            {details?.genres?.length ? (
-              <div className={styles.genres}>
-                {details.genres.map((genre) => (
-                  <span key={genre}>{genre}</span>
-                ))}
-              </div>
-            ) : null}
-            <div className={`${styles.actions} ${styles.headerActions}`}>
-              <WatchPlayButton id={card.id} className={styles.play} onBeforeNavigate={onClose}>
-                <span aria-hidden>▶</span> Play
-              </WatchPlayButton>
-              <button type="button" className={styles.ghost}>
-                + My List
-              </button>
+        <div className={styles.infoScroll}>
+          <div className={`${styles.movieHero}${backdrop ? "" : ` ${styles.movieHeroCompact}`}`}>
+            <div className={styles.movieHeroMedia} aria-hidden>
+              {backdrop ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.movieHeroImg} src={backdrop} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+              ) : null}
+              <div className={styles.movieHeroShade} />
             </div>
-          </div>
-        </div>
-        <div className={styles.body}>
-          {details?.overview ? (
-            <p className={styles.overview}>{details.overview}</p>
-          ) : detailsPending ? (
-            <p className={styles.overviewMuted}>Loading description…</p>
-          ) : (
-            <p className={styles.overviewMuted}>No description available.</p>
-          )}
-          {details && (details.directors.length > 0 || details.writers.length > 0 || details.cast.length > 0) ? (
-            <section className={styles.castSection}>
-              <div className={styles.castHead}>
-                <h3>Cast & Crew</h3>
-                <div>
-                  <button type="button" aria-label="Previous cast" onClick={() => castRow.current?.scrollBy({ left: -240, behavior: "smooth" })}>
-                    ‹
-                  </button>
-                  <button type="button" aria-label="Next cast" onClick={() => castRow.current?.scrollBy({ left: 240, behavior: "smooth" })}>
-                    ›
+            <div className={styles.movieHeroBody}>
+              <div className={styles.moviePoster}>
+                {poster ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={poster} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async" />
+                ) : null}
+              </div>
+              <div className={styles.movieHeroCopy}>
+                <h2 className={styles.movieTitle}>{title}</h2>
+                {metaParts.length > 0 ? (
+                  <div className={styles.movieMetaRow}>
+                    {metaParts.map((part) => (
+                      <span key={part} className={styles.movieMetaChip}>
+                        {part}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {details?.genres?.length ? (
+                  <div className={styles.genres}>
+                    {details.genres.map((genre) => (
+                      <span key={genre}>{genre}</span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className={`${styles.actions} ${styles.movieHeroActions} ${styles.movieHeroActionsRow}`}>
+                  <WatchPlayButton
+                    id={card.id}
+                    className={`${styles.play} ${styles.movieActionBtn}`}
+                    onBeforeNavigate={onClose}
+                  >
+                    <span aria-hidden>▶</span> Play
+                  </WatchPlayButton>
+                  <button type="button" className={`${styles.ghost} ${styles.movieActionBtn}`}>
+                    + My List
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <section className={styles.movieSection}>
+            {details?.overview ? (
+              <p className={styles.overview}>{details.overview}</p>
+            ) : detailsPending ? (
+              <p className={styles.overviewMuted}>Loading description…</p>
+            ) : (
+              <p className={styles.overviewMuted}>No description available.</p>
+            )}
+          </section>
+
+          {details && (details.directors.length > 0 || details.writers.length > 0 || details.cast.length > 0) ? (
+            <section className={styles.movieCastSection}>
+              <h3>Cast &amp; Crew</h3>
               {details.directors.length > 0 || details.writers.length > 0 ? (
-                <p className={styles.credits}>
-                  {details.directors.length > 0 ? <span>Directors · {details.directors.join(", ")}</span> : null}
-                  {details.writers.length > 0 ? <span>Writers · {details.writers.join(", ")}</span> : null}
+                <p className={styles.overviewMuted}>
+                  {[
+                    details.directors.length ? `Directors · ${details.directors.join(", ")}` : "",
+                    details.writers.length ? `Writers · ${details.writers.join(", ")}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               ) : null}
-              <div className={styles.castRow} ref={castRow}>
+              <div className={styles.movieCastRow} ref={castRow}>
                 {details.cast.map((person) => (
-                  <article key={person.name} className={styles.person}>
-                    <span>
+                  <article key={person.name} className={styles.moviePerson}>
+                    <div className={styles.moviePersonPhoto}>
                       {person.profileUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={person.profileUrl} alt="" referrerPolicy="no-referrer" />
                       ) : null}
-                    </span>
-                    <strong>{person.name}</strong>
+                    </div>
+                    <span className={styles.moviePersonName}>{person.name}</span>
                   </article>
                 ))}
               </div>
