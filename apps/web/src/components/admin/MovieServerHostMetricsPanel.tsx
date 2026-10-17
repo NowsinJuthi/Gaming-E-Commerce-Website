@@ -224,18 +224,18 @@ export function MovieServerHostMetricsPanel() {
               </summary>
               <div className={styles.storageBlockInner}>
                 <div className={styles.storageSummary}>
-                  <div>
+                  <div className={styles.storageSummaryCell}>
                     <span className={styles.statLabel}>Website uploads</span>
                     <span className={styles.storageBig}>
                       {formatBytes(metrics.storage.uploadsBytes)}
                     </span>
                   </div>
-                  <div>
+                  <div className={styles.storageSummaryCell}>
                     <span className={styles.statLabel}>Playback temp</span>
                     <span className={styles.storageBig}>
                       {formatBytes(metrics.storage.tempPlaybackBytes)}
                     </span>
-                    <span className={styles.meterHint}>HLS cache / transcode scratch</span>
+                    <span className={styles.storageSummaryHint}>HLS cache / transcode scratch</span>
                   </div>
                 </div>
 
