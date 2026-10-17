@@ -440,3 +440,53 @@
   font-weight: 600;
   color: var(--foreground);
 }
+
+.liveStatRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.liveStat {
+  border-radius: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 0.06);
+  background: rgb(0 0 0 / 0.1);
+  padding: 0.85rem 0.95rem;
+}
+
+.liveStatValueBrand {
+  color: #26bfb0;
+}
+
+.liveStatValueGreen {
+  color: #34d399;
+}
+
+.liveSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.liveSectionTitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.liveEmpty {
+  margin: 0;
+  padding: 1.25rem 0.5rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--muted-foreground);
+  border-radius: 0.75rem;
+  border: 1px dashed rgb(255 255 255 / 0.08);
+}
+
+.tabularMuted {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+}

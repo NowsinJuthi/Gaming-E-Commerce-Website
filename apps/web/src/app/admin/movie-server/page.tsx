@@ -6,6 +6,7 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { ChartIcon } from "@/components/admin/icons";
 import styles from "@/components/admin/movie-server-dashboard.module.css";
 import { MovieServerHostMetricsPanel } from "@/components/admin/MovieServerHostMetricsPanel";
+import { MovieServerLiveVisitorsPanel } from "@/components/admin/MovieServerLiveVisitorsPanel";
 import {
   getMovieServerDashboard,
   type MovieServerDashboardLibrary,
@@ -41,7 +42,7 @@ export default function MovieServerDashboardPage() {
     <AdminPageLayout
       section="Movie Server"
       title="Dashboard"
-      description="Media library overview — movie and series counts from your catalog."
+      description="Catalog overview, live visitors, playback, and server resources in one place."
       icon={ChartIcon}
       action={
         <button
@@ -86,6 +87,8 @@ export default function MovieServerDashboardPage() {
             <span className={styles.statValue}>{loading ? "—" : totals.catalog.toLocaleString()}</span>
           </div>
         </div>
+
+        <MovieServerLiveVisitorsPanel />
 
         <MovieServerHostMetricsPanel />
 
