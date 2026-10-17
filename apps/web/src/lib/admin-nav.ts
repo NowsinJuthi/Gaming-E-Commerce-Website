@@ -267,9 +267,10 @@ export const ADMIN_NAV: NavSection[] = [
         children: [
           {
             href: "/admin/movie-server",
-            label: "Dashboard",
+            label: "Media Server Dashboard",
             icon: ChartIcon,
             keywords: [
+              "media server dashboard",
               "overview",
               "stats",
               "count",

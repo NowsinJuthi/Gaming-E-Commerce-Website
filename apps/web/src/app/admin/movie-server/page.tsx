@@ -60,7 +60,7 @@ export default function MovieServerDashboardPage() {
   return (
     <AdminPageLayout
       section="Movie Server"
-      title="Dashboard"
+      title="Media Server Dashboard"
       description="Catalog overview, live visitors, playback, and server resources in one place."
       icon={ChartIcon}
       heroClassName={styles.pageHero}
