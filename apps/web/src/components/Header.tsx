@@ -516,6 +516,17 @@ export function Header({
     <svg className="h-5 w-5 opacity-0" viewBox="0 0 24 24" aria-hidden />
   );
 
+  const headerBrand = isAdminRoute ? (
+    <AdminHeaderLogo />
+  ) : (
+    <SiteLogo
+      href="/"
+      onLinkClick={(event) => {
+        hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+      }}
+    />
+  );
+
   const AvatarInner = () => (
     <span className="admin-topbar-avatar overflow-hidden">
       {avatarUrl ? (
@@ -540,7 +551,7 @@ export function Header({
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
           {/* ── Left column ────────────────────────────────────────────── */}
-          <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
+          <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
             {/* Mobile nav (+ storefront search) — admin: menu, refresh; no search */}
             <button
               type="button"
@@ -583,38 +594,15 @@ export function Header({
                 <SearchIcon />
               </button>
             ) : null}
+          </div>
 
-            {/* Logo — desktop only */}
-            <div className="site-header-logo-desktop hidden shrink-0 lg:block [&_.site-logo-img]:h-10 [&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
-              {isAdminRoute ? (
-                <AdminHeaderLogo />
-              ) : (
-                <SiteLogo
-                  href="/"
-                  onLinkClick={(event) => {
-                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
-                  }}
-                />
-              )}
-            </div>
+          {/* Single logo: centered below lg, left column on desktop */}
+          <div className="site-header-brand-slot col-start-2 row-start-1 flex min-w-0 shrink-0 items-center justify-center self-center lg:col-start-1 lg:justify-start [&_.site-logo-img]:max-w-[180px] lg:[&_.site-logo-img]:h-10 lg:[&_.site-logo-img]:max-w-[9.5rem] xl:[&_.site-logo-img]:h-11 xl:[&_.site-logo-img]:max-w-[12rem] 2xl:[&_.site-logo-img]:h-12 2xl:[&_.site-logo-img]:max-w-[14rem]">
+            {headerBrand}
           </div>
 
           {/* ── Center column ──────────────────────────────────────────── */}
-          <div className="flex min-w-0 items-center justify-center justify-self-stretch overflow-visible lg:justify-self-center">
-            {/* Logo centered — mobile + tablet */}
-            <div className="site-header-logo-mobile lg:hidden [&_.site-logo-img]:h-12 [&_.site-logo-img]:max-w-[180px]">
-              {isAdminRoute ? (
-                <AdminHeaderLogo />
-              ) : (
-                <SiteLogo
-                  href="/"
-                  onLinkClick={(event) => {
-                    hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
-                  }}
-                />
-              )}
-            </div>
-
+          <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-center justify-self-stretch overflow-visible lg:justify-self-center">
             {/* Desktop nav links */}
             <nav
               className="site-header-nav scrollbar-none hidden min-w-0 max-w-full flex-nowrap items-center justify-center overflow-visible text-sm font-bold lg:flex"
@@ -643,7 +631,7 @@ export function Header({
           </div>
 
           {/* ── Right column ───────────────────────────────────────────── */}
-          <div className="flex shrink-0 items-center justify-end gap-1 justify-self-end sm:gap-1.5 lg:gap-2">
+          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1 justify-self-end sm:gap-1.5 lg:gap-2">
             {/* Theme toggle or refresh — desktop only */}
             {isAdminRoute ? (
               <button

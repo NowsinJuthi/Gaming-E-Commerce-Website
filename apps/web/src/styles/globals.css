@@ -36454,24 +36454,18 @@
   box-shadow: none;
 }
 
-/* Theme-aware logos — stack variants so only one paints (no side-by-side ghost) */
+/* Theme-aware logos — same grid cell (never side-by-side or overflow) */
 .site-logo-theme-stack {
-  position: relative;
-  display: inline-block;
-  line-height: 0;
+  display: inline-grid;
   vertical-align: middle;
+  line-height: 0;
+  max-height: 100%;
+  max-width: 100%;
 }
 
-.site-logo-theme-stack .site-logo-img--light {
-  position: relative;
-  display: block;
-}
-
-.site-logo-theme-stack .site-logo-img--dark {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: none;
+.site-logo-theme-stack .site-logo-img {
+  grid-area: 1 / 1;
+  max-height: inherit;
 }
 
 /* Theme-aware header logos (light vs dark assets) */
@@ -36494,30 +36488,27 @@
   display: block;
 }
 
-.dark .site-logo-theme-stack .site-logo-img--light,
-[data-theme="dark"] .site-logo-theme-stack .site-logo-img--light,
-[data-theme="gaming"] .site-logo-theme-stack .site-logo-img--light,
-[data-theme="amoled"] .site-logo-theme-stack .site-logo-img--light {
-  visibility: hidden;
+.site-header-brand-slot {
+  min-width: 0;
+  max-height: 3.5rem;
+  overflow: hidden;
 }
 
-.dark .site-logo-theme-stack .site-logo-img--dark,
-[data-theme="dark"] .site-logo-theme-stack .site-logo-img--dark,
-[data-theme="gaming"] .site-logo-theme-stack .site-logo-img--dark,
-[data-theme="amoled"] .site-logo-theme-stack .site-logo-img--dark {
-  display: block;
-}
-
-/* Customer dashboard: one header logo slot (desktop left / mobile center) */
-@media (min-width: 1024px) {
-  .customer-panel .site-header-logo-mobile {
-    display: none !important;
+@media (min-width: 640px) {
+  .site-header-brand-slot {
+    max-height: 4rem;
   }
 }
 
-@media (max-width: 1023px) {
-  .customer-panel .site-header-logo-desktop {
-    display: none !important;
+.site-header-brand-slot .site-logo-theme-stack,
+.site-header-brand-slot .site-logo-img {
+  max-height: 2.5rem;
+}
+
+@media (min-width: 640px) {
+  .site-header-brand-slot .site-logo-theme-stack,
+  .site-header-brand-slot .site-logo-img {
+    max-height: 2.75rem;
   }
 }
 

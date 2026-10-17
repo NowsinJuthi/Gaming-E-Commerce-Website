@@ -122,7 +122,7 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
     <header className="site-header fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md">
       <div className="site-header-inner customer-topbar-inner grid h-14 w-full grid-cols-[auto_1fr_auto] items-center sm:h-16">
         {/* Left column: hamburger (all screens) + logo (desktop only) */}
-        <div className="flex h-full min-w-0 shrink-0 items-center gap-1 px-2 sm:gap-1.5 sm:px-3 lg:w-80 lg:max-w-[20rem] lg:gap-2 lg:px-3">
+        <div className="col-start-1 row-start-1 flex h-full min-w-0 shrink-0 items-center gap-1 px-2 sm:gap-1.5 sm:px-3 lg:w-80 lg:max-w-[20rem] lg:gap-2 lg:px-3">
           <button
             type="button"
             onClick={() => {
@@ -134,18 +134,14 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
           >
             <MenuIcon className="h-5 w-5" />
           </button>
-
-          <div className="site-header-logo-desktop hidden lg:block">
-            <AdminHeaderLogo />
-          </div>
         </div>
 
-        {/* Center column: logo centered on mobile/tablet, hidden on desktop */}
-        <div className="site-header-logo-mobile flex min-w-0 items-center justify-center lg:hidden">
+        {/* Single logo: centered on mobile, left column on desktop */}
+        <div className="site-header-brand-slot col-start-2 row-start-1 flex min-w-0 items-center justify-center self-center lg:col-start-1 lg:justify-start lg:pl-3">
           <AdminHeaderLogo />
         </div>
 
-        <div className="flex min-w-0 items-center justify-end gap-1 px-2 sm:gap-2 sm:px-3 lg:gap-3 lg:px-6">
+        <div className="col-start-3 row-start-1 flex min-w-0 items-center justify-end gap-1 px-2 sm:gap-2 sm:px-3 lg:gap-3 lg:px-6">
           <Link href="/search" className={iconBtn} aria-label="Search products">
             <SearchIcon className="h-5 w-5" />
           </Link>
