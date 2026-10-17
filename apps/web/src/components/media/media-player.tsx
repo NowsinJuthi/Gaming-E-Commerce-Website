@@ -442,7 +442,13 @@ function BusyMark({ buffering }: { buffering: boolean }) {
   );
 }
 
-export function MediaPlayer({ titleId }: { titleId: string }) {
+export function MediaPlayer({
+  titleId,
+  initialEpisodeIndex = 0,
+}: {
+  titleId: string;
+  initialEpisodeIndex?: number;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const sessionRef = useRef<PlaybackSession | null>(null);
@@ -1012,6 +1018,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     const saved = Number(localStorage.getItem(`uniqbd-watch:${titleId}`) || 0);
     void post(`${API_BASE}/media/playback/${titleId}`, {
       startSeconds: saved > 15 ? saved : 0,
+      episodeIndex: initialEpisodeIndex,
     })
       .then((next) => {
         if (!stop) {
@@ -1025,7 +1032,7 @@ export function MediaPlayer({ titleId }: { titleId: string }) {
     return () => {
       stop = true;
     };
-  }, [post, titleId]);
+  }, [initialEpisodeIndex, post, titleId]);
 
   useEffect(() => {
     if (!session?.sessionId || session.status === "error") return;

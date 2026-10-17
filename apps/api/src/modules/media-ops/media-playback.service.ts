@@ -139,6 +139,53 @@ export class MediaPlaybackService implements OnModuleInit, OnModuleDestroy {
     return this.present(session);
   }
 
+  /** Episode list for series detail pages (no playback session). */
+  async publicEpisodes(titleId: string): Promise<{ episodes: { index: number; name: string }[] }> {
+    if (!Types.ObjectId.isValid(titleId)) {
+      throw new NotFoundException('That title was not found.');
+    }
+    const title = await this.titles.findById(titleId).exec();
+    if (!title || !title.published || title.availability !== 'available') {
+      throw new NotFoundException('That title was not found.');
+    }
+    const source = title.sourceKey ?? '';
+    const splitAt = source.indexOf(':');
+    if (splitAt < 1) throw new NotFoundException('This title does not have a video file yet.');
+    const libraryId = source.slice(0, splitAt);
+    const relative = source.slice(splitAt + 1).replace(/\\/g, '/');
+    if (!Types.ObjectId.isValid(libraryId) || !relative || relative.split('/').includes('..')) {
+      throw new NotFoundException('This title does not have a video file yet.');
+    }
+    const library = await this.libraries.findById(libraryId).exec();
+    if (!library || !library.enabled) throw new NotFoundException('This library is not available.');
+
+    let auth: SmbAuth | null = null;
+    if (library.provider === 'smb') {
+      if (!library.smbServerId) throw new NotFoundException('This library is not connected to storage.');
+      const server = await this.servers.findById(library.smbServerId).select('+passwordEnc').exec();
+      if (!server) throw new NotFoundException('This library is not connected to storage.');
+      let password = '';
+      try {
+        password = this.crypto.openInventoryValue(server.passwordEnc);
+      } catch {
+        throw new NotFoundException('Saved storage password could not be read.');
+      }
+      auth = {
+        host: server.host,
+        port: server.port,
+        username: server.username,
+        password,
+        domain: server.domain,
+        share: server.share || library.smbShare || '',
+      };
+    }
+
+    const episodes = await this.listEpisodes(library, auth, relative, title.videoFileName ?? null);
+    return {
+      episodes: episodes.map((episode) => ({ index: episode.index, name: episode.name })),
+    };
+  }
+
   async retarget(sessionId: string, request: PlaybackRequest) {
     const session = this.sessions.get(sessionId);
     if (!session) {

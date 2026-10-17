@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 
 const MediaPlayer = dynamic(
   () => import("@/components/media/media-player").then((mod) => mod.MediaPlayer),
@@ -26,5 +27,10 @@ const MediaPlayer = dynamic(
 );
 
 export function WatchPlayer({ titleId }: { titleId: string }) {
-  return <MediaPlayer titleId={titleId} />;
+  const search = useSearchParams();
+  const rawEpisode = Number(search.get("episode") ?? "0");
+  const initialEpisodeIndex =
+    Number.isFinite(rawEpisode) && rawEpisode >= 0 ? Math.floor(rawEpisode) : 0;
+
+  return <MediaPlayer titleId={titleId} initialEpisodeIndex={initialEpisodeIndex} />;
 }

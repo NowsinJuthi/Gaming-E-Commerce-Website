@@ -16,6 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import styles from "./media-home.module.css";
+import { SeriesDetailPanel } from "./series-detail-panel";
 import {
   hydrateRecentCards,
   persistRecentSnapshot,
@@ -103,6 +104,7 @@ export function MediaHome({
   initialBrowse?: MediaBrowseResult;
 }) {
   const router = useRouter();
+  const navigateToWatch = useNavigateToWatch();
   const pathname = usePathname();
   const isLgScreen = useLgScreen();
   const pageSize = isLgScreen ? MEDIA_PAGE_SIZE_DESKTOP : MEDIA_PAGE_SIZE_MOBILE;
@@ -667,7 +669,19 @@ export function MediaHome({
         <p className={styles.empty}>No movies or series match your search.</p>
       ) : null}
 
-      {info ? (
+      {info ? (info.kind === "series" || details?.kind === "series") ? (
+        <SeriesDetailPanel
+          key={info.id}
+          card={info}
+          details={details}
+          castRow={castRow}
+          onClose={() => setInfo(null)}
+          onPlay={(episodeIndex) => {
+            setInfo(null);
+            navigateToWatch(info.id, { episodeIndex });
+          }}
+        />
+      ) : (
         <MovieInfo
           key={info.id}
           card={info}
@@ -855,15 +869,20 @@ function mediaWatchPath(id: string): string {
 function useNavigateToWatch() {
   const router = useRouter();
   return useCallback(
-    (id: string) => {
+    (id: string, options?: { episodeIndex?: number }) => {
       const path = mediaWatchPath(id);
+      const params = new URLSearchParams();
+      const episodeIndex = options?.episodeIndex;
+      if (episodeIndex != null && episodeIndex >= 0) {
+        params.set("episode", String(episodeIndex));
+      }
       const mobile = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches;
       if (mobile) {
         sessionStorage.setItem("uniqbd-mobile-autoplay", String(Date.now()));
-        router.push(`${path}?autoplay=1` as Route);
-        return;
+        params.set("autoplay", "1");
       }
-      router.push(path as Route);
+      const qs = params.toString();
+      router.push((qs ? `${path}?${qs}` : path) as Route);
     },
     [router],
   );

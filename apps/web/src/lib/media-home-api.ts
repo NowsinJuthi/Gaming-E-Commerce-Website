@@ -168,6 +168,22 @@ export async function getMediaGenres(libraryId: string): Promise<string[]> {
   }
 }
 
+export type MediaTitleEpisode = { index: number; name: string };
+
+export async function getMediaTitleEpisodes(titleId: string): Promise<MediaTitleEpisode[]> {
+  try {
+    const res = await fetch(`${resolveMediaApiBase()}/media/titles/${encodeURIComponent(titleId)}/episodes`, mediaFetchInit());
+    if (!res.ok) return [];
+    const data = (await res.json()) as { episodes?: MediaTitleEpisode[] };
+    if (!Array.isArray(data.episodes)) return [];
+    return data.episodes.filter(
+      (row) => row && typeof row.index === "number" && typeof row.name === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
 export async function getMediaHome(): Promise<MediaHome> {
   try {
     const res = await fetch(`${resolveMediaApiBase()}/media/home`, mediaFetchInit());

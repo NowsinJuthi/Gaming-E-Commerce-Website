@@ -1,0 +1,400 @@
+.overlay {
+  position: fixed;
+  top: 3.5rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .overlay {
+    top: 4rem;
+    padding: 1rem;
+  }
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.78);
+  cursor: pointer;
+}
+
+.sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(72rem, 100%);
+  max-height: min(94dvh, 920px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: #070b10;
+  box-shadow: 0 28px 60px rgb(0 0 0 / 0.55);
+}
+
+.scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.hero {
+  position: relative;
+  min-height: 14rem;
+  overflow: hidden;
+  background: #0a1218;
+}
+
+@media (min-width: 768px) {
+  .hero {
+    min-height: 18rem;
+  }
+}
+
+.heroImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+.heroShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    #070b10 0%,
+    rgb(7 11 16 / 0.92) 28%,
+    rgb(7 11 16 / 0.45) 62%,
+    rgb(0 0 0 / 0.35) 100%
+  );
+}
+
+.closeBtn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.heroBody {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  padding: 1.25rem 1.15rem 1.35rem;
+}
+
+@media (min-width: 768px) {
+  .heroBody {
+    gap: 1.35rem;
+    padding: 1.5rem 1.75rem 1.65rem;
+  }
+}
+
+.poster {
+  width: 5.5rem;
+  flex-shrink: 0;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 0.55);
+  background: #000;
+  aspect-ratio: 2 / 3;
+}
+
+@media (min-width: 768px) {
+  .poster {
+    width: 7.5rem;
+  }
+}
+
+.poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.heroCopy {
+  min-width: 0;
+  flex: 1;
+  padding-bottom: 0.15rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.45rem, 3.2vw, 2.35rem);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.45);
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  color: rgb(255 255 255 / 0.82);
+}
+
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.4rem;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.genre {
+  color: rgb(255 255 255 / 0.72);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.playBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  background: #fff;
+  color: #0a0a0a;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.playBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.35);
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+.section {
+  padding: 1.15rem 1.15rem 0;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding: 1.35rem 1.75rem 0;
+  }
+}
+
+.overview {
+  margin: 0;
+  max-width: 52rem;
+  line-height: 1.6;
+  font-size: 0.92rem;
+  color: rgb(255 255 255 / 0.86);
+}
+
+.overviewMuted {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgb(255 255 255 / 0.45);
+}
+
+.episodesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.episodesHead h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.seasonSelect {
+  min-width: 7rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.episodeTrack {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(16rem, 78vw);
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.episodeCard {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.04);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.episodeCard:hover {
+  background: rgb(255 255 255 / 0.08);
+  transform: translateY(-2px);
+}
+
+.episodeThumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #122028, #0a1016);
+}
+
+.episodeThumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.55;
+}
+
+.episodeBadge {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+}
+
+.episodeBody {
+  padding: 0.65rem 0.7rem 0.75rem;
+}
+
+.episodeTitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.episodeSynopsis {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgb(255 255 255 / 0.55);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.castSection {
+  padding: 1.35rem 1.15rem 1.75rem;
+}
+
+@media (min-width: 768px) {
+  .castSection {
+    padding: 1.5rem 1.75rem 2rem;
+  }
+}
+
+.castSection h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.castRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 5.5rem;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.personPhoto {
+  aspect-ratio: 2 / 3;
+  border-radius: 0.45rem;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.personPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.personName {
+  font-size: 0.72rem;
+  line-height: 1.3;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.88);
+}

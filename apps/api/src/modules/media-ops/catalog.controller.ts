@@ -34,6 +34,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { CatalogKind } from '../../database/schemas/catalog-title.schema';
 import { catalogPosterUploadMulterOptions } from '../../shared/uploads/catalog-poster-upload.multer';
 import { CatalogBulkAction, CatalogService } from './catalog.service';
+import { MediaPlaybackService } from './media-playback.service';
 
 class BulkBody {
   @IsArray()
@@ -128,7 +129,10 @@ class TmdbApplyBody {
 @UseGuards(RolesGuard)
 @Roles(Role.Administrator, Role.Admin)
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly playback: MediaPlaybackService,
+  ) {}
 
   @Public()
   @Roles()
@@ -197,6 +201,13 @@ export class CatalogController {
   @Get('media/titles/:id')
   title(@Param('id') id: string) {
     return this.catalog.publicTitle(id);
+  }
+
+  @Public()
+  @Roles()
+  @Get('media/titles/:id/episodes')
+  titleEpisodes(@Param('id') id: string) {
+    return this.playback.publicEpisodes(id);
   }
 
   @Get('admin/movie-collections')
