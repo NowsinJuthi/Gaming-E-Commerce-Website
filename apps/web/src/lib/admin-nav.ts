@@ -279,7 +279,7 @@ export const ADMIN_NAV: NavSection[] = [
           },
           {
             href: "/admin/movie-server/plans",
-            label: "Plans",
+            label: "Subscription plans",
             icon: TagIcon,
             keywords: ["subscription", "pricing", "tier", "movie", "streaming"],
           },

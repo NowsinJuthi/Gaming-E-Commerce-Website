@@ -88,7 +88,7 @@ export default function MovieServerDashboardPage() {
 
         <div className={styles.quickLinks}>
           <Link href="/admin/movie-server/plans" className={styles.quickLink}>
-            <span className={styles.quickLinkLabel}>Plans</span>
+            <span className={styles.quickLinkLabel}>Subscription plans</span>
             <span className={styles.quickLinkHint}>Subscription tiers & pricing</span>
           </Link>
           <Link href="/admin/movie-server/subscriptions" className={styles.quickLink}>
