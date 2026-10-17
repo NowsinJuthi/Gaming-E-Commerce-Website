@@ -232,8 +232,8 @@ export function SeriesDetailPanel({
           </section>
 
           <section className={`${styles.section} ${styles.episodesSection}`}>
-            <div className={styles.episodesHead}>
-              <h3>Episodes</h3>
+            <h3 className={styles.episodesTitle}>Episodes</h3>
+            <div className={styles.episodesToolbar}>
               <label className={styles.seasonField}>
                 <span className="sr-only">Season</span>
                 <span className={homeStyles.selectWrap}>
@@ -252,36 +252,36 @@ export function SeriesDetailPanel({
                   </select>
                 </span>
               </label>
+              {seasonEpisodes.length > 0 || episodeParts.length > 0 ? (
+                <div className={styles.episodesMeta}>
+                  {seasonEpisodes.length > 0 ? (
+                    <span className={styles.episodeCountPill}>
+                      {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
+                  {episodeParts.length > 1 ? (
+                    <select
+                      className={styles.partSelect}
+                      value={partIndex}
+                      onChange={(event) => setPartIndex(Number(event.target.value))}
+                      aria-label="Episode range"
+                    >
+                      {episodeParts.map((part, index) => (
+                        <option key={part.label} value={index}>
+                          {part.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : episodeParts.length === 1 ? (
+                    (() => {
+                      const sole = episodeParts.at(0);
+                      if (!sole) return null;
+                      return <span className={styles.partSelectStatic}>{sole.label}</span>;
+                    })()
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-            {seasonEpisodes.length > 0 || episodeParts.length > 0 ? (
-              <div className={styles.episodesMeta}>
-                {seasonEpisodes.length > 0 ? (
-                  <span className={styles.episodeCountPill}>
-                    {seasonEpisodes.length} episode{seasonEpisodes.length === 1 ? "" : "s"}
-                  </span>
-                ) : null}
-                {episodeParts.length > 1 ? (
-                  <select
-                    className={styles.partSelect}
-                    value={partIndex}
-                    onChange={(event) => setPartIndex(Number(event.target.value))}
-                    aria-label="Episode range"
-                  >
-                    {episodeParts.map((part, index) => (
-                      <option key={part.label} value={index}>
-                        {part.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : episodeParts.length === 1 ? (
-                  (() => {
-                    const sole = episodeParts.at(0);
-                    if (!sole) return null;
-                    return <span className={styles.partSelectStatic}>{sole.label}</span>;
-                  })()
-                ) : null}
-              </div>
-            ) : null}
             {episodesLoading ? (
               <p className={styles.overviewMuted}>Loading episodes…</p>
             ) : seasonEpisodes.length === 0 ? (
