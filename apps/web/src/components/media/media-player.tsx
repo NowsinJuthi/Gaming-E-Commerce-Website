@@ -41,6 +41,7 @@ type Sheet =
   | null;
 type DockTab = "info" | "chapters" | "cast";
 type TitleDetails = {
+  title: string;
   posterUrl: string | null;
   overview: string;
   runtimeMinutes: number | null;
