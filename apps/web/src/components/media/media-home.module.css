@@ -52,9 +52,29 @@
   grid-auto-columns: calc((100% - 0.75rem) / 2);
   gap: 0.75rem;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+}
+
+.recentTrackDragging {
+  scroll-snap-type: none;
+  cursor: grabbing;
+  user-select: none;
+}
+
+.recentTrackDragging * {
+  user-select: none;
+}
+
+@media (max-width: 767px) {
+  .recentTrack .posterLink {
+    touch-action: pan-x pinch-zoom;
+  }
 }
 
 .recentTrack::-webkit-scrollbar {

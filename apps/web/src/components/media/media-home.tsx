@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -706,6 +707,15 @@ function RecentlyWatchedSlider({
 }) {
   void progressRevision;
   const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({
+    active: false,
+    moved: false,
+    startX: 0,
+    scrollLeft: 0,
+    pointerId: -1,
+  });
+  const suppressPosterClickRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
   const [canScrollBack, setCanScrollBack] = useState(false);
   const [canScrollForward, setCanScrollForward] = useState(false);
 
@@ -740,6 +750,67 @@ function RecentlyWatchedSlider({
     track.scrollBy({ left: direction * step, behavior: "smooth" });
   };
 
+  const finishDrag = useCallback((pointerId: number) => {
+    const track = trackRef.current;
+    const drag = dragRef.current;
+    if (!track || !drag.active || drag.pointerId !== pointerId) return;
+    drag.active = false;
+    if (drag.moved) {
+      suppressPosterClickRef.current = true;
+      window.setTimeout(() => {
+        suppressPosterClickRef.current = false;
+      }, 320);
+    }
+    drag.moved = false;
+    setDragging(false);
+    try {
+      track.releasePointerCapture(pointerId);
+    } catch {
+      /* already released */
+    }
+  }, []);
+
+  const onTrackPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const track = trackRef.current;
+    if (!track) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragRef.current = {
+      active: true,
+      moved: false,
+      startX: event.clientX,
+      scrollLeft: track.scrollLeft,
+      pointerId: event.pointerId,
+    };
+    track.setPointerCapture(event.pointerId);
+  };
+
+  const onTrackPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const track = trackRef.current;
+    const drag = dragRef.current;
+    if (!track || !drag.active || event.pointerId !== drag.pointerId) return;
+    const delta = event.clientX - drag.startX;
+    if (!drag.moved && Math.abs(delta) < 6) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      setDragging(true);
+    }
+    event.preventDefault();
+    track.scrollLeft = drag.scrollLeft - delta;
+  };
+
+  const onTrackPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    finishDrag(event.pointerId);
+  };
+
+  const onTrackPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    finishDrag(event.pointerId);
+  };
+
+  const guardPosterClick = useCallback(
+    () => suppressPosterClickRef.current,
+    [],
+  );
+
   return (
     <section className={styles.recentSection} aria-label="Recently Watched">
       <h2 className={styles.recentHeading}>Recently Watched</h2>
@@ -756,13 +827,24 @@ function RecentlyWatchedSlider({
             </span>
           </button>
         ) : null}
-        <div className={styles.recentTrack} ref={trackRef}>
+        <div
+          className={`${styles.recentTrack}${dragging ? ` ${styles.recentTrackDragging}` : ""}`}
+          ref={trackRef}
+          onPointerDown={onTrackPointerDown}
+          onPointerMove={onTrackPointerMove}
+          onPointerUp={onTrackPointerUp}
+          onPointerCancel={onTrackPointerCancel}
+        >
         {items.map((item, index) => {
           const progress = watchProgressPercent(item.id, item.runtimeMinutes);
           if (!item.title.trim() && !item.posterUrl) return null;
           return (
             <article key={item.id} className={`${styles.card} ${styles.recentCard}`}>
-              <PosterPlayLink id={item.id} title={item.title || "video"}>
+              <PosterPlayLink
+                id={item.id}
+                title={item.title || "video"}
+                guardClick={guardPosterClick}
+              >
                 <span className={styles.posterFrame}>
                   {item.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -894,11 +976,13 @@ function PosterPlayLink({
   title,
   children,
   className,
+  guardClick,
 }: {
   id: string;
   title: string;
   children: ReactNode;
   className?: string;
+  guardClick?: () => boolean;
 }) {
   const navigateToWatch = useNavigateToWatch();
   const linkClass = className ? `${styles.posterLink} ${className}` : styles.posterLink;
@@ -908,7 +992,10 @@ function PosterPlayLink({
       type="button"
       className={linkClass}
       aria-label={`Play ${title}`}
-      onClick={() => navigateToWatch(id)}
+      onClick={() => {
+        if (guardClick?.()) return;
+        navigateToWatch(id);
+      }}
     >
       {children}
     </button>
