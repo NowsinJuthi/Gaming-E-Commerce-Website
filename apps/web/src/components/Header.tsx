@@ -472,7 +472,7 @@ export function Header({
           className={`site-header-inner grid h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:h-16 lg:gap-3 ${HOME_CONTAINER_CLS}`}
         >
           {/* ── Left column ────────────────────────────────────────────── */}
-          <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
+          <div className="site-header-icon-cluster col-start-1 row-start-1 flex min-w-0 items-center justify-self-start">
             {/* Mobile nav (+ storefront search) — admin: menu, refresh; no search */}
             <button
               type="button"
@@ -528,7 +528,7 @@ export function Header({
           </div>
 
           {/* ── Right column ───────────────────────────────────────────── */}
-          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1 justify-self-end sm:gap-1.5 lg:gap-2">
+          <div className="site-header-icon-cluster col-start-3 row-start-1 flex shrink-0 items-center justify-end justify-self-end">
             {/* Theme toggle or refresh — desktop only */}
             {isAdminRoute ? (
               <button

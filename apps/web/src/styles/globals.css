@@ -37899,6 +37899,41 @@ html.media-catalog-route .media-page-root :where(
   @apply min-w-0;
 }
 
+.site-header-icon-cluster {
+  gap: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .site-header-icon-cluster {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .site-header-icon-cluster {
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .site-header.site-header--storefront .site-header-icon-cluster {
+    gap: 0.75rem;
+  }
+
+  .site-header.site-header--storefront .site-header-icon-cluster .shell-icon-btn::before,
+  .site-header.site-header--storefront
+    .site-header-icon-cluster
+    .site-header-profile-ring::before {
+    inset: -1px;
+  }
+
+  .site-header.site-header--storefront
+    .site-header-icon-cluster--end
+    .shell-icon-btn.relative {
+    margin-inline-end: 2px;
+  }
+}
+
 .site-mobile-theme-grid {
   @apply grid grid-cols-3 gap-2;
 }
