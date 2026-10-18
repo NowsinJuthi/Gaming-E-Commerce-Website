@@ -4,6 +4,7 @@ import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  memo,
   Suspense,
   useEffect,
   useLayoutEffect,
@@ -48,6 +49,71 @@ import { hardNavigateFromMediaCatalog } from "@/lib/storefront-nav";
 import { StorefrontHeaderNav } from "@/components/nav/StorefrontHeaderNav";
 
 const iconBtn = "shell-icon-btn";
+
+const HEADER_PROFILE_CACHE_KEY = "uniqbd_header_profile_v1";
+
+type HeaderProfileCache = {
+  avatarUrl: string | null;
+  displayName: string;
+};
+
+function readHeaderProfileCache(): HeaderProfileCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(HEADER_PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as HeaderProfileCache;
+    if (!parsed || typeof parsed.displayName !== "string") return null;
+    return {
+      avatarUrl: parsed.avatarUrl ?? null,
+      displayName: parsed.displayName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeHeaderProfileCache(profile: HeaderProfileCache) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(HEADER_PROFILE_CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function clearHeaderProfileCache() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(HEADER_PROFILE_CACHE_KEY);
+}
+
+const SiteHeaderProfileAvatar = memo(function SiteHeaderProfileAvatar({
+  avatarUrl,
+  displayName,
+}: {
+  avatarUrl: string | null;
+  displayName: string;
+}) {
+  return (
+    <span className="site-header-profile-ring">
+      <span className="admin-topbar-avatar overflow-hidden">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={resolveAvatarSrc(avatarUrl)}
+            alt=""
+            className="site-header-profile-img h-full w-full object-cover"
+            decoding="async"
+          />
+        ) : (
+          <span className="grid h-full place-items-center text-sm font-bold">
+            {displayName.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+});
 
 // Runs synchronously before first browser paint on client; falls back to
 // useEffect on server (where window doesn't exist) to avoid SSR warnings.
@@ -231,8 +297,12 @@ export function Header({
   const [loggedIn, setLoggedIn] = useState(false);
   const { canAccessAdminPanel } = useCanAccessAdminPanel();
   const [roleLabel, setRoleLabel] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("UniQbd");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState(
+    () => readHeaderProfileCache()?.displayName ?? "UniQbd",
+  );
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    () => readHeaderProfileCache()?.avatarUrl ?? null,
+  );
   const [cartCount, setCartCount] = useState(0);
   // Admin users get staff notifications; regular users get customer notifications
   const unread = useUnreadNotifications(
@@ -248,8 +318,7 @@ export function Header({
   const [userOpen, setUserOpen] = useState(false);
   const { refreshing: adminRefreshing, refresh: refreshAdminPage } =
     useAdminHeaderRefresh();
-  const userMobileRef = useRef<HTMLDivElement>(null);
-  const userDesktopRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const theme = useThemeStore((s) => s.theme);
   const themeHydrated = useThemeStore((s) => s.hydrated);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -278,6 +347,7 @@ export function Header({
       setLoggedIn(registered);
       if (!token || isGuestCheckoutSession()) {
         if (!registered) {
+          clearHeaderProfileCache();
           setDisplayName("UniQbd");
           setAvatarUrl(null);
           setRoleLabel(null);
@@ -292,9 +362,15 @@ export function Header({
             u.profile?.displayName ||
             [u.profile?.firstName, u.profile?.lastName].filter(Boolean).join(" ") ||
             u.email.split("@")[0];
-          setDisplayName(name || "UniQbd");
-          setAvatarUrl(u.profile?.avatarUrl ?? null);
+          const nextName = name || "UniQbd";
+          const nextAvatar = u.profile?.avatarUrl ?? null;
+          setDisplayName(nextName);
+          setAvatarUrl(nextAvatar);
           setRoleLabel(getPrimaryRoleLabel(u.roles));
+          writeHeaderProfileCache({
+            displayName: nextName,
+            avatarUrl: nextAvatar,
+          });
         })
         .catch(() => {
           setDisplayName("UniQbd");
@@ -351,9 +427,7 @@ export function Header({
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      const insideUser =
-        userMobileRef.current?.contains(target) ||
-        userDesktopRef.current?.contains(target);
+      const insideUser = userMenuRef.current?.contains(target);
       if (!insideUser) {
         setUserOpen(false);
       }
@@ -365,6 +439,7 @@ export function Header({
   async function logout() {
     setMenuOpen(false);
     setUserOpen(false);
+    clearHeaderProfileCache();
     await logoutUser();
     router.push("/");
   }
@@ -386,25 +461,6 @@ export function Header({
         hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
       }}
     />
-  );
-
-  const AvatarInner = () => (
-    <span className="site-header-profile-ring">
-      <span className="admin-topbar-avatar overflow-hidden">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={resolveAvatarSrc(avatarUrl)}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="grid h-full place-items-center text-sm font-bold">
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </span>
-    </span>
   );
 
   const headerChrome = (
@@ -524,56 +580,28 @@ export function Header({
               </Link>
             )}
 
-            {/* Mobile profile avatar — shown right of cart on mobile */}
             {loggedIn ? (
-              <div ref={userMobileRef} className="relative shrink-0 lg:hidden">
+              <div ref={userMenuRef} className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     setUserOpen((o) => !o);
                   }}
-                  className="site-header-mobile-profile-btn"
+                  className="site-header-mobile-profile-btn site-header-desktop-profile-btn flex items-center gap-2 overflow-visible rounded-xl border border-transparent py-1 pl-0 pr-2 transition"
                   aria-label="My account"
                   aria-expanded={userOpen}
                   aria-haspopup="menu"
                 >
-                  <AvatarInner />
-                </button>
-
-                {userOpen ? (
-                  <SiteUserMenu
-                    className="absolute right-0 top-full z-50 mt-2 w-[min(17rem,calc(100vw-1.5rem))]"
+                  <SiteHeaderProfileAvatar
+                    avatarUrl={avatarUrl}
                     displayName={displayName}
-                    isAdmin={canAccessAdminPanel}
-                    accountMeta={roleLabel ?? undefined}
-                    unread={unread}
-                    onClose={() => setUserOpen(false)}
-                    onLogout={() => void logout()}
                   />
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* Desktop profile button — md+ screens */}
-            {loggedIn ? (
-              <div ref={userDesktopRef} className="relative hidden shrink-0 lg:block">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setUserOpen((o) => !o);
-                  }}
-                  className="site-header-desktop-profile-btn flex items-center gap-2 overflow-visible rounded-xl border border-transparent py-1 pl-0 pr-2 transition"
-                  aria-expanded={userOpen}
-                  aria-haspopup="menu"
-                >
-                  <AvatarInner />
                   <span className="hidden max-w-[7.5rem] truncate text-sm font-semibold text-foreground xl:inline">
                     {displayName}
                   </span>
                   <ChevronIcon
-                    className={`h-4 w-4 shrink-0 text-foreground-muted transition-transform duration-200 ${
+                    className={`hidden h-4 w-4 shrink-0 text-foreground-muted transition-transform duration-200 lg:block ${
                       userOpen ? "rotate-180" : ""
                     }`}
                   />

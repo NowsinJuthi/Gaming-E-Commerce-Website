@@ -38058,16 +38058,6 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-@keyframes siteHeaderProfileEnter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
 .site-header.site-header--storefront .site-header-profile-ring {
   position: relative;
   display: inline-grid;
@@ -38084,19 +38074,6 @@ html.media-catalog-route .media-page-root :where(
   border-radius: 9999px;
   background: transparent;
   transition: transform 0.2s ease;
-  animation:
-    siteHeaderProfileEnter 0.38s ease-out both,
-    siteHeaderProfileGlow 3.2s ease-in-out 0.38s infinite;
-}
-
-@keyframes siteHeaderProfileRingEnter {
-  from {
-    opacity: 0.35;
-  }
-
-  to {
-    opacity: 1;
-  }
 }
 
 .site-header.site-header--storefront .shell-icon-btn {
@@ -38148,9 +38125,7 @@ html.media-catalog-route .media-page-root :where(
 }
 
 .site-header.site-header--storefront .site-header-profile-ring::before {
-  animation:
-    siteHeaderProfileRingEnter 0.45s ease-out both,
-    siteHeaderIconOrbit 5.5s linear infinite;
+  animation: siteHeaderIconOrbit 5.5s linear infinite;
 }
 
 .site-header.site-header--storefront .site-header-profile-ring > *,
@@ -38172,7 +38147,12 @@ html.media-catalog-route .media-page-root :where(
 }
 
 .site-header.site-header--storefront .site-header-profile-ring > .admin-topbar-avatar:has(img) {
-  background: transparent;
+  background: linear-gradient(135deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
+}
+
+.site-header.site-header--storefront .site-header-profile-img {
+  display: block;
+  vertical-align: middle;
 }
 
 .site-header.site-header--storefront .shell-icon-btn:hover,
@@ -38394,8 +38374,7 @@ html.media-catalog-route .media-page-root :where(
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-header.site-header--storefront .shell-icon-btn,
-  .site-header.site-header--storefront .site-header-profile-ring {
+  .site-header.site-header--storefront .shell-icon-btn {
     animation: none;
   }
 
