@@ -484,7 +484,7 @@ export function Header({
                   setMenuOpen((open) => !open);
                 }
               }}
-              className={`${iconBtn} lg:hidden`}
+              className={`${iconBtn} site-header-icon-menu lg:hidden`}
               aria-label="Open menu"
               aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
             >
@@ -509,7 +509,7 @@ export function Header({
               <button
                 type="button"
                 onClick={() => setSearchOpen((o) => !o)}
-                className={`${iconBtn} lg:hidden`}
+                className={`${iconBtn} site-header-icon-search lg:hidden`}
                 aria-label="Search"
               >
                 <SearchIcon />
@@ -558,7 +558,7 @@ export function Header({
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
-              className={`${iconBtn} site-header-search-desktop`}
+              className={`${iconBtn} site-header-icon-search site-header-search-desktop`}
               aria-label="Search"
             >
               <SearchIcon />
@@ -570,7 +570,11 @@ export function Header({
                 <AdminPublishControl variant="compact" className={iconBtn} />
               </span>
             ) : (
-              <Link href="/cart" className={`${iconBtn} relative`} aria-label="Cart">
+              <Link
+                href="/cart"
+                className={`${iconBtn} site-header-icon-cart relative`}
+                aria-label="Cart"
+              >
                 <CartIcon />
                 {cartCount > 0 && (
                   <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
