@@ -92,6 +92,18 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
   return preference;
 }
 
+export function isResolvedThemeDark(resolved: ResolvedTheme): boolean {
+  return resolved === "dark" || resolved === "gaming" || resolved === "amoled";
+}
+
+/** Flip between light and dark based on what the user currently sees. */
+export function toggleLightDarkPreference(
+  preference: ThemePreference,
+): ThemePreference {
+  const resolved = resolveTheme(preference);
+  return isResolvedThemeDark(resolved) ? "light" : "dark";
+}
+
 /** Match server render for theme-dependent assets before client hydration. */
 export function getSsrSafeResolvedTheme(
   preference: ThemePreference,

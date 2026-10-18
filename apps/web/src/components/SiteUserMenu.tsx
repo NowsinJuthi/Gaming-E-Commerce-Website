@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { isRegisteredUserLoggedIn } from "@/lib/guest-checkout";
 import {
   BellIcon,
   GridIcon,
@@ -12,7 +13,11 @@ import {
   UserIcon,
 } from "@/components/admin/icons";
 import { ThemePreferenceIcon } from "@/components/theme/ThemeToggle";
-import { resolveTheme } from "@/lib/theme";
+import {
+  isResolvedThemeDark,
+  resolveTheme,
+  toggleLightDarkPreference,
+} from "@/lib/theme";
 import { useThemeStore } from "@/stores/theme-store";
 
 type Props = {
@@ -36,18 +41,20 @@ function ProfileMenuThemeToggle() {
   const setTheme = useThemeStore((s) => s.setTheme);
   const [animating, setAnimating] = useState(false);
   const resolved = hydrated ? resolveTheme(theme) : resolveTheme("system");
-  const isDark = resolved === "dark" || resolved === "gaming" || resolved === "amoled";
+  const isDark = isResolvedThemeDark(resolved);
   const display = isDark ? "dark" : "light";
 
   function toggleTheme() {
+    if (!hydrated) return;
     setAnimating(true);
-    setTheme(isDark ? "light" : "dark");
+    setTheme(toggleLightDarkPreference(theme));
     window.setTimeout(() => setAnimating(false), 500);
   }
 
   return (
     <button
       type="button"
+      disabled={!hydrated}
       className={`shell-icon-btn profile-theme-toggle${animating ? " profile-theme-toggle--active" : ""}`}
       aria-label={
         isDark ? "Dark mode. Tap to switch to light mode" : "Light mode. Tap to switch to dark mode"
@@ -73,6 +80,14 @@ export function SiteUserMenu({
   variant = "menu",
 }: Props) {
   const metaLabel = accountMeta ?? "Customer";
+  const [canPersonalizeTheme, setCanPersonalizeTheme] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setCanPersonalizeTheme(isRegisteredUserLoggedIn());
+    sync();
+    window.addEventListener("auth-change", sync);
+    return () => window.removeEventListener("auth-change", sync);
+  }, []);
 
   if (variant === "drawer") {
     return (
@@ -137,7 +152,7 @@ export function SiteUserMenu({
             <p className="admin-user-menu-name truncate">{displayName}</p>
             <p className="admin-user-menu-meta">{metaLabel}</p>
           </div>
-          <ProfileMenuThemeToggle />
+          {canPersonalizeTheme ? <ProfileMenuThemeToggle /> : null}
         </div>
       </div>
 

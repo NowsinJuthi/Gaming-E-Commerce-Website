@@ -22,14 +22,12 @@ import {
 import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 import { useAdminHeaderRefresh } from "@/hooks/useAdminHeaderRefresh";
 import { resolveAvatarSrc } from "@/lib/site-appearance";
-import { useThemeStore } from "@/stores/theme-store";
 import { ProductSearchAutocomplete } from "@/components/search/ProductSearchAutocomplete";
 import { HOME_CONTAINER_CLS } from "@/components/home/home-container";
 import { SiteLogo } from "@/components/SiteLogo";
 import { AdminHeaderLogo } from "@/components/admin/AdminHeaderLogo";
 import { AdminPublishControl } from "@/components/admin/AdminPublishControl";
 import { SiteUserMenu } from "@/components/SiteUserMenu";
-import { ThemePreferenceIcon } from "@/components/theme/ThemeToggle";
 import { useSiteMenus } from "@/components/SiteMenusProvider";
 import {
   ChevronIcon,
@@ -342,9 +340,6 @@ export function Header({
   const { refreshing: adminRefreshing, refresh: refreshAdminPage } =
     useAdminHeaderRefresh();
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const theme = useThemeStore((s) => s.theme);
-  const themeHydrated = useThemeStore((s) => s.hydrated);
-  const setTheme = useThemeStore((s) => s.setTheme);
   const siteMenus = useSiteMenus();
   const navItems = siteMenus.header;
   const headerOthers = siteMenus.headerOthers;
@@ -497,14 +492,6 @@ export function Header({
     router.push("/");
   }
 
-  // Show a neutral circle icon until Zustand store hydrates from localStorage
-  // to prevent a sun↔moon flash on first render.
-  const themeToggleIcon = themeHydrated ? (
-    <ThemePreferenceIcon preference={theme === "dark" ? "light" : "dark"} />
-  ) : (
-    <svg className="h-5 w-5 opacity-0" viewBox="0 0 24 24" aria-hidden />
-  );
-
   const headerBrand = isAdminRoute ? (
     <AdminHeaderLogo />
   ) : (
@@ -582,7 +569,7 @@ export function Header({
 
           {/* ── Right column ───────────────────────────────────────────── */}
           <div className="site-header-icon-cluster col-start-3 row-start-1 flex shrink-0 items-center justify-end justify-self-end">
-            {/* Theme toggle or refresh — desktop only */}
+            {/* Admin refresh — desktop only (theme is for registered accounts in profile menu). */}
             {isAdminRoute ? (
               <button
                 type="button"
@@ -595,15 +582,6 @@ export function Header({
                   className={`h-5 w-5${adminRefreshing ? " animate-spin" : ""}`}
                   aria-hidden
                 />
-              </button>
-            ) : !loggedIn ? (
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className={`${iconBtn} hidden lg:grid`}
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {themeToggleIcon}
               </button>
             ) : null}
 

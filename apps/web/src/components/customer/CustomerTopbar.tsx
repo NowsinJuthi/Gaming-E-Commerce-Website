@@ -1,5 +1,6 @@
 "use client";
 import { getSessionRoles, hasAuthSession } from "@/lib/access-token";
+import { isRegisteredUserLoggedIn } from "@/lib/guest-checkout";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,9 +41,9 @@ export function CustomerTopbar({ pathname, onOpenMenu }: Props) {
   useEffect(() => {
     function loadUser() {
       setUserOpen(false);
-      const token = hasAuthSession();
-      setLoggedIn(!!token);
-      if (!token) {
+      const registered = isRegisteredUserLoggedIn();
+      setLoggedIn(registered);
+      if (!registered) {
         setDisplayName("Account");
         setAvatarUrl(null);
         setRoleLabel(null);
