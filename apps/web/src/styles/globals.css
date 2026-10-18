@@ -38018,28 +38018,64 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-.site-header.site-header--storefront .site-header-mobile-profile-btn {
-  display: grid;
-  height: 2.5rem;
-  width: 2.5rem;
-  flex-shrink: 0;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 9999px;
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+@media (max-width: 1023px) {
+  .site-header.site-header--storefront .site-header-mobile-profile-btn {
+    display: grid;
+    height: 2.5rem;
+    width: 2.5rem;
+    flex-shrink: 0;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (min-width: 1024px) {
+  .site-header.site-header--storefront .site-header-desktop-profile-btn {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: auto;
+    max-width: 12rem;
+    height: auto;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 0;
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .site-header.site-header--storefront .site-header-desktop-profile-btn:hover {
+    border-color: rgb(var(--border) / 0.55);
+    background: rgb(var(--muted) / 0.45);
+  }
 }
 
 .site-header.site-header--storefront .site-header-mobile-profile-btn:hover,
 .site-header.site-header--storefront .site-header-mobile-profile-btn:active,
-.site-header.site-header--storefront .site-header-mobile-profile-btn:focus-visible {
+.site-header.site-header--storefront .site-header-mobile-profile-btn:focus-visible,
+.site-header.site-header--storefront .site-header-desktop-profile-btn:active,
+.site-header.site-header--storefront .site-header-desktop-profile-btn:focus-visible {
   border: 0;
   background: transparent;
   box-shadow: none;
   outline: none;
+}
+
+@media (min-width: 1024px) {
+  .site-header.site-header--storefront .site-header-desktop-profile-btn:hover {
+    border-color: rgb(var(--border) / 0.55);
+    background: rgb(var(--muted) / 0.45);
+    box-shadow: none;
+  }
 }
 
 .site-header.site-header--storefront .site-header-mobile-profile-btn:active .site-header-profile-ring,

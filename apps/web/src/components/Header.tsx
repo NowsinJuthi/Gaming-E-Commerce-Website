@@ -597,7 +597,7 @@ export function Header({
                     avatarUrl={avatarUrl}
                     displayName={displayName}
                   />
-                  <span className="hidden max-w-[7.5rem] truncate text-sm font-semibold text-foreground xl:inline">
+                  <span className="hidden max-w-[7.5rem] truncate text-sm font-semibold text-foreground lg:inline">
                     {displayName}
                   </span>
                   <ChevronIcon
