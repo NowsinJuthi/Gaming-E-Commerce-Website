@@ -37920,10 +37920,7 @@ html.media-catalog-route .media-page-root :where(
     gap: 0.75rem;
   }
 
-  .site-header.site-header--storefront .site-header-icon-cluster .shell-icon-btn::before,
-  .site-header.site-header--storefront
-    .site-header-icon-cluster
-    .site-header-profile-ring::before {
+  .site-header.site-header--storefront .site-header-icon-cluster .shell-icon-btn::before {
     inset: -1px;
   }
 
@@ -38165,7 +38162,6 @@ html.media-catalog-route .media-page-root :where(
   animation: siteHeaderProfileGlow 3.2s ease-in-out infinite;
 }
 
-.site-header.site-header--storefront .site-header-profile-ring::before,
 .site-header.site-header--storefront .shell-icon-btn::before {
   content: "";
   position: absolute;
@@ -38195,10 +38191,6 @@ html.media-catalog-route .media-page-root :where(
   animation: siteHeaderIconOrbit 5.5s linear infinite;
 }
 
-.site-header.site-header--storefront .site-header-profile-ring::before {
-  animation: siteHeaderIconOrbit 5.5s linear infinite;
-}
-
 .site-header.site-header--storefront .site-header-profile-ring > *,
 .site-header.site-header--storefront .shell-icon-btn > * {
   position: relative;
@@ -38218,7 +38210,7 @@ html.media-catalog-route .media-page-root :where(
 }
 
 .site-header.site-header--storefront .site-header-profile-ring > .admin-topbar-avatar:has(img) {
-  background: linear-gradient(135deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
+  background: transparent;
 }
 
 .site-header.site-header--storefront .site-header-profile-img {
@@ -38449,7 +38441,6 @@ html.media-catalog-route .media-page-root :where(
     animation: none;
   }
 
-  .site-header.site-header--storefront .site-header-profile-ring::before,
   .site-header.site-header--storefront .shell-icon-btn::before {
     animation: none;
     opacity: 0.75;

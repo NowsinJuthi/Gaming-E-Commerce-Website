@@ -60,14 +60,17 @@ type HeaderProfileCache = {
 function readHeaderProfileCache(): HeaderProfileCache | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(HEADER_PROFILE_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as HeaderProfileCache;
-    if (!parsed || typeof parsed.displayName !== "string") return null;
-    return {
-      avatarUrl: parsed.avatarUrl ?? null,
-      displayName: parsed.displayName,
-    };
+    for (const store of [localStorage, sessionStorage]) {
+      const raw = store.getItem(HEADER_PROFILE_CACHE_KEY);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as HeaderProfileCache;
+      if (!parsed || typeof parsed.displayName !== "string") continue;
+      return {
+        avatarUrl: parsed.avatarUrl ?? null,
+        displayName: parsed.displayName,
+      };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -76,7 +79,9 @@ function readHeaderProfileCache(): HeaderProfileCache | null {
 function writeHeaderProfileCache(profile: HeaderProfileCache) {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(HEADER_PROFILE_CACHE_KEY, JSON.stringify(profile));
+    const json = JSON.stringify(profile);
+    localStorage.setItem(HEADER_PROFILE_CACHE_KEY, json);
+    sessionStorage.setItem(HEADER_PROFILE_CACHE_KEY, json);
   } catch {
     /* quota / private mode */
   }
@@ -84,15 +89,25 @@ function writeHeaderProfileCache(profile: HeaderProfileCache) {
 
 function clearHeaderProfileCache() {
   if (typeof window === "undefined") return;
+  localStorage.removeItem(HEADER_PROFILE_CACHE_KEY);
   sessionStorage.removeItem(HEADER_PROFILE_CACHE_KEY);
+}
+
+function preloadHeaderAvatar(url: string) {
+  if (typeof window === "undefined") return;
+  const img = new window.Image();
+  img.decoding = "async";
+  img.src = resolveAvatarSrc(url);
 }
 
 const SiteHeaderProfileAvatar = memo(function SiteHeaderProfileAvatar({
   avatarUrl,
   displayName,
+  profileReady,
 }: {
   avatarUrl: string | null;
   displayName: string;
+  profileReady: boolean;
 }) {
   return (
     <span className="site-header-profile-ring">
@@ -104,12 +119,14 @@ const SiteHeaderProfileAvatar = memo(function SiteHeaderProfileAvatar({
             alt=""
             className="site-header-profile-img h-full w-full object-cover"
             decoding="async"
+            loading="eager"
+            fetchPriority="high"
           />
-        ) : (
+        ) : profileReady ? (
           <span className="grid h-full place-items-center text-sm font-bold">
             {displayName.charAt(0).toUpperCase()}
           </span>
-        )}
+        ) : null}
       </span>
     </span>
   );
@@ -303,6 +320,9 @@ export function Header({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(
     () => readHeaderProfileCache()?.avatarUrl ?? null,
   );
+  const [profileReady, setProfileReady] = useState(
+    () => Boolean(readHeaderProfileCache()?.avatarUrl),
+  );
   const [cartCount, setCartCount] = useState(0);
   // Admin users get staff notifications; regular users get customer notifications
   const unread = useUnreadNotifications(
@@ -338,6 +358,19 @@ export function Header({
     );
   }
 
+  // Hydrate cached profile before paint so the photo does not flash a letter fallback.
+  useIsomorphicLayoutEffect(() => {
+    if (!isRegisteredUserLoggedIn()) return;
+    const cached = readHeaderProfileCache();
+    if (!cached) return;
+    setDisplayName(cached.displayName);
+    if (cached.avatarUrl) {
+      setAvatarUrl(cached.avatarUrl);
+      setProfileReady(true);
+      preloadHeaderAvatar(cached.avatarUrl);
+    }
+  }, []);
+
   // useIsomorphicLayoutEffect fires synchronously before the first browser
   // paint so the logged-in state is correct from the very first render.
   useIsomorphicLayoutEffect(() => {
@@ -345,11 +378,23 @@ export function Header({
       const token = hasAuthSession();
       const registered = isRegisteredUserLoggedIn();
       setLoggedIn(registered);
+      if (registered) {
+        const cached = readHeaderProfileCache();
+        if (cached) {
+          setDisplayName(cached.displayName);
+          if (cached.avatarUrl) {
+            setAvatarUrl(cached.avatarUrl);
+            setProfileReady(true);
+            preloadHeaderAvatar(cached.avatarUrl);
+          }
+        }
+      }
       if (!token || isGuestCheckoutSession()) {
         if (!registered) {
           clearHeaderProfileCache();
           setDisplayName("UniQbd");
           setAvatarUrl(null);
+          setProfileReady(false);
           setRoleLabel(null);
         }
         if (!token) return;
@@ -375,6 +420,9 @@ export function Header({
         .catch(() => {
           setDisplayName("UniQbd");
           setRoleLabel(getPrimaryRoleLabel(getSessionRoles()));
+        })
+        .finally(() => {
+          setProfileReady(true);
         });
     };
     sync();
@@ -440,6 +488,8 @@ export function Header({
     setMenuOpen(false);
     setUserOpen(false);
     clearHeaderProfileCache();
+    setProfileReady(false);
+    setAvatarUrl(null);
     await logoutUser();
     router.push("/");
   }
@@ -596,6 +646,7 @@ export function Header({
                   <SiteHeaderProfileAvatar
                     avatarUrl={avatarUrl}
                     displayName={displayName}
+                    profileReady={profileReady}
                   />
                   <span className="hidden max-w-[7.5rem] truncate text-sm font-semibold text-foreground lg:inline">
                     {displayName}
