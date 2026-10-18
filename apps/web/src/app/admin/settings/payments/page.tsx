@@ -659,7 +659,6 @@ export default function AdminPaymentGatewaysPage() {
     | "walletEnabled"
     | "gatewayEnabled"
     | "manualEnabled"
-    | "allowGuestCheckout"
     | "paymentMethodOrder"
     | null
   >(null);
@@ -853,30 +852,6 @@ export default function AdminPaymentGatewaysPage() {
     },
     [],
   );
-
-  const handleToggleGuestCheckout = useCallback(async (enabled: boolean) => {
-    const previous = checkoutMethodsRef.current.allowGuestCheckout;
-    setCheckoutMethods((current) => ({ ...current, allowGuestCheckout: enabled }));
-    setSavingCheckoutMethod("allowGuestCheckout");
-    hideAdminToast();
-    try {
-      const updated = (await updateCustomerPanelSettings({
-        checkout: { allowGuestCheckout: enabled },
-      })) as { checkout?: Partial<CheckoutMethodFlags> };
-      setCheckoutMethods((current) =>
-        mergeCheckoutMethods(current, updated.checkout),
-      );
-      adminToast("Guest checkout updated.", true);
-    } catch (err) {
-      setCheckoutMethods((current) => ({
-        ...current,
-        allowGuestCheckout: previous,
-      }));
-      adminToast(err instanceof Error ? err.message : "Update failed.", false);
-    } finally {
-      setSavingCheckoutMethod(null);
-    }
-  }, []);
 
   const saveGatewayLabel = useCallback(async () => {
     const label = draftGatewayLabel.trim() || "bKash / Nagad";
@@ -1097,19 +1072,6 @@ export default function AdminPaymentGatewaysPage() {
                 <div className="admin-payments-overview-panel">
                   {tab === "online" ? (
                     <div className="admin-payments-settings-grid">
-                      <section className="admin-payments-settings-block">
-                        <h3 className="admin-payments-section-title">Checkout experience</h3>
-                        <PaymentOverviewSwitch
-                          label="Allow ordering without account"
-                          hint="When off, customers must register or sign in to checkout. Automatic order emails/SMS alerts are not sent to guest sessions."
-                          checked={checkoutMethods.allowGuestCheckout === true}
-                          disabled={
-                            loading || savingCheckoutMethod === "allowGuestCheckout"
-                          }
-                          onChange={(value) => void handleToggleGuestCheckout(value)}
-                        />
-                      </section>
-
                       <section className="admin-payments-settings-block admin-payments-settings-block--wide">
                         <h3 className="admin-payments-section-title">Checkout payment methods</h3>
                         <div className="admin-payments-method-list">

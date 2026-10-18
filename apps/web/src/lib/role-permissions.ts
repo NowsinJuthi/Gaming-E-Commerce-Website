@@ -92,7 +92,10 @@ export const PERMISSION_GROUPS = [
     permissions: [
       { key: "guest_browse_storefront", label: "Browse storefront" },
       { key: "guest_use_cart", label: "Use cart" },
-      { key: "guest_checkout", label: "Guest checkout" },
+      {
+        key: "guest_checkout",
+        label: "Guest checkout (order without account)",
+      },
       { key: "guest_live_chat", label: "Guest live chat" },
       { key: "guest_view_media", label: "Browse media catalog" },
     ],

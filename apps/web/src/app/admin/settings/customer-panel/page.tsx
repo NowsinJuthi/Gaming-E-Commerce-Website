@@ -1,6 +1,7 @@
 "use client";
 
 import { adminToast, hideAdminToast } from "@/lib/admin-toast";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
@@ -801,23 +802,6 @@ export default function AdminCustomerPanelPage() {
     [patchCheckout],
   );
 
-  const toggleGuestCheckout = useCallback(
-    (value: boolean) => {
-      const previous = settingsRef.current?.checkout.allowGuestCheckout ?? false;
-      patchCheckout({ allowGuestCheckout: value });
-      void (async () => {
-        try {
-          await updateCustomerPanelSettings({ checkout: { allowGuestCheckout: value } });
-          adminToast("Guest checkout setting updated.", true);
-        } catch (err) {
-          patchCheckout({ allowGuestCheckout: previous });
-          adminToast(err instanceof Error ? err.message : "Update failed.", false);
-        }
-      })();
-    },
-    [patchCheckout],
-  );
-
   const moveCheckoutMethodOrder = useCallback(
     (value: PaymentMethodValue, direction: "up" | "down") => {
       const previous = normalizePaymentMethodOrder(
@@ -1017,8 +1001,8 @@ export default function AdminCustomerPanelPage() {
                             {statsPending
                               ? "…"
                               : settings?.checkout.allowGuestCheckout
-                                ? "On"
-                                : "Off"}
+                                ? "On (Roles → Guest)"
+                                : "Off (Roles → Guest)"}
                           </span>
                           <span>
                             <span className="font-semibold text-foreground">Updated</span>{" "}
@@ -1028,15 +1012,16 @@ export default function AdminCustomerPanelPage() {
                       </div>
 
                       {settings ? (
-                        <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-3 sm:px-4">
-                          <PanelToggle
-                            label="Allow ordering without account"
-                            hint="When off, customers must register or sign in to checkout. Order emails/alerts are not sent without a real account."
-                            checked={settings.checkout.allowGuestCheckout === true}
-                            disabled={busy}
-                            onChange={toggleGuestCheckout}
-                          />
-                        </div>
+                        <p className="rounded-xl border border-border/60 bg-muted/30 px-3 py-3 text-sm text-foreground-muted sm:px-4">
+                          Guest checkout (order without account) is managed in{" "}
+                          <Link
+                            href="/admin/settings/roles"
+                            className="font-semibold text-brand hover:underline"
+                          >
+                            Roles → Guest
+                          </Link>{" "}
+                          under <span className="font-semibold">Guest checkout</span>.
+                        </p>
                       ) : null}
 
                       <div className="flex flex-wrap items-center justify-between gap-3">

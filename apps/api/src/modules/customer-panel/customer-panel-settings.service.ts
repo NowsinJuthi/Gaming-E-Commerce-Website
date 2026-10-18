@@ -290,21 +290,27 @@ export class CustomerPanelSettingsService implements OnModuleInit {
         CacheKeys.ttl.settingsPanel,
       );
     }
+    const guestPermissions = await this.resolveGuestPermissions(base.checkout);
     return {
       ...base,
-      guestPermissions: await this.resolveGuestPermissions(base.checkout),
+      checkout: {
+        ...base.checkout,
+        /** Derived from Roles → Guest (`guest_checkout`). Not a separate admin toggle. */
+        allowGuestCheckout: guestPermissions.guest_checkout,
+      },
+      guestPermissions,
     };
   }
 
   private async resolveGuestPermissions(
-    checkout: CustomerPanelConfig['checkout'],
+    checkout: Pick<CustomerPanelConfig['checkout'], 'allowGuestChat'>,
   ): Promise<GuestStorefrontPermissions> {
     const role = await this.rolePermissions.getGuestStorefrontPermissions();
     const browse = role.guest_browse_storefront;
     return {
       guest_browse_storefront: browse,
       guest_use_cart: browse && role.guest_use_cart,
-      guest_checkout: checkout.allowGuestCheckout && role.guest_checkout,
+      guest_checkout: role.guest_checkout,
       guest_live_chat: checkout.allowGuestChat && role.guest_live_chat,
       guest_view_media: browse && role.guest_view_media,
     };
@@ -343,9 +349,6 @@ export class CustomerPanelSettingsService implements OnModuleInit {
       }
       if (checkout.paymentMethodOrder !== undefined) {
         doc.checkout.paymentMethodOrder = checkout.paymentMethodOrder;
-      }
-      if (checkout.allowGuestCheckout !== undefined) {
-        doc.checkout.allowGuestCheckout = checkout.allowGuestCheckout;
       }
       if ((checkout as { allowGuestChat?: boolean }).allowGuestChat !== undefined) {
         doc.checkout.allowGuestChat = (checkout as { allowGuestChat?: boolean }).allowGuestChat!;

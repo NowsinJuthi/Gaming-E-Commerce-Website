@@ -29,3 +29,10 @@ export function guestPermissionsFromConfig(
     guest_live_chat: config.checkout.allowGuestChat === true,
   };
 }
+
+/** Guest checkout is controlled only via Roles → Guest (`guest_checkout`). */
+export function isGuestCheckoutEnabled(
+  config: Pick<CustomerPanelConfig, "checkout" | "guestPermissions">,
+): boolean {
+  return guestPermissionsFromConfig(config).guest_checkout;
+}

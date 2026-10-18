@@ -332,7 +332,8 @@ export const PERMISSION_GROUPS: Array<{
       {
         key: 'guest_checkout',
         label: 'Guest checkout',
-        description: 'Start checkout and pay without a registered account',
+        description:
+          'Allow ordering without an account (replaces the old Payment gateways toggle)',
       },
       {
         key: 'guest_live_chat',
@@ -408,7 +409,8 @@ export const ROLE_DEFINITIONS: Array<{
     summary: [
       'Applies to guest checkout and guest chat JWT sessions.',
       'Toggle cart, checkout, chat, and media browsing independently.',
-      'Works together with Customer panel guest checkout / chat switches.',
+      'Guest checkout replaces the old Payment gateways “order without account” toggle.',
+      'Guest live chat still respects Customer panel / Live chat guest switch.',
       'No admin panel access.',
     ],
   },

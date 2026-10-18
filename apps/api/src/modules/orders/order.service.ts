@@ -186,7 +186,7 @@ export class OrderService implements OnModuleInit {
     const buyer = await this.userModel.findById(userId).exec();
     if (buyer?.isGuest) {
       const panelConfig = await this.customerPanel.getConfig();
-      if (!panelConfig.checkout.allowGuestCheckout) {
+      if (!panelConfig.guestPermissions.guest_checkout) {
         throw new ForbiddenException('Guest checkout is disabled');
       }
       if (!dto.contact?.fullName?.trim() || !dto.contact?.mobile?.trim() || !dto.contact?.email?.trim()) {

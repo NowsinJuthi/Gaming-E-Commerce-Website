@@ -617,7 +617,7 @@ export default function AdminRolesPage() {
                             title={group.label}
                             subtitle={
                               selected.id === "guest"
-                                ? "Guest storefront limits first; other sections stay off unless you enable them (API keeps non-guest flags disabled for this profile)."
+                                ? "Guest checkout (order without account) and other storefront limits — turn off Guest checkout to block guest ordering site-wide."
                                 : "Toggle access for this role"
                             }
                             className="admin-product-form-section"
