@@ -428,7 +428,7 @@ export function Header({
                   setMenuOpen((open) => !open);
                 }
               }}
-              className={`${iconBtn} lg:hidden${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
+              className={`${iconBtn} lg:hidden`}
               aria-label="Open menu"
               aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
             >
@@ -453,7 +453,7 @@ export function Header({
               <button
                 type="button"
                 onClick={() => setSearchOpen((o) => !o)}
-                className={`${iconBtn} lg:hidden${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
+                className={`${iconBtn} lg:hidden`}
                 aria-label="Search"
               >
                 <SearchIcon />
@@ -649,7 +649,7 @@ export function Header({
               <p className="site-mobile-drawer-title">{isAdminRoute ? "Menu" : "Browse"}</p>
               <button
                 type="button"
-                className={`${iconBtn}${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
+                className={iconBtn}
                 aria-label="Close menu"
                 onClick={() => setMenuOpen(false)}
               >

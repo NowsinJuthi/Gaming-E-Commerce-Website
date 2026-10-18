@@ -38036,8 +38036,8 @@ html.media-catalog-route .media-page-root :where(
   place-items: center;
   isolation: isolate;
   overflow: visible;
-  height: 2rem;
-  width: 2rem;
+  height: 2.5rem;
+  width: 2.5rem;
   padding: 0;
   border-radius: 9999px;
   animation: siteHeaderProfileGlow 3.2s ease-in-out infinite;
@@ -38076,15 +38076,20 @@ html.media-catalog-route .media-page-root :where(
   width: 100% !important;
 }
 
-.site-header.site-header--storefront .site-header-orbit-btn {
+.site-header.site-header--storefront .shell-icon-btn {
   position: relative;
   isolation: isolate;
   overflow: visible;
+  height: 2.5rem;
+  width: 2.5rem;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
   border-radius: 9999px;
+  padding: 0;
   animation: siteHeaderIconGlow 3.2s ease-in-out infinite;
 }
 
-.site-header.site-header--storefront .site-header-orbit-btn::before {
+.site-header.site-header--storefront .shell-icon-btn::before {
   content: "";
   position: absolute;
   inset: -2px;
@@ -38110,13 +38115,13 @@ html.media-catalog-route .media-page-root :where(
   padding: 1.5px;
 }
 
-.site-header.site-header--storefront .site-header-orbit-btn > * {
+.site-header.site-header--storefront .shell-icon-btn > * {
   position: relative;
   z-index: 1;
 }
 
-.site-header.site-header--storefront .site-header-orbit-btn:hover,
-.site-header.site-header--storefront .site-header-orbit-btn:active {
+.site-header.site-header--storefront .shell-icon-btn:hover,
+.site-header.site-header--storefront .shell-icon-btn:active {
   transform: scale(0.94);
 }
 
@@ -38315,29 +38320,14 @@ html.media-catalog-route .media-page-root :where(
 
 @media (prefers-reduced-motion: reduce) {
   .site-header.site-header--storefront .site-header-profile-ring,
-  .site-header.site-header--storefront .site-header-orbit-btn {
+  .site-header.site-header--storefront .shell-icon-btn {
     animation: none;
   }
 
   .site-header.site-header--storefront .site-header-profile-ring::before,
-  .site-header.site-header--storefront .site-header-orbit-btn::before {
+  .site-header.site-header--storefront .shell-icon-btn::before {
     animation: none;
     opacity: 0.75;
-  }
-}
-
-@media (max-width: 1023px) {
-  .site-header.site-header--storefront .site-header-orbit-btn.shell-icon-btn {
-    height: 2.5rem;
-    width: 2.5rem;
-    min-height: 2.5rem;
-    min-width: 2.5rem;
-    border-radius: 9999px;
-  }
-
-  .site-header.site-header--storefront .site-header-profile-ring {
-    height: calc(2.5rem - 4px);
-    width: calc(2.5rem - 4px);
   }
 }
 
