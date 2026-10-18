@@ -38018,15 +38018,32 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-@keyframes siteHeaderProfileGlow {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 6px rgb(255 183 0 / 0.28));
-  }
+.site-header.site-header--storefront .site-header-mobile-profile-btn {
+  display: grid;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  50% {
-    filter: drop-shadow(0 0 10px rgb(255 183 0 / 0.45));
-  }
+.site-header.site-header--storefront .site-header-mobile-profile-btn:hover,
+.site-header.site-header--storefront .site-header-mobile-profile-btn:active,
+.site-header.site-header--storefront .site-header-mobile-profile-btn:focus-visible {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.site-header.site-header--storefront .site-header-mobile-profile-btn:active .site-header-profile-ring {
+  transform: scale(0.94);
 }
 
 .site-header.site-header--storefront .site-header-profile-ring {
@@ -38035,12 +38052,12 @@ html.media-catalog-route .media-page-root :where(
   flex-shrink: 0;
   place-items: center;
   isolation: isolate;
-  overflow: visible;
+  overflow: hidden;
   height: 2.5rem;
   width: 2.5rem;
   padding: 0;
   border-radius: 9999px;
-  animation: siteHeaderProfileGlow 3.2s ease-in-out infinite;
+  transition: transform 0.2s ease;
 }
 
 .site-header.site-header--storefront .site-header-profile-ring::before {
@@ -38074,6 +38091,8 @@ html.media-catalog-route .media-page-root :where(
   z-index: 1;
   height: 100% !important;
   width: 100% !important;
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
 }
 
 .site-header.site-header--storefront .shell-icon-btn {
@@ -38319,7 +38338,6 @@ html.media-catalog-route .media-page-root :where(
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-header.site-header--storefront .site-header-profile-ring,
   .site-header.site-header--storefront .shell-icon-btn {
     animation: none;
   }

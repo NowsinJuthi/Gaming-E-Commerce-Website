@@ -533,7 +533,7 @@ export function Header({
                     setMenuOpen(false);
                     setUserOpen((o) => !o);
                   }}
-                  className="overflow-visible rounded-full border border-transparent p-0 transition hover:border-border hover:bg-muted/60"
+                  className="site-header-mobile-profile-btn"
                   aria-label="My account"
                   aria-expanded={userOpen}
                   aria-haspopup="menu"
