@@ -38058,7 +38058,8 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-.site-header.site-header--storefront .site-header-profile-ring {
+.site-header.site-header--storefront .site-header-profile-ring,
+.site-header.site-header--storefront .shell-icon-btn {
   position: relative;
   display: inline-grid;
   flex-shrink: 0;
@@ -38073,11 +38074,13 @@ html.media-catalog-route .media-page-root :where(
   border: 0;
   border-radius: 9999px;
   background: transparent;
+  color: #ffb700;
   transition: transform 0.2s ease;
   animation: siteHeaderProfileGlow 3.2s ease-in-out infinite;
 }
 
-.site-header.site-header--storefront .site-header-profile-ring::before {
+.site-header.site-header--storefront .site-header-profile-ring::before,
+.site-header.site-header--storefront .shell-icon-btn::before {
   content: "";
   position: absolute;
   inset: -2px;
@@ -38103,6 +38106,12 @@ html.media-catalog-route .media-page-root :where(
   padding: 1.5px;
 }
 
+.site-header.site-header--storefront .site-header-profile-ring > *,
+.site-header.site-header--storefront .shell-icon-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
 .site-header.site-header--storefront .site-header-profile-ring > .admin-topbar-avatar {
   position: relative;
   z-index: 1;
@@ -38119,53 +38128,13 @@ html.media-catalog-route .media-page-root :where(
   background: transparent;
 }
 
-.site-header.site-header--storefront .shell-icon-btn {
-  position: relative;
-  isolation: isolate;
-  overflow: visible;
-  height: 2.5rem;
-  width: 2.5rem;
-  min-height: 2.5rem;
-  min-width: 2.5rem;
-  border-radius: 9999px;
-  padding: 0;
-  animation: siteHeaderIconGlow 3.2s ease-in-out infinite;
-}
-
-.site-header.site-header--storefront .shell-icon-btn::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  z-index: 0;
-  border-radius: inherit;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0 62%,
-    rgb(var(--brand)) 78%,
-    color-mix(in srgb, rgb(var(--brand)) 55%, white) 82%,
-    transparent 92%
-  );
-  animation: siteHeaderIconOrbit 5.5s linear infinite;
-  pointer-events: none;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  padding: 1.5px;
-}
-
-.site-header.site-header--storefront .shell-icon-btn > * {
-  position: relative;
-  z-index: 1;
-}
-
 .site-header.site-header--storefront .shell-icon-btn:hover,
 .site-header.site-header--storefront .shell-icon-btn:active {
   transform: scale(0.94);
+  border: 0;
+  background: transparent;
+  color: #ffc933;
+  box-shadow: none;
 }
 
 .site-mobile-drawer {
