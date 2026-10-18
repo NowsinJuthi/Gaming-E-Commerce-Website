@@ -390,7 +390,6 @@ export function Header({
 
   const AvatarInner = () => (
     <span className="site-header-profile-ring">
-      <span className="site-header-profile-ringOrbit" aria-hidden />
       <span className="admin-topbar-avatar overflow-hidden">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -429,7 +428,7 @@ export function Header({
                   setMenuOpen((open) => !open);
                 }
               }}
-              className={`${iconBtn} lg:hidden`}
+              className={`${iconBtn} lg:hidden${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
               aria-label="Open menu"
               aria-expanded={onOpenMobileMenu ? undefined : menuOpen}
             >
@@ -454,7 +453,7 @@ export function Header({
               <button
                 type="button"
                 onClick={() => setSearchOpen((o) => !o)}
-                className={`${iconBtn} lg:hidden`}
+                className={`${iconBtn} lg:hidden${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
                 aria-label="Search"
               >
                 <SearchIcon />
@@ -634,21 +633,40 @@ export function Header({
       {/* Mobile nav drawer — only shown when no external sidebar handler */}
       {menuOpen && !onOpenMobileMenu && (
         <div
-          className="pointer-events-auto fixed inset-x-0 bottom-0 top-14 z-[990] sm:top-16 lg:hidden"
+          className={`site-mobile-drawer pointer-events-auto lg:hidden${!isAdminRoute ? " site-mobile-drawer--storefront" : ""}`}
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/60"
+            className="site-mobile-drawer-backdrop"
             aria-label="Close menu"
             onClick={() => setMenuOpen(false)}
           />
-          <nav className="admin-panel admin-sidebar site-mobile-menu absolute bottom-0 left-0 top-0 flex w-[min(20rem,85vw)] flex-col shadow-2xl">
-            <div className="admin-sidebar-nav min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-4 pt-3">
-              <div className="admin-menu-panel">
-                <ul className="flex flex-col gap-2.5">
+          <aside className="site-mobile-drawer-panel">
+            <div className="site-mobile-drawer-head">
+              <p className="site-mobile-drawer-title">{isAdminRoute ? "Menu" : "Browse"}</p>
+              <button
+                type="button"
+                className={`${iconBtn}${!isAdminRoute ? " site-header-orbit-btn" : ""}`}
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <nav className="site-mobile-drawer-scroll brand-scrollbar" aria-label="Mobile navigation">
+              <div className="site-mobile-nav-panel">
+                {!isAdminRoute ? (
+                  <div className="site-mobile-section-head">
+                    <span className="site-mobile-section-icon" aria-hidden>
+                      <StoreIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="site-mobile-section-label">Store</p>
+                  </div>
+                ) : null}
+                <ul className="site-mobile-nav-list">
                   <Suspense
                     fallback={
                       <MobileNavItemsFallback
@@ -673,9 +691,8 @@ export function Header({
                   />
                 </ul>
               </div>
-            </div>
-
-          </nav>
+            </nav>
+          </aside>
         </div>
       )}
     </>
@@ -692,6 +709,14 @@ function MenuIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }
