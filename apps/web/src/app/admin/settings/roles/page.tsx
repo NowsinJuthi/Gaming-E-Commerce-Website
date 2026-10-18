@@ -280,10 +280,10 @@ export default function AdminRolesPage() {
       }
       const next = { ...current, [key]: !current[key] };
       if (key === "guest_checkout") {
-        next.guest_use_cart = next.guest_checkout;
+        next.guest_use_cart = next.guest_checkout === true;
       }
       if (key === "live_chat_without_login") {
-        next.guest_live_chat = next.live_chat_without_login;
+        next.guest_live_chat = next.live_chat_without_login === true;
       }
       return next;
     });
