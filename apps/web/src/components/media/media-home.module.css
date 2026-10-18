@@ -49,8 +49,8 @@
 .recentTrack {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 0.75rem) / 2);
-  gap: 0.75rem;
+  grid-auto-columns: calc((100% - 1rem) / 2);
+  gap: 1rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
@@ -167,25 +167,25 @@
 
 @media (min-width: 640px) {
   .recentTrack {
-    grid-auto-columns: calc((100% - 1.5rem) / 3);
+    grid-auto-columns: calc((100% - 2rem) / 3);
   }
 }
 
 @media (min-width: 768px) {
   .recentTrack {
-    grid-auto-columns: calc((100% - 2.25rem) / 4);
+    grid-auto-columns: calc((100% - 3rem) / 4);
   }
 }
 
 @media (min-width: 1024px) {
   .recentTrack {
-    grid-auto-columns: calc((100% - 3rem) / 5);
+    grid-auto-columns: calc((100% - 4rem) / 5);
   }
 }
 
 @media (min-width: 1280px) {
   .recentTrack {
-    grid-auto-columns: calc((100% - 3.75rem) / 6);
+    grid-auto-columns: calc((100% - 5rem) / 6);
   }
 }
 
@@ -783,7 +783,7 @@
   display: grid;
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 @media (min-width: 640px) {
@@ -852,6 +852,43 @@
   background: linear-gradient(to bottom right, rgb(var(--bg-muted)), #000);
   box-shadow: 0 10px 24px rgb(0 0 0 / 0.22);
   pointer-events: none;
+  transition:
+    box-shadow 0.32s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.posterFrame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.14) 50%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  opacity: 0;
+}
+
+.posterFrame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    160deg,
+    rgb(38 191 176 / 0.38) 0%,
+    rgb(1 19 26 / 0.62) 52%,
+    rgb(38 191 176 / 0.22) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .posterImage,
@@ -864,6 +901,9 @@
 
 .posterImage {
   object-fit: cover;
+  transition:
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.32s ease;
 }
 
 .posterFallback {
@@ -878,24 +918,72 @@
 .playOverlay {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
   background: transparent;
-  opacity: 1;
-  transition: opacity 0.28s ease, background 0.28s ease;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.28s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.28s ease;
 }
 
-@media (hover: hover) and (pointer: fine) {
+.posterLink:is(:hover, :focus-visible, :active) .playOverlay {
+  opacity: 1;
+  transform: scale(1);
+  background: rgb(1 19 26 / 0.42);
+}
+
+.posterLink:is(:hover, :focus-visible, :active) .posterFrame::after {
+  opacity: 1;
+}
+
+.posterLink:is(:hover, :focus-visible, :active) .posterFrame::before {
+  opacity: 1;
+  animation: posterShimmer 0.72s ease-out forwards;
+}
+
+.posterLink:is(:hover, :focus-visible, :active) .posterImage {
+  transform: scale(1.06);
+  filter: brightness(1.08) saturate(1.1);
+}
+
+.posterLink:is(:hover, :focus-visible, :active) .posterFrame {
+  box-shadow:
+    0 0 0 2px rgb(38 191 176 / 0.58),
+    0 16px 36px rgb(0 0 0 / 0.45),
+    0 0 26px rgb(38 191 176 / 0.28);
+}
+
+@keyframes posterShimmer {
+  to {
+    transform: translateX(130%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .posterFrame,
+  .posterImage,
   .playOverlay {
-    opacity: 0;
+    transition: none;
   }
 
-  .posterLink:hover .playOverlay,
-  .posterLink:focus-visible .playOverlay {
-    opacity: 1;
+  .posterLink:is(:hover, :focus-visible, :active) .posterFrame::before {
+    animation: none;
+    transform: none;
+    opacity: 0.35;
+  }
+
+  .posterLink:is(:hover, :focus-visible, :active) .posterImage {
+    transform: none;
+  }
+
+  .posterLink:is(:hover, :focus-visible, :active) .playOverlay {
+    transform: none;
   }
 }
 
