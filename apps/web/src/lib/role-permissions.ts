@@ -122,7 +122,20 @@ export function permissionGroupsForRole(roleId: string) {
     );
     return [...guestFirst, ...rest];
   }
-  return PERMISSION_GROUPS.filter((group) => group.key !== "guest_storefront");
+  return PERMISSION_GROUPS;
+}
+
+export function permissionGroupSubtitle(
+  roleId: string,
+  groupKey: string,
+): string {
+  if (groupKey === "guest_storefront") {
+    if (roleId === "guest") {
+      return "Guest checkout (order without account) and other storefront limits — turn off Guest checkout to block guest ordering site-wide.";
+    }
+    return "Same guest storefront toggles as the Guest profile. Site-wide guest checkout/cart/media limits are enforced from Roles → Guest when saved there.";
+  }
+  return "Toggle access for this role";
 }
 
 export const BLOG_PERMISSION_KEYS = PERMISSION_GROUPS.find(

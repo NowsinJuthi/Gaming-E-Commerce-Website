@@ -25,6 +25,7 @@ import {
 import { mergeRolePermissionsOverview } from "@/lib/admin-role-catalog";
 import {
   PERMISSION_GROUPS,
+  permissionGroupSubtitle,
   permissionGroupsForRole,
 } from "@/lib/role-permissions";
 
@@ -615,11 +616,10 @@ export default function AdminRolesPage() {
                             key={group.key}
                             icon={<LockIcon className="h-4 w-4" />}
                             title={group.label}
-                            subtitle={
-                              selected.id === "guest"
-                                ? "Guest checkout (order without account) and other storefront limits — turn off Guest checkout to block guest ordering site-wide."
-                                : "Toggle access for this role"
-                            }
+                            subtitle={permissionGroupSubtitle(
+                              selected.id,
+                              group.key,
+                            )}
                             className="admin-product-form-section"
                           >
                             <dl>
