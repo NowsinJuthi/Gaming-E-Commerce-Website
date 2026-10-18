@@ -14,7 +14,9 @@ import { Public } from "../../common/decorators/public.decorator";
 import { ChatRoomType } from "../../common/enums";
 import { socketIoCorsOptions } from "../../common/utils/cors-origins";
 import { RedisSlidingWindowLimiter } from "../../common/utils/redis-sliding-window";
+import { isEphemeralGuestUser } from "../../common/utils/guest-user";
 import { isChatStaff } from "../../common/utils/role.utils";
+import { RolePermissionsService } from "../role-permissions/role-permissions.service";
 import { isProductionNodeEnv } from "../../config/production-env";
 import { REDIS_CLIENT } from "../../shared/cache/redis.constants";
 import type { Redis } from "ioredis";
@@ -46,6 +48,28 @@ const participantId = (participant: unknown): string => {
 
 const isStaff = (user: AuthenticatedUser): boolean => isChatStaff(user.roles);
 
+async function guestChatAllowedForUser(
+  user: AuthenticatedUser,
+  rolePermissions: RolePermissionsService,
+): Promise<boolean> {
+  if (isStaff(user)) return true;
+  if (!user.isGuest && !isEphemeralGuestUser(user)) return true;
+  return rolePermissions.rolesHavePermission(
+    user.roles,
+    "live_chat_without_login",
+  );
+}
+
+async function pictureUploadAllowedForUser(
+  user: AuthenticatedUser,
+  rolePermissions: RolePermissionsService,
+): Promise<boolean> {
+  return rolePermissions.rolesHavePermission(
+    user.roles,
+    "live_chat_picture_upload",
+  );
+}
+
 /**
  * Live-chat gateway (NestJS WebSocket / socket.io).
  * - Authenticates each socket from the JWT in the handshake.
@@ -74,6 +98,7 @@ export class ChatGateway
     private readonly chat: ChatService,
     private readonly presence: PresenceService,
     private readonly auth: AuthService,
+    private readonly rolePermissions: RolePermissionsService,
     @Inject(REDIS_CLIENT) redis: Redis,
   ) {
     const failClosed = isProductionNodeEnv(process.env.NODE_ENV);
@@ -167,8 +192,11 @@ export class ChatGateway
   async openSupport(@ConnectedSocket() client: Socket) {
     const user = this.user(client);
     try {
-      const { checkout } = await this.auth.getPanelConfig();
-      this.chat.assertRegisteredChatUser(user, checkout.allowGuestChat);
+      const allowGuestChat = await guestChatAllowedForUser(
+        user,
+        this.rolePermissions,
+      );
+      this.chat.assertRegisteredChatUser(user, allowGuestChat);
     } catch (error) {
       return { ok: false, error: this.errorMessage(error) };
     }
@@ -202,13 +230,20 @@ export class ChatGateway
       return { ok: false, error: "Too many messages" };
     }
     try {
-      const config = await this.auth.getPanelConfig();
+      const allowGuestChat = await guestChatAllowedForUser(
+        user,
+        this.rolePermissions,
+      );
+      const allowImageUpload = await pictureUploadAllowedForUser(
+        user,
+        this.rolePermissions,
+      );
       const { payload, room } = await this.chat.sendRoomMessage(
         user,
         dto.roomId,
         {
-          allowGuestChat: config.checkout.allowGuestChat,
-          allowImageUpload: config.chat.allowImageUpload !== false,
+          allowGuestChat,
+          allowImageUpload,
           body: dto.body,
           imageUrl: dto.imageUrl,
         },

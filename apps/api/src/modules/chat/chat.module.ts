@@ -18,6 +18,7 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UploadsService } from '../../shared/uploads/uploads.service';
 import { AuthModule } from '../auth/auth.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { LicenseModule } from '../license/license.module';
 import { CHAT_QUEUE } from '../../queues/queue.constants';
 import { ChatController } from './chat.controller';
@@ -41,6 +42,7 @@ import { ChatImageCleanupProcessor } from './chat-image-cleanup.processor';
     NotificationsModule,
     forwardRef(() => AuthModule),
     LicenseModule,
+    RolePermissionsModule,
   ],
   controllers: [ChatController],
   providers: [

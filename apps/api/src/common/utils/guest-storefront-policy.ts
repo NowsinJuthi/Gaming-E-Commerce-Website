@@ -6,10 +6,9 @@ export type GuestStorefrontPermissions = {
   guest_view_media: boolean;
 };
 
-/** Site-wide effective limits (Roles → Guest + live-chat panel switch). */
+/** Site-wide effective limits (Roles → Guest profile). */
 export function resolveEffectiveGuestStorefrontPermissions(
   role: GuestStorefrontPermissions,
-  allowGuestChat: boolean,
 ): GuestStorefrontPermissions {
   const browse = Boolean(role.guest_browse_storefront);
   const shop = browse && Boolean(role.guest_checkout);
@@ -17,7 +16,7 @@ export function resolveEffectiveGuestStorefrontPermissions(
     guest_browse_storefront: browse,
     guest_use_cart: shop,
     guest_checkout: shop,
-    guest_live_chat: allowGuestChat && Boolean(role.guest_live_chat),
+    guest_live_chat: Boolean(role.guest_live_chat),
     guest_view_media: browse && Boolean(role.guest_view_media),
   };
 }

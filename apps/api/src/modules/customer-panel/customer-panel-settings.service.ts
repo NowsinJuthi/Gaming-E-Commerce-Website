@@ -16,11 +16,10 @@ import { EventsService } from '../../shared/events/events.service';
 import { AppEvent } from '../../shared/events/events.types';
 import { UpdateCustomerPanelSettingsDto } from './dto/update-customer-panel-settings.dto';
 import { deepReplaceLegacyBrand } from '../../common/utils/legacy-brand-migration';
-import { resolveEffectiveGuestStorefrontPermissions } from '../../common/utils/guest-storefront-policy';
 import { LICENSE_FEATURE_LABELS } from '../license/license.constants';
 import { LicenseService } from '../license/license.service';
 import { RolePermissionsService } from '../role-permissions/role-permissions.service';
-import type { GuestStorefrontPermissions } from '../role-permissions/role-permissions.service';
+import type { GuestStorefrontPermissions } from '../../common/utils/guest-storefront-policy';
 
 const SETTINGS_KEY = 'global';
 
@@ -291,23 +290,24 @@ export class CustomerPanelSettingsService implements OnModuleInit {
         CacheKeys.ttl.settingsPanel,
       );
     }
-    const guestPermissions = await this.resolveGuestPermissions(base.checkout);
+    const guestPermissions =
+      await this.rolePermissions.getGuestStorefrontPermissions();
     return {
       ...base,
       checkout: {
         ...base.checkout,
         /** Derived from Roles → Guest (`guest_checkout`). Not a separate admin toggle. */
         allowGuestCheckout: guestPermissions.guest_checkout,
+        /** Derived from Roles → Guest (`live_chat_without_login`). */
+        allowGuestChat: guestPermissions.guest_live_chat,
+      },
+      chat: {
+        ...base.chat,
+        /** Per-role via Roles → LIVE CHAT; kept for legacy clients (use /chat/capabilities). */
+        allowImageUpload: true,
       },
       guestPermissions,
     };
-  }
-
-  private async resolveGuestPermissions(
-    checkout: Pick<CustomerPanelConfig['checkout'], 'allowGuestChat'>,
-  ): Promise<GuestStorefrontPermissions> {
-    const role = await this.rolePermissions.getGuestStorefrontPermissions();
-    return resolveEffectiveGuestStorefrontPermissions(role, checkout.allowGuestChat);
   }
 
   async getSettings(): Promise<CustomerPanelSettingsDocument> {
@@ -344,17 +344,11 @@ export class CustomerPanelSettingsService implements OnModuleInit {
       if (checkout.paymentMethodOrder !== undefined) {
         doc.checkout.paymentMethodOrder = checkout.paymentMethodOrder;
       }
-      if ((checkout as { allowGuestChat?: boolean }).allowGuestChat !== undefined) {
-        doc.checkout.allowGuestChat = (checkout as { allowGuestChat?: boolean }).allowGuestChat!;
-      }
       doc.markModified('checkout');
     }
     if (dto.chat) {
       if (!doc.chat) {
         doc.chat = {} as typeof doc.chat;
-      }
-      if (dto.chat.allowImageUpload !== undefined) {
-        doc.chat.allowImageUpload = dto.chat.allowImageUpload;
       }
       if (dto.chat.averageResponseTime !== undefined) {
         doc.chat.averageResponseTime =
@@ -509,10 +503,7 @@ export class CustomerPanelSettingsService implements OnModuleInit {
     dto: UpdateCustomerPanelSettingsDto,
   ): Promise<void> {
     const touchesLiveChat =
-      Boolean(dto.chat) ||
-      dto.nav?.chat !== undefined ||
-      (dto.checkout as { allowGuestChat?: boolean } | undefined)
-        ?.allowGuestChat !== undefined;
+      Boolean(dto.chat) || dto.nav?.chat !== undefined;
     if (!touchesLiveChat) {
       return;
     }

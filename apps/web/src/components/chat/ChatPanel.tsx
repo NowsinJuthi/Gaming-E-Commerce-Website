@@ -35,6 +35,7 @@ import {
 import { notifyUnreadCountChanged } from "@/hooks/useUnreadNotifications";
 import {
   deleteChatRoom,
+  getChatCapabilities,
   getChatAdminOverview,
   fetchFullChatHistory,
   fetchFullCustomerSupportHistory,
@@ -393,26 +394,21 @@ export function ChatPanel({
       setAllowChatImages(allowChatImagesProp);
     }
     let cancelled = false;
-    getCustomerPanelConfig()
-      .then((config) => {
-        if (!cancelled) {
-          if (allowChatImagesProp === undefined) {
-            setAllowChatImages(config.chat?.allowImageUpload !== false);
-          }
-          setAverageResponseTime(
-            config.chat?.averageResponseTime?.trim() ||
-              DEFAULT_AVERAGE_RESPONSE_TIME,
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          if (allowChatImagesProp === undefined) {
-            setAllowChatImages(true);
-          }
-          setAverageResponseTime(DEFAULT_AVERAGE_RESPONSE_TIME);
-        }
-      });
+    Promise.all([
+      getCustomerPanelConfig().catch(() => null),
+      allowChatImagesProp === undefined
+        ? getChatCapabilities().catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([config, capabilities]) => {
+      if (cancelled) return;
+      if (allowChatImagesProp === undefined) {
+        setAllowChatImages(capabilities?.pictureUpload === true);
+      }
+      setAverageResponseTime(
+        config?.chat?.averageResponseTime?.trim() ||
+          DEFAULT_AVERAGE_RESPONSE_TIME,
+      );
+    });
     return () => {
       cancelled = true;
     };

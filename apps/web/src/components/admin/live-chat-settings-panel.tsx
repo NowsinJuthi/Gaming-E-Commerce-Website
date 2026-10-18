@@ -60,14 +60,10 @@ function SettingSwitchRow({
 
 export function LiveChatSettingsPanel() {
   const [settingsLoading, setSettingsLoading] = useState(true);
-  const [allowChatImages, setAllowChatImages] = useState(true);
-  const [allowGuestChat, setAllowGuestChat] = useState(false);
   const [chatNavEnabled, setChatNavEnabled] = useState(true);
   const [averageResponseTime, setAverageResponseTime] = useState("< 15 minutes");
   const [savedAverageResponseTime, setSavedAverageResponseTime] =
     useState("< 15 minutes");
-  const [savingChatImages, setSavingChatImages] = useState(false);
-  const [savingGuestChat, setSavingGuestChat] = useState(false);
   const [savingChatNav, setSavingChatNav] = useState(false);
   const [savingResponseTime, setSavingResponseTime] = useState(false);
   const [canManageReplies, setCanManageReplies] = useState(() =>
@@ -114,8 +110,6 @@ export function LiveChatSettingsPanel() {
     getCustomerPanelAdminSettings()
       .then((data) => {
         if (!cancelled) {
-          setAllowChatImages(data.chat?.allowImageUpload !== false);
-          setAllowGuestChat(data.checkout?.allowGuestChat === true);
           setChatNavEnabled(resolveNavItemEnabled(data.nav, "chat"));
           const responseTime =
             data.chat?.averageResponseTime?.trim() || "< 15 minutes";
@@ -125,8 +119,6 @@ export function LiveChatSettingsPanel() {
       })
       .catch(() => {
         if (!cancelled) {
-          setAllowChatImages(true);
-          setAllowGuestChat(false);
           setChatNavEnabled(true);
           setAverageResponseTime("< 15 minutes");
           setSavedAverageResponseTime("< 15 minutes");
@@ -197,53 +189,6 @@ export function LiveChatSettingsPanel() {
       cancelled = true;
     };
   }, [canManageReplies]);
-
-  const handleToggleChatImages = useCallback(
-    async (enabled: boolean) => {
-      const previous = allowChatImages;
-      setAllowChatImages(enabled);
-      setSavingChatImages(true);
-      hideAdminToast();
-      try {
-        await updateCustomerPanelSettings({
-          chat: { allowImageUpload: enabled },
-        });
-        adminToast(
-          enabled
-            ? "Live chat picture uploads enabled."
-            : "Live chat picture uploads disabled.",
-          true,
-        );
-      } catch (err) {
-        setAllowChatImages(previous);
-        adminToast(err instanceof Error ? err.message : "Update failed.", false);
-      } finally {
-        setSavingChatImages(false);
-      }
-    },
-    [allowChatImages],
-  );
-
-  const handleToggleGuestChat = useCallback(
-    async (enabled: boolean) => {
-      const previous = allowGuestChat;
-      setAllowGuestChat(enabled);
-      setSavingGuestChat(true);
-      hideAdminToast();
-      try {
-        await updateCustomerPanelSettings({
-          checkout: { allowGuestChat: enabled },
-        });
-        adminToast("Live chat guest access updated.", true);
-      } catch (err) {
-        setAllowGuestChat(previous);
-        adminToast(err instanceof Error ? err.message : "Update failed.", false);
-      } finally {
-        setSavingGuestChat(false);
-      }
-    },
-    [allowGuestChat],
-  );
 
   const handleToggleChatNav = useCallback(
     async (enabled: boolean) => {
@@ -348,22 +293,17 @@ export function LiveChatSettingsPanel() {
         className="w-full"
       >
         <div className="space-y-2">
-          <SettingSwitchRow
-            title="Allow picture uploads"
-            description="When off, nobody can attach images in live chat — customers, guests, and staff. Text messages still work."
-            checked={allowChatImages}
-            disabled={togglesDisabled || savingChatImages}
-            ariaLabel="Allow picture uploads in live chat"
-            onToggle={(enabled) => void handleToggleChatImages(enabled)}
-          />
-          <SettingSwitchRow
-            title="Allow live chat without login"
-            description="When enabled, visitors can open a live chat session by entering their name only — no account required. When disabled, a login is required to send messages."
-            checked={allowGuestChat}
-            disabled={togglesDisabled || savingGuestChat}
-            ariaLabel="Allow live chat without login"
-            onToggle={(enabled) => void handleToggleGuestChat(enabled)}
-          />
+          <p className="text-sm text-foreground-muted">
+            Picture uploads and chat without login are managed per role under{" "}
+            <Link
+              href="/admin/settings/roles"
+              className="text-accent hover:underline"
+            >
+              Settings → Roles &amp; permissions
+            </Link>{" "}
+            (LIVE CHAT group). On the Guest role, &quot;without login&quot;
+            controls site-wide anonymous chat.
+          </p>
           <div className="admin-payments-setting-row">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground">

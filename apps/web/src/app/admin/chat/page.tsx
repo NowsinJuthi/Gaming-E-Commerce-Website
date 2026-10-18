@@ -11,7 +11,7 @@ import { ChatIcon } from "@/components/admin/icons";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import {
   getChatAdminOverview,
-  getCustomerPanelAdminSettings,
+  getChatCapabilities,
   type ChatAdminOverview,
 } from "@/lib/api";
 
@@ -40,10 +40,10 @@ function AdminChatPageContent() {
 
   useEffect(() => {
     let cancelled = false;
-    getCustomerPanelAdminSettings()
+    getChatCapabilities()
       .then((data) => {
         if (!cancelled) {
-          setAllowChatImages(data.chat?.allowImageUpload !== false);
+          setAllowChatImages(data.pictureUpload === true);
         }
       })
       .catch(() => {

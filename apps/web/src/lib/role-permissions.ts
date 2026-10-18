@@ -95,8 +95,21 @@ export const PERMISSION_GROUPS = [
         key: "guest_checkout",
         label: "Guest cart & checkout (order without account)",
       },
-      { key: "guest_live_chat", label: "Guest live chat" },
       { key: "guest_view_media", label: "Browse media catalog" },
+    ],
+  },
+  {
+    key: "live_chat",
+    label: "LIVE CHAT",
+    permissions: [
+      {
+        key: "live_chat_picture_upload",
+        label: "Allow picture uploads",
+      },
+      {
+        key: "live_chat_without_login",
+        label: "Allow live chat without login",
+      },
     ],
   },
   {
@@ -109,6 +122,15 @@ export const PERMISSION_GROUPS = [
     ],
   },
 ] as const;
+
+/** Keys only editable on the Guest role profile (site-wide storefront limits). */
+export const GUEST_STOREFRONT_ONLY_PERMISSION_KEYS = new Set([
+  "guest_browse_storefront",
+  "guest_use_cart",
+  "guest_checkout",
+  "guest_view_media",
+  "guest_live_chat",
+]);
 
 /** Permission panels shown for a given role profile in admin Roles UI. */
 export function permissionGroupsForRole(roleId: string) {
@@ -133,6 +155,12 @@ export function permissionGroupSubtitle(
       return "Site-wide limits for visitors without an account. Turn off cart & checkout to block guest ordering.";
     }
     return "Read-only — edit these on the Guest role. Only Guest profile saves apply to the storefront.";
+  }
+  if (groupKey === "live_chat") {
+    if (roleId === "guest") {
+      return "Without login applies site-wide to anonymous chat. Picture uploads apply to guest chat sessions.";
+    }
+    return "Live chat access for users assigned this role profile.";
   }
   return "Toggle access for this role";
 }

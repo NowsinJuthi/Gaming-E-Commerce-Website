@@ -23,8 +23,9 @@ const GUEST_PERMISSION_DEFAULTS: Record<string, boolean> = {
   guest_browse_storefront: true,
   guest_use_cart: true,
   guest_checkout: true,
-  guest_live_chat: true,
   guest_view_media: true,
+  live_chat_without_login: true,
+  live_chat_picture_upload: true,
 };
 
 function allPermissionKeysFalse(): Record<string, boolean> {
@@ -47,7 +48,7 @@ function buildGuestRoleProfile(): RolePermissionProfile {
     summary: [
       "Site-wide limits for visitors without an account.",
       "Cart and checkout are one permission; browse must stay on for shop access.",
-      "Guest live chat also requires Customer panel → Live chat guest switch.",
+      "Live chat toggles are under LIVE CHAT on this profile.",
       "No admin panel access.",
     ],
     customized: false,

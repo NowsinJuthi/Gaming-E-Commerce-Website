@@ -5758,6 +5758,15 @@ export function getStaffChatUnreadCount(): Promise<{ count: number }> {
   return authRequest<{ count: number }>("/chat/unread-customer-count");
 }
 
+export function getChatCapabilities(): Promise<{
+  pictureUpload: boolean;
+  guestAccess: boolean;
+}> {
+  return authRequest<{ pictureUpload: boolean; guestAccess: boolean }>(
+    "/chat/capabilities",
+  );
+}
+
 export function listChatRooms(
   page = 1,
   limit = 50,

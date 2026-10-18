@@ -4,7 +4,6 @@ export const GUEST_STOREFRONT_PERMISSION_KEYS = [
   'guest_browse_storefront',
   'guest_use_cart',
   'guest_checkout',
-  'guest_live_chat',
   'guest_view_media',
 ] as const;
 
@@ -72,9 +71,17 @@ export const PERMISSION_KEYS = [
   'guest_checkout',
   'guest_live_chat',
   'guest_view_media',
+  'live_chat_picture_upload',
+  'live_chat_without_login',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+
+/** Extra keys editable on the Guest role profile (site-wide chat limits). */
+export const GUEST_ROLE_EXTRA_PERMISSION_KEYS = [
+  'live_chat_without_login',
+  'live_chat_picture_upload',
+] as const satisfies readonly PermissionKey[];
 
 export const BLOG_PERMISSION_KEYS: readonly PermissionKey[] = [
   'view_blog_overview',
@@ -331,14 +338,26 @@ export const PERMISSION_GROUPS: Array<{
           'Add to cart and order without registering (includes guest cart session)',
       },
       {
-        key: 'guest_live_chat',
-        label: 'Guest live chat',
-        description: 'Open live chat without registering',
-      },
-      {
         key: 'guest_view_media',
         label: 'Browse media catalog',
         description: 'View /media movies and series as a guest',
+      },
+    ],
+  },
+  {
+    key: 'live_chat',
+    label: 'LIVE CHAT',
+    permissions: [
+      {
+        key: 'live_chat_picture_upload',
+        label: 'Allow picture uploads',
+        description: 'Send image attachments in live chat for users with this role',
+      },
+      {
+        key: 'live_chat_without_login',
+        label: 'Allow live chat without login',
+        description:
+          'For guest sessions: open chat with a name only. On the Guest role this controls site-wide anonymous chat.',
       },
     ],
   },
@@ -404,7 +423,7 @@ export const ROLE_DEFINITIONS: Array<{
     summary: [
       'Site-wide limits for visitors without an account.',
       'Cart and checkout are one permission; browse must stay on for shop access.',
-      'Guest live chat also requires Customer panel / Live chat guest switch.',
+      'Live chat without login is under LIVE CHAT on this profile.',
       'No admin panel access.',
     ],
   },
@@ -558,24 +577,39 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     view_customers: true,
     edit_customers_wallet: true,
     view_blog_posts: true,
+    live_chat_picture_upload: true,
   },
-  customer: allPermissions(false),
+  customer: {
+    ...allPermissions(false),
+    live_chat_picture_upload: true,
+  },
   guest: {
     ...allPermissions(false),
     guest_browse_storefront: true,
     guest_use_cart: true,
     guest_checkout: true,
-    guest_live_chat: true,
     guest_view_media: true,
+    live_chat_without_login: true,
+    live_chat_picture_upload: true,
   },
   vip: {
     ...allPermissions(false),
     auto_delivery: true,
+    live_chat_picture_upload: true,
   },
-  reseller: allPermissions(false),
-  affiliate: allPermissions(false),
+  reseller: {
+    ...allPermissions(false),
+    live_chat_picture_upload: true,
+  },
+  affiliate: {
+    ...allPermissions(false),
+    live_chat_picture_upload: true,
+  },
   supplier: allPermissions(false),
-  subscriber: allPermissions(false),
+  subscriber: {
+    ...allPermissions(false),
+    live_chat_picture_upload: true,
+  },
   contributor: {
     ...allPermissions(false),
     submit_product_drafts: true,
@@ -612,6 +646,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     publish_blog_posts: true,
     delete_blog_posts: true,
     manage_blog_categories: true,
+    live_chat_picture_upload: true,
   },
   movie_server: {
     ...allPermissions(false),

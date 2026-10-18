@@ -15,6 +15,7 @@ import { CacheService } from '../../shared/cache/cache.service';
 import {
   ADMIN_ROLE_IDS,
   DEFAULT_ROLE_PERMISSIONS,
+  GUEST_ROLE_EXTRA_PERMISSION_KEYS,
   GUEST_STOREFRONT_PERMISSION_KEYS,
   PERMISSION_KEYS,
   ROLE_DEFINITIONS,
@@ -24,11 +25,10 @@ import {
   type GuestStorefrontPermissionKey,
   type PermissionKey,
 } from './role-permissions.constants';
+import type { GuestStorefrontPermissions } from '../../common/utils/guest-storefront-policy';
+import { resolveEffectiveGuestStorefrontPermissions } from '../../common/utils/guest-storefront-policy';
 
-export type GuestStorefrontPermissions = Record<
-  GuestStorefrontPermissionKey,
-  boolean
->;
+export type { GuestStorefrontPermissions };
 
 @Injectable()
 export class RolePermissionsService {
@@ -140,12 +140,20 @@ export class RolePermissionsService {
   async getGuestStorefrontPermissions(): Promise<GuestStorefrontPermissions> {
     const doc = await this.getOrCreate();
     const role = this.buildRole('guest', doc);
-    return Object.fromEntries(
-      GUEST_STOREFRONT_PERMISSION_KEYS.map((key) => [
-        key,
-        Boolean(role.permissions[key]),
-      ]),
-    ) as GuestStorefrontPermissions;
+    const guestLiveChat = Boolean(
+      role.permissions.live_chat_without_login ??
+        role.permissions.guest_live_chat,
+    );
+    const raw = {
+      ...Object.fromEntries(
+        GUEST_STOREFRONT_PERMISSION_KEYS.map((key) => [
+          key,
+          Boolean(role.permissions[key]),
+        ]),
+      ),
+      guest_live_chat: guestLiveChat,
+    } as GuestStorefrontPermissions;
+    return resolveEffectiveGuestStorefrontPermissions(raw);
   }
 
   /** Merged effective permissions for the user's JWT roles (OR across profiles). */
@@ -208,9 +216,14 @@ export class RolePermissionsService {
       ? { ...defaults }
       : { ...defaults, ...(stored ?? {}) };
     if (roleId === 'guest') {
+      const withoutLogin = Boolean(
+        permissions.live_chat_without_login ?? permissions.guest_live_chat,
+      );
       permissions = {
         ...permissions,
         guest_use_cart: permissions.guest_checkout,
+        live_chat_without_login: withoutLogin,
+        guest_live_chat: withoutLogin,
       };
     }
     const customized = stored
@@ -245,16 +258,23 @@ export class RolePermissionsService {
       }
     }
     if (roleId === 'guest') {
+      const guestAllowed = new Set<string>([
+        ...GUEST_STOREFRONT_PERMISSION_KEYS,
+        ...GUEST_ROLE_EXTRA_PERMISSION_KEYS,
+        'guest_live_chat',
+      ]);
       for (const key of PERMISSION_KEYS) {
-        if (
-          !GUEST_STOREFRONT_PERMISSION_KEYS.includes(
-            key as GuestStorefrontPermissionKey,
-          )
-        ) {
+        if (!guestAllowed.has(key)) {
           out[key] = false;
         }
       }
       out.guest_use_cart = out.guest_checkout;
+      if (typeof input.live_chat_without_login === 'boolean') {
+        out.live_chat_without_login = input.live_chat_without_login;
+      } else if (typeof input.guest_live_chat === 'boolean') {
+        out.live_chat_without_login = input.guest_live_chat;
+      }
+      out.guest_live_chat = out.live_chat_without_login;
     } else {
       for (const key of GUEST_STOREFRONT_PERMISSION_KEYS) {
         out[key as PermissionKey] = false;

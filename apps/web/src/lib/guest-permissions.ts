@@ -26,7 +26,9 @@ export function guestPermissionsFromConfig(
   return {
     ...DEFAULT_GUEST_PERMISSIONS,
     guest_checkout: config.checkout.allowGuestCheckout === true,
-    guest_live_chat: config.checkout.allowGuestChat === true,
+    guest_live_chat:
+      config.checkout.allowGuestChat === true ||
+      DEFAULT_GUEST_PERMISSIONS.guest_live_chat,
   };
 }
 

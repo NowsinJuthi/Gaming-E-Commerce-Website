@@ -44,7 +44,10 @@ import {
   omitSecretsFromBrowserSession,
   refreshCookieOptions,
 } from '../auth/auth-cookies';
+import { isEphemeralGuestUser } from '../../common/utils/guest-user';
+import { isChatStaff } from '../../common/utils/role.utils';
 import { AuthService } from '../auth/auth.service';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { RequiresLicenseFeature } from '../license/decorators/requires-license-feature.decorator';
 import { LicenseFeatureGuard } from '../license/guards/license-feature.guard';
 import { ChatSettingsService } from './chat-settings.service';
@@ -74,16 +77,33 @@ export class ChatController {
     private readonly uploads: UploadsService,
     private readonly auth: AuthService,
     private readonly config: ConfigService,
+    private readonly rolePermissions: RolePermissionsService,
   ) {}
 
-  private async isGuestChatAllowed(): Promise<boolean> {
-    const config = await this.auth.getPanelConfig();
-    return config.checkout.allowGuestChat === true;
+  private async guestChatAllowed(user: AuthenticatedUser): Promise<boolean> {
+    if (isChatStaff(user.roles)) return true;
+    if (!user.isGuest && !isEphemeralGuestUser(user)) return true;
+    return this.rolePermissions.rolesHavePermission(
+      user.roles,
+      'live_chat_without_login',
+    );
   }
 
-  private async isChatImageUploadAllowed(): Promise<boolean> {
-    const config = await this.auth.getPanelConfig();
-    return config.chat.allowImageUpload !== false;
+  private async pictureUploadAllowed(
+    user: AuthenticatedUser,
+  ): Promise<boolean> {
+    return this.rolePermissions.rolesHavePermission(
+      user.roles,
+      'live_chat_picture_upload',
+    );
+  }
+
+  @Get('capabilities')
+  async capabilities(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      pictureUpload: await this.pictureUploadAllowed(user),
+      guestAccess: await this.guestChatAllowed(user),
+    };
   }
 
   /** Public endpoint — issues a short-lived guest JWT for anonymous chat. */
@@ -132,14 +152,14 @@ export class ChatController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ChatRoomsQueryDto,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     return this.chat.listRoomsForUserSerialized(user, query, query.q);
   }
 
   @Post('rooms/support')
   async openSupport(@CurrentUser() user: AuthenticatedUser) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     return this.chat.ensureSupportRoom(user).then(async (room) => {
       const creator = await this.chat.findCreatorSummary(String(room.createdBy));
@@ -152,7 +172,7 @@ export class ChatController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() pagination: ChatHistoryQueryDto,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     return this.chat.getCustomerSupportHistory(user, pagination);
   }
@@ -163,7 +183,7 @@ export class ChatController {
     @Param('id') id: string,
     @Query() pagination: ChatHistoryQueryDto,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     return this.chat.getHistory(user, id, pagination);
   }
@@ -174,8 +194,8 @@ export class ChatController {
     @Param('id') id: string,
     @Body() dto: CreateChatMessageDto,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
-    const allowImageUpload = await this.isChatImageUploadAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
+    const allowImageUpload = await this.pictureUploadAllowed(user);
     const { payload, room } = await this.chat.sendRoomMessage(user, id, {
       allowGuestChat,
       allowImageUpload,
@@ -207,10 +227,10 @@ export class ChatController {
     )
     file: Express.Multer.File,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     await this.chat.getAccessibleRoom(user, id);
-    if (!(await this.isChatImageUploadAllowed())) {
+    if (!(await this.pictureUploadAllowed(user))) {
       throw new ForbiddenException('Picture uploads are disabled for live chat');
     }
     validateLiveChatUploadFile(file);
@@ -235,7 +255,7 @@ export class ChatController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     return this.chat.markRead(user, id);
   }
@@ -257,7 +277,7 @@ export class ChatController {
 
   @Get('support-online')
   async supportOnline(@CurrentUser() user: AuthenticatedUser) {
-    const allowGuestChat = await this.isGuestChatAllowed();
+    const allowGuestChat = await this.guestChatAllowed(user);
     this.chat.assertRegisteredChatUser(user, allowGuestChat);
     const onlineIds = await this.presence.listOnline();
     return this.chat.listOnlineSupportStaff(onlineIds);

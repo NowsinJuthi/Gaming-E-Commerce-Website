@@ -28,6 +28,7 @@ import {
   PERMISSION_GROUPS,
   permissionGroupSubtitle,
   permissionGroupsForRole,
+  GUEST_STOREFRONT_ONLY_PERMISSION_KEYS,
 } from "@/lib/role-permissions";
 
 type RolesOverview = Awaited<ReturnType<typeof getRolePermissionsOverview>>;
@@ -270,10 +271,19 @@ export default function AdminRolesPage() {
       const role = overview?.roles.find(
         (row) => row.id === selectedIdRef.current,
       );
-      if (role?.locked || role?.id !== "guest") return current;
+      if (role?.locked) return current;
+      if (
+        role?.id !== "guest" &&
+        GUEST_STOREFRONT_ONLY_PERMISSION_KEYS.has(key)
+      ) {
+        return current;
+      }
       const next = { ...current, [key]: !current[key] };
       if (key === "guest_checkout") {
         next.guest_use_cart = next.guest_checkout;
+      }
+      if (key === "live_chat_without_login") {
+        next.guest_live_chat = next.live_chat_without_login;
       }
       return next;
     });
