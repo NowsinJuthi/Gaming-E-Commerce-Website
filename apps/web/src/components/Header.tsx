@@ -502,7 +502,7 @@ export function Header({
             <button
               type="button"
               onClick={() => setSearchOpen((o) => !o)}
-              className={`${iconBtn} hidden lg:grid`}
+              className={`${iconBtn} site-header-search-desktop`}
               aria-label="Search"
             >
               <SearchIcon />
