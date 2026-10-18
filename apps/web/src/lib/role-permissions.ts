@@ -111,7 +111,13 @@ export const PERMISSION_GROUPS = [
 /** Permission panels shown for a given role profile in admin Roles UI. */
 export function permissionGroupsForRole(roleId: string) {
   if (roleId === "guest") {
-    return PERMISSION_GROUPS.filter((group) => group.key === "guest_storefront");
+    const guestFirst = PERMISSION_GROUPS.filter(
+      (group) => group.key === "guest_storefront",
+    );
+    const rest = PERMISSION_GROUPS.filter(
+      (group) => group.key !== "guest_storefront",
+    );
+    return [...guestFirst, ...rest];
   }
   return PERMISSION_GROUPS.filter((group) => group.key !== "guest_storefront");
 }
