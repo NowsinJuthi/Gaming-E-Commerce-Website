@@ -29,6 +29,7 @@ import {
   permissionGroupSubtitle,
   permissionGroupsForRole,
   GUEST_STOREFRONT_ONLY_PERMISSION_KEYS,
+  roleUiPermissions,
 } from "@/lib/role-permissions";
 
 type RolesOverview = Awaited<ReturnType<typeof getRolePermissionsOverview>>;
@@ -115,7 +116,7 @@ function isRoleDirty(
   draft: Record<string, boolean>,
 ) {
   return permissionGroupsForRole(role.id).some((group) =>
-    group.permissions.some(
+    roleUiPermissions(group).some(
       (permission) => draft[permission.key] !== role.permissions[permission.key],
     ),
   );
@@ -650,7 +651,7 @@ export default function AdminRolesPage() {
                                 <dt>Permissions</dt>
                                 <dd>
                                   <div className="admin-roles-perm-grid">
-                                    {group.permissions.map((perm) => {
+                                    {roleUiPermissions(group).map((perm) => {
                                       const guestStorefrontReadOnly =
                                         group.key === "guest_storefront" &&
                                         selected.id !== "guest";

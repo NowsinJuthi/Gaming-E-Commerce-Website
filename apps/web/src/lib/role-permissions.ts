@@ -123,6 +123,17 @@ export const PERMISSION_GROUPS = [
   },
 ] as const;
 
+/** Retired toggles — never show in Roles UI (replaced by `play_media_catalog`). */
+export const DEPRECATED_ROLE_PERMISSION_KEYS = new Set(["guest_view_media"]);
+
+export function roleUiPermissions(
+  group: (typeof PERMISSION_GROUPS)[number],
+): (typeof PERMISSION_GROUPS)[number]["permissions"][number][] {
+  return group.permissions.filter(
+    (perm) => !DEPRECATED_ROLE_PERMISSION_KEYS.has(perm.key),
+  );
+}
+
 /** Keys only editable on the Guest role profile (site-wide storefront limits). */
 export const GUEST_STOREFRONT_ONLY_PERMISSION_KEYS = new Set([
   "guest_browse_storefront",
