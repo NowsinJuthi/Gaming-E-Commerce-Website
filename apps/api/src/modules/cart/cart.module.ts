@@ -10,6 +10,7 @@ import {
 } from '../../database/schemas/product.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { CouponsModule } from '../coupons/coupons.module';
+import { CustomerPanelModule } from '../customer-panel/customer-panel.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { CartController } from './cart.controller';
@@ -25,6 +26,7 @@ import { CartService } from './cart.service';
     CouponsModule,
     VouchersModule,
     RolePermissionsModule,
+    CustomerPanelModule,
   ],
   controllers: [CartController],
   providers: [CartService],

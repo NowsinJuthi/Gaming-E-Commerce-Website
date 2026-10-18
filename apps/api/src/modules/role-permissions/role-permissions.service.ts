@@ -204,9 +204,15 @@ export class RolePermissionsService {
     const def = ROLE_DEFINITIONS.find((r) => r.id === roleId)!;
     const stored = doc.roles?.[roleId];
     const defaults = DEFAULT_ROLE_PERMISSIONS[roleId];
-    const permissions = def.locked
+    let permissions = def.locked
       ? { ...defaults }
       : { ...defaults, ...(stored ?? {}) };
+    if (roleId === 'guest') {
+      permissions = {
+        ...permissions,
+        guest_use_cart: permissions.guest_checkout,
+      };
+    }
     const customized = stored
       ? PERMISSION_KEYS.some((k) => stored[k] !== defaults[k])
       : false;
@@ -247,6 +253,11 @@ export class RolePermissionsService {
         ) {
           out[key] = false;
         }
+      }
+      out.guest_use_cart = out.guest_checkout;
+    } else {
+      for (const key of GUEST_STOREFRONT_PERMISSION_KEYS) {
+        out[key as PermissionKey] = false;
       }
     }
     return out;

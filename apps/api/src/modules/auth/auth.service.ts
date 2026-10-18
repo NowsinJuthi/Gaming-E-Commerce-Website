@@ -549,7 +549,10 @@ export class AuthService {
 
   async guestSession(meta: SessionMeta): Promise<AuthResult> {
     const config = await this.panelSettings.getConfig();
-    if (!config.guestPermissions.guest_checkout) {
+    if (
+      !config.guestPermissions.guest_browse_storefront ||
+      !config.guestPermissions.guest_checkout
+    ) {
       throw new ForbiddenException('Guest checkout is disabled');
     }
     const user = await this.users.createGuestUser();

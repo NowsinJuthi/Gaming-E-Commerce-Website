@@ -91,10 +91,9 @@ export const PERMISSION_GROUPS = [
     label: "GUEST STOREFRONT",
     permissions: [
       { key: "guest_browse_storefront", label: "Browse storefront" },
-      { key: "guest_use_cart", label: "Use cart" },
       {
         key: "guest_checkout",
-        label: "Guest checkout (order without account)",
+        label: "Guest cart & checkout (order without account)",
       },
       { key: "guest_live_chat", label: "Guest live chat" },
       { key: "guest_view_media", label: "Browse media catalog" },
@@ -131,9 +130,9 @@ export function permissionGroupSubtitle(
 ): string {
   if (groupKey === "guest_storefront") {
     if (roleId === "guest") {
-      return "Guest checkout (order without account) and other storefront limits — turn off Guest checkout to block guest ordering site-wide.";
+      return "Site-wide limits for visitors without an account. Turn off cart & checkout to block guest ordering.";
     }
-    return "Same guest storefront toggles as the Guest profile. Site-wide guest checkout/cart/media limits are enforced from Roles → Guest when saved there.";
+    return "Read-only — edit these on the Guest role. Only Guest profile saves apply to the storefront.";
   }
   return "Toggle access for this role";
 }

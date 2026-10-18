@@ -23,6 +23,7 @@ import {
   type RolePermissionProfile,
 } from "@/lib/api";
 import { mergeRolePermissionsOverview } from "@/lib/admin-role-catalog";
+import { notifyPanelConfigChanged } from "@/lib/customer-panel";
 import {
   PERMISSION_GROUPS,
   permissionGroupSubtitle,
@@ -204,6 +205,11 @@ export default function AdminRolesPage() {
     [overview, selectedId],
   );
 
+  const guestRoleProfile = useMemo(
+    () => overview?.roles.find((role) => role.id === "guest") ?? null,
+    [overview],
+  );
+
   const dirty = selected ? isRoleDirty(selected, draft) : false;
   const enabledCount = useMemo(() => countEnabledPermissions(draft), [draft]);
 
@@ -264,8 +270,12 @@ export default function AdminRolesPage() {
       const role = overview?.roles.find(
         (row) => row.id === selectedIdRef.current,
       );
-      if (role?.locked) return current;
-      return { ...current, [key]: !current[key] };
+      if (role?.locked || role?.id !== "guest") return current;
+      const next = { ...current, [key]: !current[key] };
+      if (key === "guest_checkout") {
+        next.guest_use_cart = next.guest_checkout;
+      }
+      return next;
     });
   }, [overview]);
 
@@ -289,6 +299,9 @@ export default function AdminRolesPage() {
         current ? patchOverviewRole(current, updated) : current,
       );
       setDraft({ ...updated.permissions });
+      if (roleId === "guest") {
+        notifyPanelConfigChanged();
+      }
       adminToast("Role saved.", true);
     } catch (err) {
       adminToast(err instanceof Error ? err.message : "Save failed.", false);
@@ -627,16 +640,29 @@ export default function AdminRolesPage() {
                                 <dt>Permissions</dt>
                                 <dd>
                                   <div className="admin-roles-perm-grid">
-                                    {group.permissions.map((perm) => (
-                                      <PermissionToggle
-                                        key={perm.key}
-                                        permKey={perm.key}
-                                        label={perm.label}
-                                        enabled={!!draft[perm.key]}
-                                        locked={selected.locked}
-                                        onToggle={togglePermission}
-                                      />
-                                    ))}
+                                    {group.permissions.map((perm) => {
+                                      const guestStorefrontReadOnly =
+                                        group.key === "guest_storefront" &&
+                                        selected.id !== "guest";
+                                      const enabled = guestStorefrontReadOnly
+                                        ? !!guestRoleProfile?.permissions[
+                                            perm.key
+                                          ]
+                                        : !!draft[perm.key];
+                                      return (
+                                        <PermissionToggle
+                                          key={perm.key}
+                                          permKey={perm.key}
+                                          label={perm.label}
+                                          enabled={enabled}
+                                          locked={
+                                            selected.locked ||
+                                            guestStorefrontReadOnly
+                                          }
+                                          onToggle={togglePermission}
+                                        />
+                                      );
+                                    })}
                                   </div>
                                 </dd>
                               </div>

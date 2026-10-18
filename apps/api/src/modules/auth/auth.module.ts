@@ -15,6 +15,7 @@ import { CustomerPanelModule } from '../customer-panel/customer-panel.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -30,7 +31,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, OptionalJwtAuthGuard],
+  exports: [AuthService, OptionalJwtAuthGuard],
 })
 export class AuthModule {}

@@ -10,6 +10,8 @@ import {
 } from '../../database/schemas/media-library.schema';
 import { SmbServer, SmbServerSchema } from '../../database/schemas/smb-server.schema';
 import { CryptoModule } from '../../shared/crypto/crypto.module';
+import { AuthModule } from '../auth/auth.module';
+import { CustomerPanelModule } from '../customer-panel/customer-panel.module';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { MediaOpsController } from './media-ops.controller';
@@ -30,6 +32,8 @@ import { MovieServerHostMetricsService } from './movie-server-host-metrics.servi
       { name: CatalogTitle.name, schema: CatalogTitleSchema },
     ]),
     CryptoModule,
+    CustomerPanelModule,
+    AuthModule,
   ],
   controllers: [MediaOpsController, CatalogController, MediaPlaybackController],
   providers: [

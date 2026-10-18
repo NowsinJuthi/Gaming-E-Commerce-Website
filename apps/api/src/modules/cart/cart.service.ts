@@ -20,6 +20,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CacheKeys } from '../../shared/cache/cache-keys';
 import { CacheService } from '../../shared/cache/cache.service';
 import { CouponService } from '../coupons/coupon.service';
+import { GuestStorefrontEnforcementService } from '../customer-panel/guest-storefront-enforcement.service';
 import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { VoucherService } from '../vouchers/voucher.service';
 import { AddItemDto } from './dto/add-item.dto';
@@ -45,13 +46,16 @@ export class CartService {
     private readonly coupons: CouponService,
     private readonly vouchers: VoucherService,
     private readonly rolePermissions: RolePermissionsService,
+    private readonly guestStorefront: GuestStorefrontEnforcementService,
   ) {}
 
   async getCart(userId: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     return this.buildView(userId, await this.load(userId));
   }
 
   async addItem(userId: string, dto: AddItemDto): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     const variationValueId = dto.variationValueId?.trim() || undefined;
     const customerInputs = this.sanitizeCustomerInputs(dto.customerInputs);
@@ -94,6 +98,7 @@ export class CartService {
     quantity: number,
     variationValueId?: string,
   ): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     const matches = this.lineMatcher(productId, variationValueId);
     if (quantity === 0) {
@@ -131,6 +136,7 @@ export class CartService {
     productId: string,
     variationValueId?: string,
   ): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     const matches = this.lineMatcher(productId, variationValueId);
     cart.items = cart.items.filter((i) => !matches(i));
@@ -172,11 +178,13 @@ export class CartService {
   }
 
   async clear(userId: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     await this.cache.del(this.key(userId));
     return this.buildView(userId, this.empty());
   }
 
   async applyCoupon(userId: string, code: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     const { subtotal } = await this.resolveItems(cart);
     const evaluation = await this.coupons.evaluate(code, subtotal, userId);
@@ -189,6 +197,7 @@ export class CartService {
   }
 
   async removeCoupon(userId: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     delete cart.couponCode;
     await this.save(userId, cart);
@@ -196,6 +205,7 @@ export class CartService {
   }
 
   async applyVoucher(userId: string, code: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     const evaluation = await this.vouchers.evaluate(code, userId);
     if (!evaluation.valid) {
@@ -207,6 +217,7 @@ export class CartService {
   }
 
   async removeVoucher(userId: string): Promise<CartView> {
+    await this.guestStorefront.assertGuestCartAccess(userId);
     const cart = await this.load(userId);
     delete cart.voucherCode;
     await this.save(userId, cart);

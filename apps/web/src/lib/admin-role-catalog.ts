@@ -45,9 +45,9 @@ function buildGuestRoleProfile(): RolePermissionProfile {
       "Ephemeral checkout and chat sessions — limit what visitors can do before they register.",
     locked: false,
     summary: [
-      "Applies to guest checkout and guest chat JWT sessions.",
-      "Toggle cart, checkout, chat, and media browsing independently.",
-      "Works together with Customer panel guest checkout / chat switches.",
+      "Site-wide limits for visitors without an account.",
+      "Cart and checkout are one permission; browse must stay on for shop access.",
+      "Guest live chat also requires Customer panel → Live chat guest switch.",
       "No admin panel access.",
     ],
     customized: false,

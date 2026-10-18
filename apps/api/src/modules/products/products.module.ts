@@ -13,6 +13,8 @@ import { BrandsModule } from '../brands/brands.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { UploadsService } from '../../shared/uploads/uploads.service';
 import { EventsModule } from '../../shared/events/events.module';
+import { AuthModule } from '../auth/auth.module';
+import { CustomerPanelModule } from '../customer-panel/customer-panel.module';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { StockService } from './stock.service';
@@ -27,6 +29,8 @@ import { StockService } from './stock.service';
     CategoriesModule,
     BrandsModule,
     EventsModule,
+    CustomerPanelModule,
+    AuthModule,
   ],
   controllers: [ProductController],
   providers: [ProductService, StockService, UploadsService],

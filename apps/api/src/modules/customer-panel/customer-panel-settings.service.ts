@@ -16,6 +16,7 @@ import { EventsService } from '../../shared/events/events.service';
 import { AppEvent } from '../../shared/events/events.types';
 import { UpdateCustomerPanelSettingsDto } from './dto/update-customer-panel-settings.dto';
 import { deepReplaceLegacyBrand } from '../../common/utils/legacy-brand-migration';
+import { resolveEffectiveGuestStorefrontPermissions } from '../../common/utils/guest-storefront-policy';
 import { LICENSE_FEATURE_LABELS } from '../license/license.constants';
 import { LicenseService } from '../license/license.service';
 import { RolePermissionsService } from '../role-permissions/role-permissions.service';
@@ -306,14 +307,7 @@ export class CustomerPanelSettingsService implements OnModuleInit {
     checkout: Pick<CustomerPanelConfig['checkout'], 'allowGuestChat'>,
   ): Promise<GuestStorefrontPermissions> {
     const role = await this.rolePermissions.getGuestStorefrontPermissions();
-    const browse = role.guest_browse_storefront;
-    return {
-      guest_browse_storefront: browse,
-      guest_use_cart: browse && role.guest_use_cart,
-      guest_checkout: role.guest_checkout,
-      guest_live_chat: checkout.allowGuestChat && role.guest_live_chat,
-      guest_view_media: browse && role.guest_view_media,
-    };
+    return resolveEffectiveGuestStorefrontPermissions(role, checkout.allowGuestChat);
   }
 
   async getSettings(): Promise<CustomerPanelSettingsDocument> {

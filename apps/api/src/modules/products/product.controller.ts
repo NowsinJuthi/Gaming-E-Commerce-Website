@@ -11,6 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   MaxFileSizeValidator,
@@ -34,6 +35,7 @@ import {
 } from '../../shared/uploads/product-image-upload.multer';
 import { processProductImageUpload } from '../../shared/uploads/product-image.processor';
 import { UploadsService } from '../../shared/uploads/uploads.service';
+import { GuestStorefrontEnforcementService } from '../customer-panel/guest-storefront-enforcement.service';
 import { ProductService } from './product.service';
 import { StockService } from './stock.service';
 
@@ -43,14 +45,18 @@ export class ProductController {
     private readonly products: ProductService,
     private readonly stock: StockService,
     private readonly uploads: UploadsService,
+    private readonly guestStorefront: GuestStorefrontEnforcementService,
   ) {}
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('homepage-sections')
-  homepageSections(
+  async homepageSections(
+    @CurrentUser() user: AuthenticatedUser | undefined,
     @Query('limit') limit?: string,
     @Query('featuredOnly') featuredOnly?: string,
   ) {
+    await this.guestStorefront.assertStorefrontBrowseForRequest(user);
     const perCategory = limit ? Math.min(Math.max(parseInt(limit, 10) || 6, 1), 20) : 6;
     const featured =
       featuredOnly === undefined || featuredOnly === ''
@@ -60,8 +66,13 @@ export class ProductController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  list(@Query() query: QueryProductDto) {
+  async list(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Query() query: QueryProductDto,
+  ) {
+    await this.guestStorefront.assertStorefrontBrowseForRequest(user);
     return this.products.list(query);
   }
 
@@ -232,8 +243,13 @@ export class ProductController {
   }
 
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
-  bySlug(@Param('slug') slug: string) {
+  async bySlug(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('slug') slug: string,
+  ) {
+    await this.guestStorefront.assertStorefrontBrowseForRequest(user);
     return this.products.findBySlug(slug);
   }
 }

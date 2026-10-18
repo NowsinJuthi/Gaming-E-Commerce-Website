@@ -325,15 +325,10 @@ export const PERMISSION_GROUPS: Array<{
         description: 'View products, categories, and public pages without logging in',
       },
       {
-        key: 'guest_use_cart',
-        label: 'Use cart',
-        description: 'Add items to cart as a guest session',
-      },
-      {
         key: 'guest_checkout',
-        label: 'Guest checkout',
+        label: 'Guest cart & checkout (order without account)',
         description:
-          'Allow ordering without an account (replaces the old Payment gateways toggle)',
+          'Add to cart and order without registering (includes guest cart session)',
       },
       {
         key: 'guest_live_chat',
@@ -407,10 +402,9 @@ export const ROLE_DEFINITIONS: Array<{
       'Ephemeral checkout and chat sessions — limit what visitors can do before they register.',
     locked: false,
     summary: [
-      'Applies to guest checkout and guest chat JWT sessions.',
-      'Toggle cart, checkout, chat, and media browsing independently.',
-      'Guest checkout replaces the old Payment gateways “order without account” toggle.',
-      'Guest live chat still respects Customer panel / Live chat guest switch.',
+      'Site-wide limits for visitors without an account.',
+      'Cart and checkout are one permission; browse must stay on for shop access.',
+      'Guest live chat also requires Customer panel / Live chat guest switch.',
       'No admin panel access.',
     ],
   },

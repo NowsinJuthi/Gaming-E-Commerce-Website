@@ -11,6 +11,9 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ArrayNotEmpty,
@@ -33,6 +36,7 @@ import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { CatalogKind } from '../../database/schemas/catalog-title.schema';
 import { catalogPosterUploadMulterOptions } from '../../shared/uploads/catalog-poster-upload.multer';
+import { GuestStorefrontEnforcementService } from '../customer-panel/guest-storefront-enforcement.service';
 import { CatalogBulkAction, CatalogService } from './catalog.service';
 import { MediaPlaybackService } from './media-playback.service';
 
@@ -132,19 +136,27 @@ export class CatalogController {
   constructor(
     private readonly catalog: CatalogService,
     private readonly playback: MediaPlaybackService,
+    private readonly guestStorefront: GuestStorefrontEnforcementService,
   ) {}
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/home')
-  home() {
+  async home(@CurrentUser() user: AuthenticatedUser | undefined) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.catalog.publicHome();
   }
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/bootstrap')
-  bootstrap(@Query('limit') limit?: string) {
+  async bootstrap(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Query('limit') limit?: string,
+  ) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     const parsedLimit = limit?.trim() ? Number(limit) : 12;
     const safeLimit = Number.isFinite(parsedLimit)
       ? Math.min(48, Math.max(1, Math.floor(parsedLimit)))
@@ -154,8 +166,10 @@ export class CatalogController {
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/browse')
-  browse(
+  async browse(
+    @CurrentUser() user: AuthenticatedUser | undefined,
     @Query('libraryId') libraryId?: string,
     @Query('year') year?: string,
     @Query('genre') genre?: string,
@@ -168,6 +182,7 @@ export class CatalogController {
     const parsedMinRating = minRating?.trim() ? Number(minRating) : undefined;
     const parsedOffset = offset?.trim() ? Number(offset) : 0;
     const parsedLimit = limit?.trim() ? Number(limit) : 24;
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.catalog.publicBrowse({
       libraryId,
       year: parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
@@ -184,29 +199,49 @@ export class CatalogController {
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/years')
-  years(@Query('libraryId') libraryId?: string) {
+  async years(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Query('libraryId') libraryId?: string,
+  ) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.catalog.publicYears(libraryId);
   }
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/genres')
-  genres(@Query('libraryId') libraryId?: string) {
+  async genres(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Query('libraryId') libraryId?: string,
+  ) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.catalog.publicGenres(libraryId);
   }
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/titles/:id')
-  title(@Param('id') id: string) {
+  async title(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('id') id: string,
+  ) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.catalog.publicTitle(id);
   }
 
   @Public()
   @Roles()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('media/titles/:id/episodes')
-  titleEpisodes(@Param('id') id: string) {
+  async titleEpisodes(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('id') id: string,
+  ) {
+    await this.guestStorefront.assertGuestMediaBrowseForRequest(user);
     return this.playback.publicEpisodes(id);
   }
 

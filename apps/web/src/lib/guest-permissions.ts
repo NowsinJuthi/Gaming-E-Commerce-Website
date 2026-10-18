@@ -34,5 +34,13 @@ export function guestPermissionsFromConfig(
 export function isGuestCheckoutEnabled(
   config: Pick<CustomerPanelConfig, "checkout" | "guestPermissions">,
 ): boolean {
-  return guestPermissionsFromConfig(config).guest_checkout;
+  const p = guestPermissionsFromConfig(config);
+  return p.guest_browse_storefront && p.guest_checkout;
+}
+
+export function isGuestCartEnabled(
+  config: Pick<CustomerPanelConfig, "checkout" | "guestPermissions">,
+): boolean {
+  const p = guestPermissionsFromConfig(config);
+  return p.guest_browse_storefront && p.guest_use_cart;
 }
