@@ -1,10 +1,19 @@
 import markStyles from "./media-poster-play-mark.module.css";
 
-export function MediaPosterPlayMark({ size = "detail" }: { size?: "detail" | "card" }) {
-  const rootClass =
-    size === "card"
-      ? `${markStyles.root} ${markStyles.rootCard}`
-      : `${markStyles.root} ${markStyles.rootDetail}`;
+export function MediaPosterPlayMark({
+  size = "detail",
+  tone = "brand",
+}: {
+  size?: "detail" | "card";
+  tone?: "brand" | "golden";
+}) {
+  const rootClass = [
+    markStyles.root,
+    size === "card" ? markStyles.rootCard : markStyles.rootDetail,
+    tone === "golden" ? markStyles.rootGolden : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <span className={rootClass} aria-hidden>

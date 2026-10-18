@@ -94,6 +94,30 @@
   margin-left: 0.12rem;
 }
 
+.rootGolden .glow {
+  background: radial-gradient(circle, rgb(255 183 0 / 0.42) 0%, transparent 70%);
+  animation: posterPlayGlow 2.2s ease-in-out infinite;
+}
+
+.rootGolden .arc {
+  stroke: #ffb700;
+  filter: drop-shadow(0 0 6px rgb(255 183 0 / 0.72));
+  animation: posterPlaySpin 1.35s linear infinite;
+}
+
+.rootGolden .arcInner {
+  stroke: rgb(255 224 130 / 0.65);
+  animation: posterPlaySpinReverse 2.15s linear infinite;
+}
+
+.rootGolden .core {
+  color: #1a1000;
+  background: linear-gradient(145deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
+  box-shadow:
+    0 0 0 3px rgb(255 255 255 / 0.08),
+    0 0 22px rgb(255 183 0 / 0.52);
+}
+
 .icon {
   display: block;
 }

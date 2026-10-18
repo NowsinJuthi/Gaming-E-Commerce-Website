@@ -146,6 +146,43 @@
   scroll-snap-align: start;
 }
 
+.recentCard .posterFrame {
+  transition:
+    box-shadow 0.5s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.recentCard .posterFrame::after {
+  background: linear-gradient(
+    160deg,
+    rgb(255 183 0 / 0.32) 0%,
+    rgb(1 19 26 / 0.62) 52%,
+    rgb(255 183 0 / 0.18) 100%
+  );
+  transition: opacity 0.45s ease;
+}
+
+.recentCard .posterImage {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.48s ease;
+}
+
+.recentCard .playOverlay {
+  transition:
+    opacity 0.42s ease,
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.42s ease;
+}
+
+.recentCard .posterLink:is(:hover, :focus-visible, :active) .posterFrame::before {
+  animation-duration: 1.05s;
+}
+
+.recentCard .posterLink:is(:hover, :focus-visible, :active) .posterFrame {
+  box-shadow: 0 16px 36px rgb(0 0 0 / 0.45);
+}
+
 .recentProgressTrack {
   position: absolute;
   right: 0;
