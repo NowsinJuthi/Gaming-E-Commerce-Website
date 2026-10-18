@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronIcon } from "@/components/admin/icons";
 import { useSiteMenus } from "@/components/SiteMenusProvider";
 import {
@@ -22,6 +22,7 @@ function NavOthersDropdown({
   pathname: string;
   typeParam: string | null;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const active = isHeaderOthersMenuActive(items, pathname, typeParam);
@@ -76,7 +77,7 @@ function NavOthersDropdown({
                 className={`site-nav-dropdown__item${itemActive ? " site-nav-dropdown__item--active" : ""}`}
                 onClick={(event) => {
                   setOpen(false);
-                  hardNavigateFromMediaCatalog(pathname, item.href, event);
+                  hardNavigateFromMediaCatalog(pathname, item.href, router, event);
                 }}
               >
                 {item.label}
@@ -98,6 +99,7 @@ function NavLinks({
   headerOthers: SiteMenuLink[];
   pathname: string;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
@@ -111,7 +113,7 @@ function NavLinks({
             href={item.href as "/"}
             className={active ? "site-nav-link site-nav-link--active" : "site-nav-link"}
             onClick={(event) => {
-              hardNavigateFromMediaCatalog(pathname, item.href, event);
+              hardNavigateFromMediaCatalog(pathname, item.href, router, event);
             }}
           >
             {item.label}
@@ -130,6 +132,7 @@ function NavLinksFallback({
   headerOthers: SiteMenuLink[];
 }) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
@@ -139,7 +142,7 @@ function NavLinksFallback({
           href={item.href as "/"}
           className="site-nav-link"
           onClick={(event) => {
-            hardNavigateFromMediaCatalog(pathname, item.href, event);
+            hardNavigateFromMediaCatalog(pathname, item.href, router, event);
           }}
         >
           {item.label}

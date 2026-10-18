@@ -165,6 +165,7 @@ function MobileNavOthers({
   typeParam: string | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const active = isHeaderOthersMenuActive(items, pathname, typeParam);
 
@@ -200,7 +201,7 @@ function MobileNavOthers({
                   href={item.href as "/"}
                   onClick={(event) => {
                     onClose();
-                    hardNavigateFromMediaCatalog(pathname, item.href, event);
+                    hardNavigateFromMediaCatalog(pathname, item.href, router, event);
                   }}
                   className={`admin-nav-link ${itemActive ? "admin-nav-link-active" : ""}`}
                 >
@@ -232,6 +233,7 @@ function MobileNavItems({
   pathname: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
@@ -246,7 +248,7 @@ function MobileNavItems({
               href={item.href as "/"}
               onClick={(event) => {
                 onClose();
-                hardNavigateFromMediaCatalog(pathname, item.href, event);
+                hardNavigateFromMediaCatalog(pathname, item.href, router, event);
               }}
               className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}
             >
@@ -273,6 +275,7 @@ function MobileNavItemsFallback({
   onClose: () => void;
 }) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const { primary } = splitStorefrontHeaderNav(navItems, headerOthers);
   return (
     <>
@@ -284,7 +287,7 @@ function MobileNavItemsFallback({
               href={item.href as "/"}
               onClick={(event) => {
                 onClose();
-                hardNavigateFromMediaCatalog(pathname, item.href, event);
+                hardNavigateFromMediaCatalog(pathname, item.href, router, event);
               }}
               className="admin-nav-link"
             >
@@ -508,7 +511,7 @@ export function Header({
     <SiteLogo
       href="/"
       onLinkClick={(event) => {
-        hardNavigateFromMediaCatalog(pathname ?? "", "/", event);
+        hardNavigateFromMediaCatalog(pathname ?? "", "/", router, event);
       }}
     />
   );
