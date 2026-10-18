@@ -38163,8 +38163,10 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-.site-header.site-header--storefront .shell-icon-btn.lg\:hidden {
-  display: none;
+@media (min-width: 1024px) {
+  .site-header.site-header--storefront .shell-icon-btn.lg\:hidden {
+    display: none !important;
+  }
 }
 
 .site-mobile-drawer {
