@@ -168,15 +168,13 @@ export class RolePermissionsService {
       role.permissions.live_chat_without_login ??
         role.permissions.guest_live_chat,
     );
-    const raw = {
-      ...Object.fromEntries(
-        GUEST_STOREFRONT_PERMISSION_KEYS.map((key) => [
-          key,
-          Boolean(role.permissions[key]),
-        ]),
-      ),
+    const raw: GuestStorefrontPermissions = {
+      guest_browse_storefront: Boolean(role.permissions.guest_browse_storefront),
+      guest_use_cart: Boolean(role.permissions.guest_checkout),
+      guest_checkout: Boolean(role.permissions.guest_checkout),
       guest_live_chat: guestLiveChat,
-    } as GuestStorefrontPermissions;
+      guest_view_media: Boolean(role.permissions.play_media_catalog),
+    };
     return resolveEffectiveGuestStorefrontPermissions(raw);
   }
 
@@ -260,11 +258,19 @@ export class RolePermissionsService {
       const withoutLogin = Boolean(
         permissions.live_chat_without_login ?? permissions.guest_live_chat,
       );
+      const storedPlay = stored?.play_media_catalog;
+      const legacyBrowse = Boolean(stored?.guest_view_media);
+      const playMedia =
+        typeof storedPlay === 'boolean'
+          ? storedPlay
+          : legacyBrowse || Boolean(permissions.play_media_catalog);
       permissions = {
         ...permissions,
         guest_use_cart: permissions.guest_checkout,
         live_chat_without_login: withoutLogin,
         guest_live_chat: withoutLogin,
+        play_media_catalog: playMedia,
+        guest_view_media: false,
       };
     }
     const customized = stored
@@ -310,6 +316,7 @@ export class RolePermissionsService {
         }
       }
       out.guest_use_cart = out.guest_checkout;
+      out.guest_view_media = false;
       if (typeof input.live_chat_without_login === 'boolean') {
         out.live_chat_without_login = input.live_chat_without_login;
       } else if (typeof input.guest_live_chat === 'boolean') {
@@ -321,6 +328,7 @@ export class RolePermissionsService {
         out[key as PermissionKey] = false;
       }
     }
+    out.guest_view_media = false;
     return out;
   }
 }

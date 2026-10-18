@@ -96,7 +96,6 @@ export const PERMISSION_GROUPS = [
         key: "guest_checkout",
         label: "Guest cart & checkout (order without account)",
       },
-      { key: "guest_view_media", label: "Browse media catalog" },
     ],
   },
   {
@@ -129,7 +128,6 @@ export const GUEST_STOREFRONT_ONLY_PERMISSION_KEYS = new Set([
   "guest_browse_storefront",
   "guest_use_cart",
   "guest_checkout",
-  "guest_view_media",
   "guest_live_chat",
 ]);
 
@@ -162,6 +160,9 @@ export function permissionGroupSubtitle(
       return "Without login applies site-wide to anonymous chat. Picture uploads apply to guest chat sessions.";
     }
     return "Live chat access for users assigned this role profile.";
+  }
+  if (groupKey === "movie_server_catalog" && roleId === "guest") {
+    return "Play movies & series controls guest /media browse and playback (site-wide on this profile).";
   }
   return "Toggle access for this role";
 }

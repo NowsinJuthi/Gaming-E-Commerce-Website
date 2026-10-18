@@ -31,8 +31,8 @@ const GUEST_PERMISSION_DEFAULTS: Record<string, boolean> = {
   guest_browse_storefront: true,
   guest_use_cart: true,
   guest_checkout: true,
-  guest_view_media: true,
   live_chat_without_login: true,
+  play_media_catalog: true,
   live_chat_picture_upload: true,
 };
 

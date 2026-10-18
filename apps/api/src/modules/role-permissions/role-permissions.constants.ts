@@ -4,7 +4,6 @@ export const GUEST_STOREFRONT_PERMISSION_KEYS = [
   'guest_browse_storefront',
   'guest_use_cart',
   'guest_checkout',
-  'guest_view_media',
 ] as const;
 
 export type GuestStorefrontPermissionKey =
@@ -352,11 +351,6 @@ export const PERMISSION_GROUPS: Array<{
         description:
           'Add to cart and order without registering (includes guest cart session)',
       },
-      {
-        key: 'guest_view_media',
-        label: 'Browse media catalog',
-        description: 'View /media movies and series as a guest',
-      },
     ],
   },
   {
@@ -603,9 +597,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     guest_browse_storefront: true,
     guest_use_cart: true,
     guest_checkout: true,
-    guest_view_media: true,
     live_chat_without_login: true,
     live_chat_picture_upload: true,
+    play_media_catalog: true,
   },
   vip: {
     ...allPermissions(false),
