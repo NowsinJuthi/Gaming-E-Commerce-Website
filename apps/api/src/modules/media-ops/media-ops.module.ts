@@ -12,6 +12,8 @@ import { SmbServer, SmbServerSchema } from '../../database/schemas/smb-server.sc
 import { CryptoModule } from '../../shared/crypto/crypto.module';
 import { AuthModule } from '../auth/auth.module';
 import { CustomerPanelModule } from '../customer-panel/customer-panel.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
+import { MediaPlaybackAccessService } from './media-playback-access.service';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { MediaOpsController } from './media-ops.controller';
@@ -34,9 +36,11 @@ import { MovieServerHostMetricsService } from './movie-server-host-metrics.servi
     CryptoModule,
     CustomerPanelModule,
     AuthModule,
+    RolePermissionsModule,
   ],
   controllers: [MediaOpsController, CatalogController, MediaPlaybackController],
   providers: [
+    MediaPlaybackAccessService,
     MediaOpsService,
     SmbClientService,
     SmbMountService,

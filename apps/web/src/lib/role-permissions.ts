@@ -62,6 +62,7 @@ export const PERMISSION_GROUPS = [
     label: "MOVIE SERVER — CATALOG",
     permissions: [
       { key: "view_media_catalog", label: "View media catalog" },
+      { key: "play_media_catalog", label: "Play movies & series" },
       { key: "manage_media_catalog", label: "Manage media catalog" },
       { key: "manage_media_collections", label: "Manage collections" },
       { key: "manage_media_genres", label: "Genres & metadata" },

@@ -64,6 +64,7 @@ export const PERMISSION_KEYS = [
   'delete_blog_posts',
   'manage_blog_categories',
   'view_media_catalog',
+  'play_media_catalog',
   'manage_media_catalog',
   'manage_media_collections',
   'manage_media_genres',
@@ -89,6 +90,7 @@ export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 export const GUEST_ROLE_EXTRA_PERMISSION_KEYS = [
   'live_chat_without_login',
   'live_chat_picture_upload',
+  'play_media_catalog',
 ] as const satisfies readonly PermissionKey[];
 
 export const BLOG_PERMISSION_KEYS: readonly PermissionKey[] = [
@@ -265,6 +267,11 @@ export const PERMISSION_GROUPS: Array<{
         key: 'view_media_catalog',
         label: 'View media catalog',
         description: 'Browse movies, series, and titles in admin',
+      },
+      {
+        key: 'play_media_catalog',
+        label: 'Play movies & series',
+        description: 'Start video playback on the storefront /media watch player',
       },
       {
         key: 'manage_media_catalog',
@@ -617,6 +624,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
   subscriber: {
     ...allPermissions(false),
     live_chat_picture_upload: true,
+    play_media_catalog: true,
   },
   contributor: {
     ...allPermissions(false),
@@ -661,6 +669,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     admin_panel_access: true,
     dashboard_analytics: true,
     view_media_catalog: true,
+    play_media_catalog: true,
     manage_media_catalog: true,
     manage_media_collections: true,
     manage_media_genres: true,

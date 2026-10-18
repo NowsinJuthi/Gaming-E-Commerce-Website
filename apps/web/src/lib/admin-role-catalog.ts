@@ -50,6 +50,7 @@ const MOVIE_SERVER_PERMISSION_DEFAULTS: Record<string, boolean> = {
   admin_panel_access: true,
   dashboard_analytics: true,
   view_media_catalog: true,
+  play_media_catalog: true,
   manage_media_catalog: true,
   manage_media_collections: true,
   manage_media_genres: true,

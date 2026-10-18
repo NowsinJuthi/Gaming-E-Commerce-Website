@@ -125,6 +125,29 @@ export class RolePermissionsService {
     return this.rolesHavePermission(user.roles, permission);
   }
 
+  /** Storefront /media playback (Roles → Guest for visitors without JWT). */
+  async siteAllowsGuestMediaPlay(): Promise<boolean> {
+    const doc = await this.getOrCreate();
+    const role = this.buildRole('guest', doc);
+    return Boolean(role.permissions.play_media_catalog);
+  }
+
+  async userCanPlayMediaCatalog(userRoles: string[]): Promise<boolean> {
+    if (await this.rolesHavePermission(userRoles, 'play_media_catalog')) {
+      return true;
+    }
+    return this.rolesHavePermission(userRoles, 'manage_media_catalog');
+  }
+
+  async resolveMediaPlayAllowed(
+    user?: { roles: string[] } | null,
+  ): Promise<boolean> {
+    if (user?.roles?.length) {
+      return this.userCanPlayMediaCatalog(user.roles);
+    }
+    return this.siteAllowsGuestMediaPlay();
+  }
+
   async rolesHavePermission(
     userRoles: string[],
     permission: PermissionKey,

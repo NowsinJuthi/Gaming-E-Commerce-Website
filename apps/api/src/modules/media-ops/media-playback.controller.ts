@@ -3,9 +3,13 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { IsIn, IsNumber, IsOptional, Min } from 'class-validator';
 import type { Response } from 'express';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { MediaPlaybackAccessService } from './media-playback-access.service';
 import { MediaPlaybackService, PlaybackQuality } from './media-playback.service';
 
 class PlaybackBody {
@@ -36,31 +40,50 @@ class PlaybackBody {
 @Public()
 @Roles()
 @SkipThrottle()
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, OptionalJwtAuthGuard)
 export class MediaPlaybackController {
-  constructor(private readonly playback: MediaPlaybackService) {}
+  constructor(
+    private readonly playback: MediaPlaybackService,
+    private readonly playbackAccess: MediaPlaybackAccessService,
+  ) {}
 
   @Get('sessions/:sessionId')
-  status(@Param('sessionId') sessionId: string) {
+  async status(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('sessionId') sessionId: string,
+  ) {
+    await this.playbackAccess.assertPlayAllowed(user);
     return this.playback.status(sessionId);
   }
 
   @Post('sessions/:sessionId')
-  retarget(@Param('sessionId') sessionId: string, @Body() body: PlaybackBody) {
+  async retarget(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('sessionId') sessionId: string,
+    @Body() body: PlaybackBody,
+  ) {
+    await this.playbackAccess.assertPlayAllowed(user);
     return this.playback.retarget(sessionId, body);
   }
 
   @Post(':titleId')
-  start(@Param('titleId') titleId: string, @Body() body: PlaybackBody) {
+  async start(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('titleId') titleId: string,
+    @Body() body: PlaybackBody,
+  ) {
+    await this.playbackAccess.assertPlayAllowed(user);
     return this.playback.start(titleId, body);
   }
 
   @Get('sessions/:sessionId/:file')
   async file(
+    @CurrentUser() user: AuthenticatedUser | undefined,
     @Param('sessionId') sessionId: string,
     @Param('file') file: string,
     @Res() res: Response,
   ) {
+    await this.playbackAccess.assertPlayAllowed(user);
     try {
       const baseFile = decodeURIComponent(file.split('?')[0]?.split('#')[0] ?? file);
       if (baseFile === 'media.mp4') {
