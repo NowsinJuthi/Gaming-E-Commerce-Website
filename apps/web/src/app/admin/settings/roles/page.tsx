@@ -636,7 +636,7 @@ export default function AdminRolesPage() {
 
                         {permissionPanelsForRole(selected.id).map((panel) => {
                           const renderPermGrid = (
-                            perms: PermissionEntry[],
+                            perms: readonly PermissionEntry[],
                             groupKey: string,
                           ) => (
                             <div className="admin-roles-perm-grid">
