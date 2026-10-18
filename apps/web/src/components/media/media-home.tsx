@@ -861,7 +861,7 @@ function RecentlyWatchedSlider({
                     <span className={styles.posterFallback}>{item.title.trim().charAt(0).toUpperCase() || "M"}</span>
                   )}
                   <span className={styles.playOverlay} aria-hidden>
-                    <MediaPosterPlayMark size="card" tone="golden" />
+                    <MediaPosterPlayMark size="card" />
                   </span>
                   {progress > 0 ? (
                     <span className={styles.recentProgressTrack} aria-hidden>

@@ -890,8 +890,8 @@
   box-shadow: 0 10px 24px rgb(0 0 0 / 0.22);
   pointer-events: none;
   transition:
-    box-shadow 0.32s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 0.48s ease,
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .posterFrame::before {
@@ -925,7 +925,7 @@
     rgb(38 191 176 / 0.22) 100%
   );
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.45s ease;
 }
 
 .posterImage,
@@ -939,8 +939,8 @@
 .posterImage {
   object-fit: cover;
   transition:
-    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.32s ease;
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.48s ease;
 }
 
 .posterFallback {
@@ -964,9 +964,9 @@
   opacity: 0;
   transform: scale(0.9);
   transition:
-    opacity 0.28s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.28s ease;
+    opacity 0.42s ease,
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.42s ease;
 }
 
 .posterLink:is(:hover, :focus-visible, :active) .playOverlay {
@@ -981,7 +981,7 @@
 
 .posterLink:is(:hover, :focus-visible, :active) .posterFrame::before {
   opacity: 1;
-  animation: posterShimmer 0.72s ease-out forwards;
+  animation: posterShimmer 1.05s ease-out forwards;
 }
 
 .posterLink:is(:hover, :focus-visible, :active) .posterImage {

@@ -1,4 +1,4 @@
-/* Matches media-player BusyMark (buffering / preparing overlay) */
+/* Poster play control — golden rings (matches storefront accent) */
 .root {
   position: relative;
   display: grid;
@@ -20,8 +20,8 @@
   position: absolute;
   inset: 12%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgb(38 191 176 / 0.42) 0%, transparent 70%);
-  animation: posterPlayGlow 1.6s ease-in-out infinite;
+  background: radial-gradient(circle, rgb(255 183 0 / 0.42) 0%, transparent 70%);
+  animation: posterPlayGlow 2.2s ease-in-out infinite;
 }
 
 .rings {
@@ -45,18 +45,18 @@
 }
 
 .arc {
-  stroke: #26bfb0;
+  stroke: #ffb700;
   stroke-width: 3.5;
   stroke-dasharray: 58 160;
-  filter: drop-shadow(0 0 6px rgb(38 191 176 / 0.7));
-  animation: posterPlaySpin 0.95s linear infinite;
+  filter: drop-shadow(0 0 6px rgb(255 183 0 / 0.72));
+  animation: posterPlaySpin 1.35s linear infinite;
 }
 
 .arcInner {
-  stroke: rgb(255 255 255 / 0.55);
+  stroke: rgb(255 224 130 / 0.65);
   stroke-width: 2;
   stroke-dasharray: 28 140;
-  animation: posterPlaySpinReverse 1.55s linear infinite;
+  animation: posterPlaySpinReverse 2.15s linear infinite;
 }
 
 .core {
@@ -65,11 +65,11 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  color: #fff;
-  background: linear-gradient(145deg, #26bfb0 0%, #0a6258 100%);
+  color: #1a1000;
+  background: linear-gradient(145deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
   box-shadow:
     0 0 0 3px rgb(255 255 255 / 0.08),
-    0 0 22px rgb(38 191 176 / 0.5);
+    0 0 22px rgb(255 183 0 / 0.52);
 }
 
 .rootCard .core {
@@ -92,30 +92,6 @@
   width: 1.05rem;
   height: 1.05rem;
   margin-left: 0.12rem;
-}
-
-.rootGolden .glow {
-  background: radial-gradient(circle, rgb(255 183 0 / 0.42) 0%, transparent 70%);
-  animation: posterPlayGlow 2.2s ease-in-out infinite;
-}
-
-.rootGolden .arc {
-  stroke: #ffb700;
-  filter: drop-shadow(0 0 6px rgb(255 183 0 / 0.72));
-  animation: posterPlaySpin 1.35s linear infinite;
-}
-
-.rootGolden .arcInner {
-  stroke: rgb(255 224 130 / 0.65);
-  animation: posterPlaySpinReverse 2.15s linear infinite;
-}
-
-.rootGolden .core {
-  color: #1a1000;
-  background: linear-gradient(145deg, #ffe082 0%, #ffb700 42%, #e6a800 100%);
-  box-shadow:
-    0 0 0 3px rgb(255 255 255 / 0.08),
-    0 0 22px rgb(255 183 0 / 0.52);
 }
 
 .icon {
