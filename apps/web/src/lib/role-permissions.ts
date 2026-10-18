@@ -123,15 +123,77 @@ export const PERMISSION_GROUPS = [
   },
 ] as const;
 
+export type PermissionGroup = (typeof PERMISSION_GROUPS)[number];
+export type PermissionEntry = PermissionGroup["permissions"][number];
+
+const MOVIE_SERVER_GROUP_KEYS = [
+  "movie_server_catalog",
+  "movie_server_library",
+  "movie_server_accounts",
+] as const;
+
+export type RolePermissionPanel =
+  | { kind: "single"; group: PermissionGroup }
+  | {
+      kind: "movie_server";
+      sections: Array<{
+        key: string;
+        label: string;
+        permissions: readonly PermissionEntry[];
+      }>;
+    };
+
 /** Retired toggles — never show in Roles UI (replaced by `play_media_catalog`). */
 export const DEPRECATED_ROLE_PERMISSION_KEYS = new Set(["guest_view_media"]);
 
 export function roleUiPermissions(
-  group: (typeof PERMISSION_GROUPS)[number],
-): (typeof PERMISSION_GROUPS)[number]["permissions"][number][] {
-  return group.permissions.filter(
+  permissions: readonly PermissionEntry[],
+): PermissionEntry[] {
+  return permissions.filter(
     (perm) => !DEPRECATED_ROLE_PERMISSION_KEYS.has(perm.key),
   );
+}
+
+/** Flat list of toggles shown for one role (respects movie-server merge). */
+export function rolePermissionEntriesForRole(roleId: string): PermissionEntry[] {
+  return permissionPanelsForRole(roleId).flatMap((panel) =>
+    panel.kind === "single"
+      ? roleUiPermissions(panel.group.permissions)
+      : panel.sections.flatMap((section) =>
+          roleUiPermissions(section.permissions),
+        ),
+  );
+}
+
+export function permissionPanelsForRole(roleId: string): RolePermissionPanel[] {
+  const groups = permissionGroupsForRole(roleId);
+  const movieSet = new Set<string>(MOVIE_SERVER_GROUP_KEYS);
+  const panels: RolePermissionPanel[] = [];
+  let movieSections: Extract<
+    RolePermissionPanel,
+    { kind: "movie_server" }
+  >["sections"] = [];
+
+  const flushMovie = () => {
+    if (movieSections.length === 0) return;
+    panels.push({ kind: "movie_server", sections: movieSections });
+    movieSections = [];
+  };
+
+  for (const group of groups) {
+    if (movieSet.has(group.key)) {
+      movieSections.push({
+        key: group.key,
+        label: group.label,
+        permissions: group.permissions,
+      });
+      continue;
+    }
+    flushMovie();
+    panels.push({ kind: "single", group });
+  }
+  flushMovie();
+  return panels;
 }
 
 /** Keys only editable on the Guest role profile (site-wide storefront limits). */
@@ -172,7 +234,7 @@ export function permissionGroupSubtitle(
     }
     return "Live chat access for users assigned this role profile.";
   }
-  if (groupKey === "movie_server_catalog" && roleId === "guest") {
+  if (groupKey === "movie_server" && roleId === "guest") {
     return "Play movies & series controls guest /media browse and playback (site-wide on this profile).";
   }
   return "Toggle access for this role";

@@ -25,11 +25,12 @@ import {
 import { mergeRolePermissionsOverview } from "@/lib/admin-role-catalog";
 import { notifyPanelConfigChanged } from "@/lib/customer-panel";
 import {
-  PERMISSION_GROUPS,
   permissionGroupSubtitle,
-  permissionGroupsForRole,
+  permissionPanelsForRole,
   GUEST_STOREFRONT_ONLY_PERMISSION_KEYS,
+  rolePermissionEntriesForRole,
   roleUiPermissions,
+  type PermissionEntry,
 } from "@/lib/role-permissions";
 
 type RolesOverview = Awaited<ReturnType<typeof getRolePermissionsOverview>>;
@@ -115,10 +116,8 @@ function isRoleDirty(
   role: RolePermissionProfile,
   draft: Record<string, boolean>,
 ) {
-  return permissionGroupsForRole(role.id).some((group) =>
-    roleUiPermissions(group).some(
-      (permission) => draft[permission.key] !== role.permissions[permission.key],
-    ),
+  return rolePermissionEntriesForRole(role.id).some(
+    (permission) => draft[permission.key] !== role.permissions[permission.key],
   );
 }
 
@@ -635,51 +634,95 @@ export default function AdminRolesPage() {
                           </dl>
                         </ProductFormOrderCard>
 
-                        {permissionGroupsForRole(selected.id).map((group) => (
-                          <ProductFormOrderCard
-                            key={group.key}
-                            icon={<LockIcon className="h-4 w-4" />}
-                            title={group.label}
-                            subtitle={permissionGroupSubtitle(
-                              selected.id,
-                              group.key,
-                            )}
-                            className="admin-product-form-section"
-                          >
-                            <dl>
-                              <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
-                                <dt>Permissions</dt>
-                                <dd>
-                                  <div className="admin-roles-perm-grid">
-                                    {roleUiPermissions(group).map((perm) => {
-                                      const guestStorefrontReadOnly =
-                                        group.key === "guest_storefront" &&
-                                        selected.id !== "guest";
-                                      const enabled = guestStorefrontReadOnly
-                                        ? !!guestRoleProfile?.permissions[
-                                            perm.key
-                                          ]
-                                        : !!draft[perm.key];
-                                      return (
-                                        <PermissionToggle
-                                          key={perm.key}
-                                          permKey={perm.key}
-                                          label={perm.label}
-                                          enabled={enabled}
-                                          locked={
-                                            selected.locked ||
-                                            guestStorefrontReadOnly
-                                          }
-                                          onToggle={togglePermission}
-                                        />
-                                      );
-                                    })}
+                        {permissionPanelsForRole(selected.id).map((panel) => {
+                          const renderPermGrid = (
+                            perms: PermissionEntry[],
+                            groupKey: string,
+                          ) => (
+                            <div className="admin-roles-perm-grid">
+                              {roleUiPermissions(perms).map((perm) => {
+                                const guestStorefrontReadOnly =
+                                  groupKey === "guest_storefront" &&
+                                  selected.id !== "guest";
+                                const enabled = guestStorefrontReadOnly
+                                  ? !!guestRoleProfile?.permissions[perm.key]
+                                  : !!draft[perm.key];
+                                return (
+                                  <PermissionToggle
+                                    key={perm.key}
+                                    permKey={perm.key}
+                                    label={perm.label}
+                                    enabled={enabled}
+                                    locked={
+                                      selected.locked || guestStorefrontReadOnly
+                                    }
+                                    onToggle={togglePermission}
+                                  />
+                                );
+                              })}
+                            </div>
+                          );
+
+                          if (panel.kind === "movie_server") {
+                            return (
+                              <ProductFormOrderCard
+                                key="movie_server"
+                                icon={<LockIcon className="h-4 w-4" />}
+                                title="MOVIE SERVER"
+                                subtitle={permissionGroupSubtitle(
+                                  selected.id,
+                                  "movie_server",
+                                )}
+                                className="admin-product-form-section"
+                              >
+                                <dl>
+                                  <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                                    <dt>Permissions</dt>
+                                    <dd className="space-y-5">
+                                      {panel.sections.map((section) => (
+                                        <div key={section.key}>
+                                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+                                            {section.label}
+                                          </p>
+                                          {renderPermGrid(
+                                            section.permissions,
+                                            section.key,
+                                          )}
+                                        </div>
+                                      ))}
+                                    </dd>
                                   </div>
-                                </dd>
-                              </div>
-                            </dl>
-                          </ProductFormOrderCard>
-                        ))}
+                                </dl>
+                              </ProductFormOrderCard>
+                            );
+                          }
+
+                          const { group } = panel;
+                          return (
+                            <ProductFormOrderCard
+                              key={group.key}
+                              icon={<LockIcon className="h-4 w-4" />}
+                              title={group.label}
+                              subtitle={permissionGroupSubtitle(
+                                selected.id,
+                                group.key,
+                              )}
+                              className="admin-product-form-section"
+                            >
+                              <dl>
+                                <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">
+                                  <dt>Permissions</dt>
+                                  <dd>
+                                    {renderPermGrid(
+                                      group.permissions,
+                                      group.key,
+                                    )}
+                                  </dd>
+                                </div>
+                              </dl>
+                            </ProductFormOrderCard>
+                          );
+                        })}
                       </>
                     ) : (
                       <ProductFormOrderCard
