@@ -38054,8 +38054,8 @@ html.media-catalog-route .media-page-root :where(
 @media (max-width: 1023px) {
   .site-header.site-header--storefront .site-header-mobile-profile-btn {
     display: grid;
-    height: 2.5rem;
-    width: 2.5rem;
+    height: 2.125rem;
+    width: 2.125rem;
     flex-shrink: 0;
     place-items: center;
     padding: 0;
@@ -38065,6 +38065,23 @@ html.media-catalog-route .media-page-root :where(
     box-shadow: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .site-header.site-header--storefront .site-header-profile-ring,
+  .site-header.site-header--storefront .shell-icon-btn {
+    height: 2.125rem;
+    width: 2.125rem;
+    min-height: 2.125rem;
+    min-width: 2.125rem;
+  }
+
+  .site-header.site-header--storefront .shell-icon-btn svg {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
+  .site-header.site-header--storefront .site-header-profile-ring > .admin-topbar-avatar {
+    font-size: 0.75rem;
   }
 }
 
@@ -38481,10 +38498,16 @@ html.media-catalog-route .media-page-root :where(
 
 @media (max-width: 767px) {
   .site-header:not(.site-header--storefront) .shell-icon-btn {
-    @apply h-8 w-8;
+    @apply h-7 w-7;
   }
+
+  .site-header:not(.site-header--storefront) .shell-icon-btn svg {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
   .site-header:not(.site-header--storefront) .admin-topbar-avatar {
-    @apply h-8 w-8 text-xs;
+    @apply h-7 w-7 text-xs;
   }
 }
 

@@ -172,53 +172,54 @@ export function CatalogCollectionsPage({
           </div>
         </div>
         <div className={styles.tablePanel}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    className={styles.checkbox}
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={(event) =>
-                      setSelected(event.target.checked ? items.map((item) => item.id) : [])
-                    }
-                    aria-label="Select all"
-                  />
-                </th>
-                <th>Title</th>
-                <th>Year</th>
-                <th>Status</th>
-                <th>Availability</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const year = yearLabel === "firstAirYear" ? item.firstAirYear : item.releaseYear;
-                const initial = item.title.trim().charAt(0).toUpperCase() || "M";
-                return (
-                  <tr
-                    key={item.id}
-                    className={selected.includes(item.id) ? styles.rowSelected : undefined}
-                  >
-                    <td>
-                      <input
-                        className={styles.checkbox}
-                        type="checkbox"
-                        checked={selected.includes(item.id)}
-                        onChange={(event) =>
-                          setSelected((current) =>
-                            event.target.checked
-                              ? [...current, item.id]
-                              : current.filter((id) => id !== item.id),
-                          )
-                        }
-                        aria-label={`Select ${item.title}`}
-                      />
-                    </td>
-                    <td>
-                      <div className={styles.titleCell}>
+          <div className={`${styles.tableWrap} ${styles.tableWrapResponsive}`}>
+            <table className={`${styles.table} ${styles.tableResponsive}`}>
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      className={styles.checkbox}
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(event) =>
+                        setSelected(event.target.checked ? items.map((item) => item.id) : [])
+                      }
+                      aria-label="Select all"
+                    />
+                  </th>
+                  <th>Title</th>
+                  <th>Year</th>
+                  <th>Status</th>
+                  <th>Availability</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const year = yearLabel === "firstAirYear" ? item.firstAirYear : item.releaseYear;
+                  const initial = item.title.trim().charAt(0).toUpperCase() || "M";
+                  return (
+                    <tr
+                      key={item.id}
+                      className={selected.includes(item.id) ? styles.rowSelected : undefined}
+                    >
+                      <td className={styles.checkboxCell} data-label="">
+                        <input
+                          className={styles.checkbox}
+                          type="checkbox"
+                          checked={selected.includes(item.id)}
+                          onChange={(event) =>
+                            setSelected((current) =>
+                              event.target.checked
+                                ? [...current, item.id]
+                                : current.filter((id) => id !== item.id),
+                            )
+                          }
+                          aria-label={`Select ${item.title}`}
+                        />
+                      </td>
+                      <td className={styles.titleColumn} data-label="Title">
+                        <div className={styles.titleCell}>
                         <span className={styles.posterThumb}>
                           {item.posterUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -256,37 +257,38 @@ export function CatalogCollectionsPage({
                               : ""}
                           </span>
                         </span>
-                      </div>
-                    </td>
-                    <td>{year}</td>
-                    <td>
-                      <span
-                        className={`${styles.badge} ${item.published ? styles.badgePublished : styles.badgeDraft}`}
-                      >
-                        {item.published ? "Published" : "Draft"}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className={`${styles.badge} ${
-                          item.availability === "available"
-                            ? styles.badgeAvailable
-                            : styles.badgeUnavailable
-                        }`}
-                      >
-                        {item.availability}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <button type="button" className="dashboard-pro-btn-ghost" onClick={() => setEdit(item)}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        </div>
+                      </td>
+                      <td data-label="Year">{year ?? "—"}</td>
+                      <td data-label="Status">
+                        <span
+                          className={`${styles.badge} ${item.published ? styles.badgePublished : styles.badgeDraft}`}
+                        >
+                          {item.published ? "Published" : "Draft"}
+                        </span>
+                      </td>
+                      <td data-label="Availability">
+                        <span
+                          className={`${styles.badge} ${
+                            item.availability === "available"
+                              ? styles.badgeAvailable
+                              : styles.badgeUnavailable
+                          }`}
+                        >
+                          {item.availability}
+                        </span>
+                      </td>
+                      <td className={styles.actionsCell} data-label="Actions">
+                        <button type="button" className="dashboard-pro-btn-ghost" onClick={() => setEdit(item)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {loading ? (
             <p className="px-4 py-8 text-sm text-subtle">Loading catalog...</p>
           ) : items.length === 0 ? (

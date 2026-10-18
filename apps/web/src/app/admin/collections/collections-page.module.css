@@ -223,6 +223,15 @@
   background: color-mix(in srgb, var(--card) 72%, transparent);
 }
 
+.tableWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableWrapResponsive {
+  overflow-x: auto;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -452,4 +461,192 @@
   width: 1rem;
   accent-color: #26bfb0;
   cursor: pointer;
+}
+
+.actionsCell {
+  text-align: right;
+}
+
+@media (max-width: 639px) {
+  .layout {
+    gap: 0.9rem;
+  }
+
+  .stat {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .statValue {
+    font-size: 1.15rem;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem;
+    gap: 0.65rem;
+  }
+
+  .searchWrap {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .selectionChip {
+    align-self: flex-start;
+  }
+
+  .actions {
+    margin-left: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .actions :global(.dashboard-pro-btn-ghost) {
+    width: 100%;
+    justify-content: center;
+    min-height: 2.5rem;
+    font-size: 0.8125rem;
+  }
+
+  .tablePanel {
+    overflow: visible;
+    border-radius: 0.85rem;
+  }
+
+  .tableWrapResponsive {
+    overflow-x: visible;
+    padding: 0.65rem;
+  }
+
+  .tableResponsive {
+    display: block;
+    min-width: 0;
+  }
+
+  .tableResponsive thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .tableResponsive tbody {
+    display: block;
+  }
+
+  .tableResponsive tbody tr {
+    position: relative;
+    display: block;
+    margin-bottom: 0.65rem;
+    padding: 0.75rem 0.85rem 0.75rem 2.35rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(0 0 0 / 0.14);
+  }
+
+  .tableResponsive tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .tableResponsive tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.35rem 0;
+    border-top: none;
+    text-align: right;
+    font-size: 0.8125rem;
+  }
+
+  .tableResponsive tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .tableResponsive tbody td[data-label=""]::before {
+    content: none;
+  }
+
+  .tableResponsive tbody td.checkboxCell {
+    position: absolute;
+    top: 0.85rem;
+    left: 0.75rem;
+    display: block;
+    padding: 0;
+  }
+
+  .tableResponsive tbody td.titleColumn {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .tableResponsive tbody td.titleColumn::before {
+    margin-bottom: 0.35rem;
+  }
+
+  .tableResponsive tbody td.actionsCell {
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .tableResponsive tbody td.actionsCell::before {
+    display: none;
+  }
+
+  .titleCell {
+    align-items: flex-start;
+  }
+
+  .posterThumb {
+    height: 4.25rem;
+    width: 2.85rem;
+  }
+
+  .titleName {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .titleFile {
+    max-width: none;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .pager {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    text-align: center;
+  }
+
+  .empty {
+    padding: 2rem 1rem;
+  }
 }
