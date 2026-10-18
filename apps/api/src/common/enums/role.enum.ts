@@ -1,6 +1,8 @@
 /** Assignable user roles — aligned with admin permission profiles (+ legacy aliases). */
 export enum Role {
   ShopManager = 'shop_manager',
+  /** Ephemeral checkout / chat sessions (not assignable via admin user forms). */
+  Guest = 'guest',
   Customer = 'customer',
   Vip = 'vip',
   Reseller = 'reseller',

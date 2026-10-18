@@ -18,6 +18,8 @@ import { UpdateCustomerPanelSettingsDto } from './dto/update-customer-panel-sett
 import { deepReplaceLegacyBrand } from '../../common/utils/legacy-brand-migration';
 import { LICENSE_FEATURE_LABELS } from '../license/license.constants';
 import { LicenseService } from '../license/license.service';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
+import type { GuestStorefrontPermissions } from '../role-permissions/role-permissions.service';
 
 const SETTINGS_KEY = 'global';
 
@@ -190,6 +192,8 @@ export interface CustomerPanelConfig {
   homepageSlides: HomepageSlide[];
   /** When true, only featured products appear in homepage category sections. */
   homepageFeaturedOnly: boolean;
+  /** Effective guest limits from Roles → Guest (merged with checkout toggles). */
+  guestPermissions: GuestStorefrontPermissions;
 }
 
 const DEFAULT_PAYMENT_METHOD_ORDER = ['wallet', 'gateway', 'manual'] as const;
@@ -226,6 +230,7 @@ export class CustomerPanelSettingsService implements OnModuleInit {
     private readonly events: EventsService,
     private readonly cacheService: CacheService,
     private readonly license: LicenseService,
+    private readonly rolePermissions: RolePermissionsService,
   ) {}
 
   /** Replace leftover legacy branding in stored panel settings on startup. */
@@ -269,12 +274,40 @@ export class CustomerPanelSettingsService implements OnModuleInit {
   }
 
   async getConfig(): Promise<CustomerPanelConfig> {
-    const cached = await this.cacheService.getJson<CustomerPanelConfig>(CacheKeys.settings.panel);
-    if (cached) return cached;
-    const doc = await this.getOrCreate();
-    const config = this.toConfig(doc);
-    await this.cacheService.setJson(CacheKeys.settings.panel, config, CacheKeys.ttl.settingsPanel);
-    return config;
+    const cached =
+      await this.cacheService.getJson<
+        Omit<CustomerPanelConfig, 'guestPermissions'>
+      >(CacheKeys.settings.panel);
+    let base: Omit<CustomerPanelConfig, 'guestPermissions'>;
+    if (cached) {
+      base = cached;
+    } else {
+      const doc = await this.getOrCreate();
+      base = this.toConfig(doc);
+      await this.cacheService.setJson(
+        CacheKeys.settings.panel,
+        base,
+        CacheKeys.ttl.settingsPanel,
+      );
+    }
+    return {
+      ...base,
+      guestPermissions: await this.resolveGuestPermissions(base.checkout),
+    };
+  }
+
+  private async resolveGuestPermissions(
+    checkout: CustomerPanelConfig['checkout'],
+  ): Promise<GuestStorefrontPermissions> {
+    const role = await this.rolePermissions.getGuestStorefrontPermissions();
+    const browse = role.guest_browse_storefront;
+    return {
+      guest_browse_storefront: browse,
+      guest_use_cart: browse && role.guest_use_cart,
+      guest_checkout: checkout.allowGuestCheckout && role.guest_checkout,
+      guest_live_chat: checkout.allowGuestChat && role.guest_live_chat,
+      guest_view_media: browse && role.guest_view_media,
+    };
   }
 
   async getSettings(): Promise<CustomerPanelSettingsDocument> {
@@ -553,7 +586,9 @@ export class CustomerPanelSettingsService implements OnModuleInit {
     return doc;
   }
 
-  private toConfig(doc: CustomerPanelSettingsDocument): CustomerPanelConfig {
+  private toConfig(
+    doc: CustomerPanelSettingsDocument,
+  ): Omit<CustomerPanelConfig, 'guestPermissions'> {
     const navKeys = [
       'home',
       'categories',

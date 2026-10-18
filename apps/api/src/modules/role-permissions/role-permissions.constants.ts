@@ -1,7 +1,19 @@
 export const ROLE_PERMISSIONS_KEY = 'global';
 
+export const GUEST_STOREFRONT_PERMISSION_KEYS = [
+  'guest_browse_storefront',
+  'guest_use_cart',
+  'guest_checkout',
+  'guest_live_chat',
+  'guest_view_media',
+] as const;
+
+export type GuestStorefrontPermissionKey =
+  (typeof GUEST_STOREFRONT_PERMISSION_KEYS)[number];
+
 export const ADMIN_ROLE_IDS = [
   'shop_manager',
+  'guest',
   'customer',
   'vip',
   'reseller',
@@ -58,6 +70,11 @@ export const PERMISSION_KEYS = [
   'view_media_playback',
   'view_media_subscriptions',
   'manage_media_subscriptions',
+  'guest_browse_storefront',
+  'guest_use_cart',
+  'guest_checkout',
+  'guest_live_chat',
+  'guest_view_media',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -302,6 +319,37 @@ export const PERMISSION_GROUPS: Array<{
     ],
   },
   {
+    key: 'guest_storefront',
+    label: 'GUEST STOREFRONT',
+    permissions: [
+      {
+        key: 'guest_browse_storefront',
+        label: 'Browse storefront',
+        description: 'View products, categories, and public pages without logging in',
+      },
+      {
+        key: 'guest_use_cart',
+        label: 'Use cart',
+        description: 'Add items to cart as a guest session',
+      },
+      {
+        key: 'guest_checkout',
+        label: 'Guest checkout',
+        description: 'Start checkout and pay without a registered account',
+      },
+      {
+        key: 'guest_live_chat',
+        label: 'Guest live chat',
+        description: 'Open live chat without registering',
+      },
+      {
+        key: 'guest_view_media',
+        label: 'Browse media catalog',
+        description: 'View /media movies and series as a guest',
+      },
+    ],
+  },
+  {
     key: 'settings',
     label: 'SETTINGS',
     permissions: [
@@ -352,6 +400,19 @@ export const ROLE_DEFINITIONS: Array<{
       'Browse and purchase on the storefront.',
       'Manage own orders, wallet, and profile.',
       'No access to the admin panel.',
+    ],
+  },
+  {
+    id: 'guest',
+    label: 'Guest',
+    description:
+      'Ephemeral checkout and chat sessions — limit what visitors can do before they register.',
+    locked: false,
+    summary: [
+      'Applies to guest checkout and guest chat JWT sessions.',
+      'Toggle cart, checkout, chat, and media browsing independently.',
+      'Works together with Customer panel guest checkout / chat switches.',
+      'No admin panel access.',
     ],
   },
   {
@@ -537,6 +598,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     view_blog_posts: true,
   },
   customer: allPermissions(false),
+  guest: {
+    ...allPermissions(false),
+    guest_browse_storefront: true,
+    guest_use_cart: true,
+    guest_checkout: true,
+    guest_live_chat: true,
+    guest_view_media: true,
+  },
   vip: {
     ...allPermissions(false),
     auto_delivery: true,
@@ -619,6 +688,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
 /** Maps storefront user roles to role-permission profiles. */
 export const USER_ROLE_TO_PERMISSION_ROLE: Record<string, AdminRoleId | undefined> =
   {
+    guest: 'guest',
     customer: 'customer',
     vip: 'vip',
     reseller: 'reseller',

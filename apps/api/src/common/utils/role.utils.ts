@@ -42,6 +42,9 @@ export function normalizeAssignedRoles(roles: string[]): Role[] {
       out.add(Role.Editor);
       continue;
     }
+    if (role === Role.Guest) {
+      continue;
+    }
     if (ASSIGNABLE_USER_ROLE_SET.has(role)) {
       out.add(role as Role);
     }

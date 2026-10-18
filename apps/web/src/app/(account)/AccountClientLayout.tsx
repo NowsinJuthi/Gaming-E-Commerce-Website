@@ -7,6 +7,7 @@ import { CustomerPanelShell } from "@/components/customer/CustomerPanelShell";
 import { canAccessLiveChat } from "@/lib/chat-access";
 import { getCustomerPanelConfig } from "@/lib/api";
 import { ensureShoppingSession, isEphemeralGuestSession } from "@/lib/guest-checkout";
+import { guestPermissionsFromConfig } from "@/lib/guest-permissions";
 
 const AUTH_REQUIRED_PREFIXES = [
   "/wallet",
@@ -95,7 +96,11 @@ export default function AccountClientLayout({
         if (path === "/chat" || path.startsWith("/chat/")) {
           try {
             const config = await getCustomerPanelConfig();
-            if (!canAccessLiveChat(config.checkout.allowGuestChat === true)) {
+            if (
+              !canAccessLiveChat(
+                guestPermissionsFromConfig(config).guest_live_chat,
+              )
+            ) {
               router.replace(`/login?next=${encodeURIComponent(path)}`);
               return;
             }

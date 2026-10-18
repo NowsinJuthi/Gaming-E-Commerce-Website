@@ -107,7 +107,7 @@ export class UsersService {
     const email = `guest_${randomUUID()}@guest.local`;
     return this.userModel.create({
       email,
-      roles: [Role.Customer],
+      roles: [Role.Guest],
       status: UserStatus.Active,
       emailVerified: false,
       isGuest: true,

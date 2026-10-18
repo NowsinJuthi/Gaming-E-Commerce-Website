@@ -2575,6 +2575,14 @@ export interface CustomerPanelConfig {
   homepageSlides?: HomepageSlide[];
   /** When true, only products marked featured appear in homepage category sections. */
   homepageFeaturedOnly?: boolean;
+  /** Guest storefront limits (Roles → Guest profile, merged with checkout toggles). */
+  guestPermissions?: {
+    guest_browse_storefront: boolean;
+    guest_use_cart: boolean;
+    guest_checkout: boolean;
+    guest_live_chat: boolean;
+    guest_view_media: boolean;
+  };
 }
 
 const CUSTOMER_PANEL_NAV_FALLBACK: CustomerPanelConfig["nav"] = {
@@ -2616,6 +2624,13 @@ const CUSTOMER_PANEL_CONFIG_FALLBACK: CustomerPanelConfig = {
     paymentMethodOrder: ["wallet", "gateway", "manual"],
     allowGuestCheckout: false,
     allowGuestChat: false,
+  },
+  guestPermissions: {
+    guest_browse_storefront: true,
+    guest_use_cart: true,
+    guest_checkout: false,
+    guest_live_chat: false,
+    guest_view_media: true,
   },
   chat: {
     allowImageUpload: true,

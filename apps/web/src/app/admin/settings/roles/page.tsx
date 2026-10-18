@@ -22,7 +22,10 @@ import {
   updateRolePermissions,
   type RolePermissionProfile,
 } from "@/lib/api";
-import { PERMISSION_GROUPS } from "@/lib/role-permissions";
+import {
+  PERMISSION_GROUPS,
+  permissionGroupsForRole,
+} from "@/lib/role-permissions";
 
 type RolesOverview = Awaited<ReturnType<typeof getRolePermissionsOverview>>;
 
@@ -107,7 +110,7 @@ function isRoleDirty(
   role: RolePermissionProfile,
   draft: Record<string, boolean>,
 ) {
-  return PERMISSION_GROUPS.some((group) =>
+  return permissionGroupsForRole(role.id).some((group) =>
     group.permissions.some(
       (permission) => draft[permission.key] !== role.permissions[permission.key],
     ),
@@ -568,12 +571,16 @@ export default function AdminRolesPage() {
                           </dl>
                         </ProductFormOrderCard>
 
-                        {PERMISSION_GROUPS.map((group) => (
+                        {permissionGroupsForRole(selected.id).map((group) => (
                           <ProductFormOrderCard
                             key={group.key}
                             icon={<LockIcon className="h-4 w-4" />}
                             title={group.label}
-                            subtitle="Toggle access for this role"
+                            subtitle={
+                              selected.id === "guest"
+                                ? "Limits for guest checkout and chat sessions (also respects Customer panel guest switches)."
+                                : "Toggle access for this role"
+                            }
                             className="admin-product-form-section"
                           >
                             <dl>
@@ -629,7 +636,9 @@ export default function AdminRolesPage() {
                       <dt>Role hierarchy</dt>
                       <dd className="text-sm text-foreground-muted">
                         Shop Manager through Editor can be tuned per permission.
-                        Administrator is locked with full access.
+                        Guest controls storefront limits for anonymous and
+                        ephemeral sessions. Administrator is locked with full
+                        access.
                       </dd>
                     </div>
                     <div className="admin-order-view-detail-row admin-order-view-detail-row--stacked">

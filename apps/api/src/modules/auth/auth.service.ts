@@ -549,7 +549,7 @@ export class AuthService {
 
   async guestSession(meta: SessionMeta): Promise<AuthResult> {
     const config = await this.panelSettings.getConfig();
-    if (!config.checkout.allowGuestCheckout) {
+    if (!config.guestPermissions.guest_checkout) {
       throw new ForbiddenException('Guest checkout is disabled');
     }
     const user = await this.users.createGuestUser();
@@ -562,7 +562,7 @@ export class AuthService {
     meta: SessionMeta,
   ): Promise<AuthResult> {
     const config = await this.panelSettings.getConfig();
-    if (!config.checkout.allowGuestChat) {
+    if (!config.guestPermissions.guest_live_chat) {
       throw new ForbiddenException('Guest chat is disabled');
     }
     const user = await this.users.createGuestUser(displayName.trim());

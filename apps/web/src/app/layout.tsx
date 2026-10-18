@@ -33,6 +33,7 @@ import {
 } from "@/lib/server-cache";
 import { organizationSchema, websiteSchema } from "@/lib/structured-data";
 import { getAppBuildId } from "@/lib/build-id";
+import { guestPermissionsFromConfig } from "@/lib/guest-permissions";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -208,7 +209,9 @@ export default async function RootLayout({
           }}
           initialContactSettings={contactSettings}
           initialSeoSocial={seo.social}
-          allowGuestChat={panelConfig.checkout.allowGuestChat}
+          allowGuestChat={
+            guestPermissionsFromConfig(panelConfig).guest_live_chat
+          }
         >
           {children}
         </ChromeShell>

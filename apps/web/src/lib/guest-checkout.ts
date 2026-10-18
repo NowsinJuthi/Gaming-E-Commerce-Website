@@ -7,6 +7,7 @@ import {
   setTokens,
   startGuestCheckoutSession,
 } from "@/lib/api";
+import { guestPermissionsFromConfig } from "@/lib/guest-permissions";
 
 const CHECKOUT_CONTACT_KEY = "uniqbd_checkout_contact";
 
@@ -56,7 +57,7 @@ export async function isGuestCheckoutAllowed(
   if (allowGuestCheckout !== undefined) return allowGuestCheckout === true;
   try {
     const config = await getCustomerPanelConfig();
-    return config.checkout.allowGuestCheckout === true;
+    return guestPermissionsFromConfig(config).guest_checkout;
   } catch {
     return false;
   }

@@ -87,6 +87,17 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    key: "guest_storefront",
+    label: "GUEST STOREFRONT",
+    permissions: [
+      { key: "guest_browse_storefront", label: "Browse storefront" },
+      { key: "guest_use_cart", label: "Use cart" },
+      { key: "guest_checkout", label: "Guest checkout" },
+      { key: "guest_live_chat", label: "Guest live chat" },
+      { key: "guest_view_media", label: "Browse media catalog" },
+    ],
+  },
+  {
     key: "settings",
     label: "SETTINGS",
     permissions: [
@@ -96,6 +107,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
 ] as const;
+
+/** Permission panels shown for a given role profile in admin Roles UI. */
+export function permissionGroupsForRole(roleId: string) {
+  if (roleId === "guest") {
+    return PERMISSION_GROUPS.filter((group) => group.key === "guest_storefront");
+  }
+  return PERMISSION_GROUPS.filter((group) => group.key !== "guest_storefront");
+}
 
 export const BLOG_PERMISSION_KEYS = PERMISSION_GROUPS.find(
   (group) => group.key === "blog",

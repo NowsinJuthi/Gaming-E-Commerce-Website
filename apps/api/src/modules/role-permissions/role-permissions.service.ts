@@ -10,16 +10,25 @@ import {
   RolePermissionsDocument,
 } from '../../database/schemas/role-permissions.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { CacheKeys } from '../../shared/cache/cache-keys';
+import { CacheService } from '../../shared/cache/cache.service';
 import {
   ADMIN_ROLE_IDS,
   DEFAULT_ROLE_PERMISSIONS,
+  GUEST_STOREFRONT_PERMISSION_KEYS,
   PERMISSION_KEYS,
   ROLE_DEFINITIONS,
   ROLE_PERMISSIONS_KEY,
   USER_ROLE_TO_PERMISSION_ROLE,
   type AdminRoleId,
+  type GuestStorefrontPermissionKey,
   type PermissionKey,
 } from './role-permissions.constants';
+
+export type GuestStorefrontPermissions = Record<
+  GuestStorefrontPermissionKey,
+  boolean
+>;
 
 @Injectable()
 export class RolePermissionsService {
@@ -28,6 +37,7 @@ export class RolePermissionsService {
     private readonly model: Model<RolePermissionsDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async getOverview() {
@@ -61,11 +71,12 @@ export class RolePermissionsService {
       throw new BadRequestException('Administrator role cannot be modified');
     }
 
-    const sanitized = this.sanitizePermissions(permissions);
+    const sanitized = this.sanitizePermissions(roleId as AdminRoleId, permissions);
     const doc = await this.getOrCreate();
     doc.roles[roleId] = sanitized;
     doc.markModified('roles');
     await doc.save();
+    await this.invalidateGuestPolicyCaches(roleId);
 
     return this.buildRole(roleId as AdminRoleId, doc);
   }
@@ -84,6 +95,7 @@ export class RolePermissionsService {
     delete doc.roles[roleId];
     doc.markModified('roles');
     await doc.save();
+    await this.invalidateGuestPolicyCaches(roleId);
 
     return this.buildRole(roleId as AdminRoleId, doc);
   }
@@ -93,6 +105,7 @@ export class RolePermissionsService {
     doc.roles = {};
     doc.markModified('roles');
     await doc.save();
+    await this.invalidateGuestPolicyCaches('guest');
     return this.getOverview();
   }
 
@@ -121,6 +134,18 @@ export class RolePermissionsService {
       const role = this.buildRole(roleId, doc);
       return Boolean(role.permissions[permission]);
     });
+  }
+
+  /** Storefront limits for ephemeral guest sessions (Roles → Guest profile). */
+  async getGuestStorefrontPermissions(): Promise<GuestStorefrontPermissions> {
+    const doc = await this.getOrCreate();
+    const role = this.buildRole('guest', doc);
+    return Object.fromEntries(
+      GUEST_STOREFRONT_PERMISSION_KEYS.map((key) => [
+        key,
+        Boolean(role.permissions[key]),
+      ]),
+    ) as GuestStorefrontPermissions;
   }
 
   /** Merged effective permissions for the user's JWT roles (OR across profiles). */
@@ -197,13 +222,31 @@ export class RolePermissionsService {
     };
   }
 
+  private async invalidateGuestPolicyCaches(roleId: string): Promise<void> {
+    if (roleId === 'guest') {
+      await this.cacheService.del(CacheKeys.settings.panel);
+    }
+  }
+
   private sanitizePermissions(
+    roleId: AdminRoleId,
     input: Record<string, boolean>,
   ): Record<PermissionKey, boolean> {
-    const out = { ...DEFAULT_ROLE_PERMISSIONS.customer };
+    const out = { ...DEFAULT_ROLE_PERMISSIONS[roleId] };
     for (const key of PERMISSION_KEYS) {
       if (typeof input[key] === 'boolean') {
         out[key] = input[key];
+      }
+    }
+    if (roleId === 'guest') {
+      for (const key of PERMISSION_KEYS) {
+        if (
+          !GUEST_STOREFRONT_PERMISSION_KEYS.includes(
+            key as GuestStorefrontPermissionKey,
+          )
+        ) {
+          out[key] = false;
+        }
       }
     }
     return out;

@@ -11,6 +11,7 @@ import {
 import { Order, OrderSchema } from '../../database/schemas/order.schema';
 import { EventsModule } from '../../shared/events/events.module';
 import { LicenseModule } from '../license/license.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { CustomerPanelAdminController } from './customer-panel-admin.controller';
 import { CustomerPanelAdminService } from './customer-panel-admin.service';
 import { CustomerPanelController } from './customer-panel.controller';
@@ -26,6 +27,7 @@ import { UploadsService } from '../../shared/uploads/uploads.service';
     ]),
     EventsModule,
     LicenseModule,
+    RolePermissionsModule,
   ],
   controllers: [CustomerPanelController, CustomerPanelAdminController],
   providers: [CustomerPanelSettingsService, CustomerPanelAdminService, UploadsService],
