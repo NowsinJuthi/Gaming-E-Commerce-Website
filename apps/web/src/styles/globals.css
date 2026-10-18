@@ -38058,12 +38058,28 @@ html.media-catalog-route .media-page-root :where(
   }
 }
 
-.site-header.site-header--storefront .site-header-profile-ring,
-.site-header.site-header--storefront .shell-icon-btn {
+.site-header.site-header--storefront .site-header-profile-ring {
   position: relative;
   display: inline-grid;
   flex-shrink: 0;
   place-items: center;
+  isolation: isolate;
+  overflow: visible;
+  height: 2.5rem;
+  width: 2.5rem;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  transition: transform 0.2s ease;
+  animation: siteHeaderProfileGlow 3.2s ease-in-out infinite;
+}
+
+.site-header.site-header--storefront .shell-icon-btn {
+  position: relative;
+  flex-shrink: 0;
   isolation: isolate;
   overflow: visible;
   height: 2.5rem;
