@@ -22,6 +22,7 @@ import {
   updateRolePermissions,
   type RolePermissionProfile,
 } from "@/lib/api";
+import { mergeRolePermissionsOverview } from "@/lib/admin-role-catalog";
 import {
   PERMISSION_GROUPS,
   permissionGroupsForRole,
@@ -188,7 +189,9 @@ export default function AdminRolesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
+  const [missingServerRoles, setMissingServerRoles] = useState<string[]>([]);
+  const serverRoleIdsRef = useRef<Set<string>>(new Set());
+
   const refreshBusyRef = useRef(false);
   const selectedIdRef = useRef(selectedId);
   const draftRef = useRef(draft);
@@ -213,13 +216,16 @@ export default function AdminRolesPage() {
       setLoadError(null);
     }
     try {
-      const data = await getRolePermissionsOverview();
-      setOverview(data);
+      const raw = await getRolePermissionsOverview();
+      const merged = mergeRolePermissionsOverview(raw);
+      serverRoleIdsRef.current = merged.serverRoleIds;
+      setMissingServerRoles(merged.missingOnServer);
+      setOverview(merged.overview);
       if (silent) return;
       const role =
-        data.roles.find(
+        merged.overview.roles.find(
           (row) => row.id === (keepRoleId ?? selectedIdRef.current),
-        ) ?? data.roles[0];
+        ) ?? merged.overview.roles[0];
       if (role) {
         setSelectedId(role.id);
         setDraft({ ...role.permissions });
@@ -267,6 +273,13 @@ export default function AdminRolesPage() {
     const role = overview?.roles.find((row) => row.id === roleId);
     const permissions = draftRef.current;
     if (!role || role.locked || !isRoleDirty(role, permissions)) return;
+    if (!serverRoleIdsRef.current.has(roleId)) {
+      adminToast(
+        "This role is not on the running API yet. Rebuild and restart the API service (rebuild-api.sh), then refresh.",
+        false,
+      );
+      return;
+    }
     setBusy(true);
     hideAdminToast();
     try {
@@ -287,6 +300,13 @@ export default function AdminRolesPage() {
     const roleId = selectedIdRef.current;
     const role = overview?.roles.find((row) => row.id === roleId);
     if (!role || role.locked) return;
+    if (!serverRoleIdsRef.current.has(roleId)) {
+      adminToast(
+        "This role is not on the running API yet. Rebuild and restart the API service first.",
+        false,
+      );
+      return;
+    }
     if (!window.confirm(`Reset "${role.label}" to default permissions? Unsaved changes will be lost.`)) return;
     setBusy(true);
     hideAdminToast();
@@ -310,10 +330,13 @@ export default function AdminRolesPage() {
     hideAdminToast();
     try {
       const data = await resetAllRolePermissions();
-      setOverview(data);
+      const merged = mergeRolePermissionsOverview(data);
+      serverRoleIdsRef.current = merged.serverRoleIds;
+      setMissingServerRoles(merged.missingOnServer);
+      setOverview(merged.overview);
       const role =
-        data.roles.find((row) => row.id === selectedIdRef.current) ??
-        data.roles[0];
+        merged.overview.roles.find((row) => row.id === selectedIdRef.current) ??
+        merged.overview.roles[0];
       if (role) {
         setSelectedId(role.id);
         setDraft({ ...role.permissions });
@@ -396,6 +419,22 @@ export default function AdminRolesPage() {
         )
       }
     >
+
+      {missingServerRoles.length > 0 ? (
+        <ProductFormOrderCard
+          title="API update required to save Guest limits"
+          subtitle={`The roles list includes ${missingServerRoles.join(", ")} from the latest app code, but your API still returns an older profile set. Rebuild and restart the NestJS API (deploy/rebuild-api.sh), then click Refresh.`}
+          className="space-y-3 border-amber-500/30 bg-amber-500/10"
+        >
+          <button
+            type="button"
+            onClick={() => void loadCore(true, selectedId)}
+            className="dashboard-pro-btn-ghost text-xs"
+          >
+            Refresh after API deploy
+          </button>
+        </ProductFormOrderCard>
+      ) : null}
 
       {loadError && !overview ? (
         <ProductFormOrderCard
