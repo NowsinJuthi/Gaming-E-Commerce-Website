@@ -1,6 +1,14 @@
 import type { RolePermissionProfile } from "@/lib/api";
 import { PERMISSION_GROUPS } from "@/lib/role-permissions";
 
+/** Retired — never show in Roles UI (use `movie_server` instead). */
+export const LEGACY_REMOVED_ROLE_IDS = new Set([
+  "content_manager",
+  "library_manager",
+  "media_uploader",
+  "media_support",
+]);
+
 /** Must match API `ADMIN_ROLE_IDS` order (apps/api role-permissions.constants). */
 export const ADMIN_ROLE_ORDER = [
   "shop_manager",
@@ -38,6 +46,44 @@ function allPermissionKeysFalse(): Record<string, boolean> {
   return out;
 }
 
+const MOVIE_SERVER_PERMISSION_DEFAULTS: Record<string, boolean> = {
+  admin_panel_access: true,
+  dashboard_analytics: true,
+  view_media_catalog: true,
+  manage_media_catalog: true,
+  manage_media_collections: true,
+  manage_media_genres: true,
+  manage_media_home: true,
+  manage_media_libraries: true,
+  upload_media_files: true,
+  manage_media_files: true,
+  view_media_playback: true,
+  view_media_subscriptions: true,
+  manage_media_subscriptions: true,
+  live_chat_picture_upload: true,
+};
+
+function buildMovieServerRoleProfile(): RolePermissionProfile {
+  return {
+    id: "movie_server",
+    label: "Movie Server",
+    description:
+      "Full Movie Server staff — catalog, libraries, uploads, playback, and subscriptions.",
+    locked: false,
+    summary: [
+      "Manage movies, series, collections, genres, and /media homepage.",
+      "Configure libraries, upload files, and manage media storage.",
+      "Monitor playback streams and media subscription accounts.",
+      "No shop catalog, orders, or site-wide security settings by default.",
+    ],
+    customized: false,
+    permissions: {
+      ...allPermissionKeysFalse(),
+      ...MOVIE_SERVER_PERMISSION_DEFAULTS,
+    },
+  };
+}
+
 function buildGuestRoleProfile(): RolePermissionProfile {
   return {
     id: "guest",
@@ -62,6 +108,7 @@ function buildGuestRoleProfile(): RolePermissionProfile {
 /** Profiles the admin UI can show when the running API build is behind the repo. */
 const SUPPLEMENTAL_ROLE_PROFILES: RolePermissionProfile[] = [
   buildGuestRoleProfile(),
+  buildMovieServerRoleProfile(),
 ];
 
 export type MergedRolesOverview = {
@@ -81,8 +128,11 @@ export type MergedRolesOverview = {
 export function mergeRolePermissionsOverview(
   fromApi: MergedRolesOverview["overview"],
 ): MergedRolesOverview {
-  const serverRoleIds = new Set(fromApi.roles.map((role) => role.id));
-  const byId = new Map(fromApi.roles.map((role) => [role.id, role]));
+  const apiRoles = fromApi.roles.filter(
+    (role) => !LEGACY_REMOVED_ROLE_IDS.has(role.id),
+  );
+  const serverRoleIds = new Set(apiRoles.map((role) => role.id));
+  const byId = new Map(apiRoles.map((role) => [role.id, role]));
   const missingOnServer: string[] = [];
 
   for (const supplemental of SUPPLEMENTAL_ROLE_PROFILES) {
@@ -97,8 +147,8 @@ export function mergeRolePermissionsOverview(
     if (role) roles.push(role);
   }
   const orderSet = new Set<string>(ADMIN_ROLE_ORDER);
-  for (const role of fromApi.roles) {
-    if (!orderSet.has(role.id)) {
+  for (const role of apiRoles) {
+    if (!orderSet.has(role.id) && !LEGACY_REMOVED_ROLE_IDS.has(role.id)) {
       roles.push(role);
     }
   }

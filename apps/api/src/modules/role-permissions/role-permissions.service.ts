@@ -17,6 +17,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   GUEST_ROLE_EXTRA_PERMISSION_KEYS,
   GUEST_STOREFRONT_PERMISSION_KEYS,
+  LEGACY_REMOVED_ROLE_IDS,
   PERMISSION_KEYS,
   ROLE_DEFINITIONS,
   ROLE_PERMISSIONS_KEY,
@@ -200,8 +201,25 @@ export class RolePermissionsService {
     let doc = await this.model.findOne({ key: ROLE_PERMISSIONS_KEY }).exec();
     if (!doc) {
       doc = await this.model.create({ key: ROLE_PERMISSIONS_KEY, roles: {} });
+      return doc;
     }
+    await this.purgeLegacyRoleProfiles(doc);
     return doc;
+  }
+
+  /** Drop retired media staff profiles; keep `movie_server` as the single Movie Server role. */
+  private async purgeLegacyRoleProfiles(
+    doc: RolePermissionsDocument,
+  ): Promise<void> {
+    let dirty = false;
+    for (const legacyId of LEGACY_REMOVED_ROLE_IDS) {
+      if (!doc.roles?.[legacyId]) continue;
+      delete doc.roles[legacyId];
+      dirty = true;
+    }
+    if (!dirty) return;
+    doc.markModified('roles');
+    await doc.save();
   }
 
   private buildRoles(doc: RolePermissionsDocument) {

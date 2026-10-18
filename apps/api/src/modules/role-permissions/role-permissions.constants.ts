@@ -29,6 +29,14 @@ export const ADMIN_ROLE_IDS = [
 
 export type AdminRoleId = (typeof ADMIN_ROLE_IDS)[number];
 
+/** Removed from Roles UI — merged into `movie_server`; purged from stored profiles. */
+export const LEGACY_REMOVED_ROLE_IDS = [
+  'content_manager',
+  'library_manager',
+  'media_uploader',
+  'media_support',
+] as const;
+
 export const PERMISSION_KEYS = [
   'admin_panel_access',
   'dashboard_analytics',
