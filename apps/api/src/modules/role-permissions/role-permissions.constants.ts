@@ -12,6 +12,10 @@ export const ADMIN_ROLE_IDS = [
   'author',
   'blogger',
   'editor',
+  'content_manager',
+  'library_manager',
+  'media_uploader',
+  'media_support',
   'administrator',
 ] as const;
 
@@ -43,6 +47,15 @@ export const PERMISSION_KEYS = [
   'publish_blog_posts',
   'delete_blog_posts',
   'manage_blog_categories',
+  'view_media_catalog',
+  'manage_media_catalog',
+  'manage_media_collections',
+  'manage_media_genres',
+  'manage_media_home',
+  'manage_media_libraries',
+  'upload_media_files',
+  'manage_media_files',
+  'view_media_playback',
   'view_media_subscriptions',
   'manage_media_subscriptions',
 ] as const;
@@ -216,8 +229,65 @@ export const PERMISSION_GROUPS: Array<{
     ],
   },
   {
-    key: 'movie_server',
-    label: 'MOVIE SERVER',
+    key: 'movie_server_catalog',
+    label: 'MOVIE SERVER — CATALOG',
+    permissions: [
+      {
+        key: 'view_media_catalog',
+        label: 'View media catalog',
+        description: 'Browse movies, series, and titles in admin',
+      },
+      {
+        key: 'manage_media_catalog',
+        label: 'Manage media catalog',
+        description: 'Create, edit, publish, and remove catalog titles',
+      },
+      {
+        key: 'manage_media_collections',
+        label: 'Manage collections',
+        description: 'Curate movie and series collections',
+      },
+      {
+        key: 'manage_media_genres',
+        label: 'Genres & metadata',
+        description: 'Manage genres, tags, and catalog metadata',
+      },
+      {
+        key: 'manage_media_home',
+        label: 'Media homepage',
+        description: 'Featured rows and /media browse layout',
+      },
+    ],
+  },
+  {
+    key: 'movie_server_library',
+    label: 'MOVIE SERVER — LIBRARY & UPLOAD',
+    permissions: [
+      {
+        key: 'manage_media_libraries',
+        label: 'Media libraries',
+        description: 'Add libraries, scan folders, and link storage',
+      },
+      {
+        key: 'upload_media_files',
+        label: 'Upload media files',
+        description: 'Upload videos to configured storage (no delete)',
+      },
+      {
+        key: 'manage_media_files',
+        label: 'Manage media files',
+        description: 'Full file manager — upload, link, and remove files',
+      },
+      {
+        key: 'view_media_playback',
+        label: 'Playback & streams',
+        description: 'Monitor active playback and stream sessions',
+      },
+    ],
+  },
+  {
+    key: 'movie_server_accounts',
+    label: 'MOVIE SERVER — SUBSCRIPTIONS',
     permissions: [
       {
         key: 'view_media_subscriptions',
@@ -386,6 +456,50 @@ export const ROLE_DEFINITIONS: Array<{
     ],
   },
   {
+    id: 'content_manager',
+    label: 'Content manager',
+    description: 'Movies, series, collections, and media homepage curation.',
+    locked: false,
+    summary: [
+      'View and manage the media catalog and collections.',
+      'Curate genres and /media homepage rows.',
+      'No library uploads, billing, or shop settings.',
+    ],
+  },
+  {
+    id: 'library_manager',
+    label: 'Library manager',
+    description: 'Media libraries, uploads, files, and playback monitoring.',
+    locked: false,
+    summary: [
+      'Manage libraries and media file storage.',
+      'Upload videos and use the full file manager.',
+      'Monitor playback and stream sessions.',
+      'No catalog metadata editing or subscriptions.',
+    ],
+  },
+  {
+    id: 'media_uploader',
+    label: 'Media uploader',
+    description: 'Upload videos only — no delete or catalog access.',
+    locked: false,
+    summary: [
+      'Upload media files to configured storage.',
+      'Cannot manage libraries, catalog titles, or subscriptions.',
+    ],
+  },
+  {
+    id: 'media_support',
+    label: 'Media support',
+    description: 'Read-only media access for troubleshooting.',
+    locked: false,
+    summary: [
+      'View catalog titles and playback sessions.',
+      'View media subscriptions on customer accounts.',
+      'Cannot upload, edit catalog, or change plans.',
+    ],
+  },
+  {
     id: 'administrator',
     label: 'Administrator',
     description: 'Full access to all admin features.',
@@ -468,6 +582,37 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     delete_blog_posts: true,
     manage_blog_categories: true,
   },
+  content_manager: {
+    ...allPermissions(false),
+    admin_panel_access: true,
+    dashboard_analytics: true,
+    view_media_catalog: true,
+    manage_media_catalog: true,
+    manage_media_collections: true,
+    manage_media_genres: true,
+    manage_media_home: true,
+  },
+  library_manager: {
+    ...allPermissions(false),
+    admin_panel_access: true,
+    dashboard_analytics: true,
+    manage_media_libraries: true,
+    upload_media_files: true,
+    manage_media_files: true,
+    view_media_playback: true,
+  },
+  media_uploader: {
+    ...allPermissions(false),
+    admin_panel_access: true,
+    upload_media_files: true,
+  },
+  media_support: {
+    ...allPermissions(false),
+    admin_panel_access: true,
+    view_media_catalog: true,
+    view_media_playback: true,
+    view_media_subscriptions: true,
+  },
   administrator: allPermissions(true),
 };
 
@@ -481,6 +626,10 @@ export const USER_ROLE_TO_PERMISSION_ROLE: Record<string, AdminRoleId | undefine
     supplier: 'supplier',
     contributor: 'contributor',
     blogger: 'blogger',
+    content_manager: 'content_manager',
+    library_manager: 'library_manager',
+    media_uploader: 'media_uploader',
+    media_support: 'media_support',
     admin: 'administrator',
     support: 'editor',
   };

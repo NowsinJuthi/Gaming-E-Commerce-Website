@@ -1626,6 +1626,10 @@ export type CustomerRole =
   | "author"
   | "blogger"
   | "editor"
+  | "content_manager"
+  | "library_manager"
+  | "media_uploader"
+  | "media_support"
   | "administrator";
 
 /** All assignable roles — keep in sync with `ADMIN_ROLE_IDS` in the API. */
@@ -1657,6 +1661,26 @@ export const CUSTOMER_ROLE_OPTIONS: ReadonlyArray<{
   { value: "author", label: "Author", description: "Own product listings" },
   { value: "blogger", label: "Blogger", description: "Write blog posts" },
   { value: "editor", label: "Editor", description: "Catalog & moderation" },
+  {
+    value: "content_manager",
+    label: "Content manager",
+    description: "Movies, series & media homepage",
+  },
+  {
+    value: "library_manager",
+    label: "Library manager",
+    description: "Libraries, uploads & streams",
+  },
+  {
+    value: "media_uploader",
+    label: "Media uploader",
+    description: "Upload videos only",
+  },
+  {
+    value: "media_support",
+    label: "Media support",
+    description: "View catalog, playback & subs",
+  },
   {
     value: "administrator",
     label: "Administrator",

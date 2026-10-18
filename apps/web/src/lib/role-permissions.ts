@@ -58,8 +58,29 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
-    key: "movie_server",
-    label: "MOVIE SERVER",
+    key: "movie_server_catalog",
+    label: "MOVIE SERVER — CATALOG",
+    permissions: [
+      { key: "view_media_catalog", label: "View media catalog" },
+      { key: "manage_media_catalog", label: "Manage media catalog" },
+      { key: "manage_media_collections", label: "Manage collections" },
+      { key: "manage_media_genres", label: "Genres & metadata" },
+      { key: "manage_media_home", label: "Media homepage" },
+    ],
+  },
+  {
+    key: "movie_server_library",
+    label: "MOVIE SERVER — LIBRARY & UPLOAD",
+    permissions: [
+      { key: "manage_media_libraries", label: "Media libraries" },
+      { key: "upload_media_files", label: "Upload media files" },
+      { key: "manage_media_files", label: "Manage media files" },
+      { key: "view_media_playback", label: "Playback & streams" },
+    ],
+  },
+  {
+    key: "movie_server_accounts",
+    label: "MOVIE SERVER — SUBSCRIPTIONS",
     permissions: [
       { key: "view_media_subscriptions", label: "View media subscriptions" },
       { key: "manage_media_subscriptions", label: "Manage media subscriptions" },

@@ -11,6 +11,10 @@ export enum Role {
   Author = 'author',
   Blogger = 'blogger',
   Editor = 'editor',
+  ContentManager = 'content_manager',
+  LibraryManager = 'library_manager',
+  MediaUploader = 'media_uploader',
+  MediaSupport = 'media_support',
   Administrator = 'administrator',
   /** @deprecated Prefer {@link Role.Administrator} */
   Admin = 'admin',
