@@ -606,6 +606,7 @@ const ROLE_SUBTITLE_PRIORITY = [
   "admin",
   "editor",
   "support",
+  "movie_server",
   "content_manager",
   "library_manager",
   "media_uploader",
@@ -625,6 +626,10 @@ const ROLE_SUBTITLE_PRIORITY = [
 const LEGACY_ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   support: "Support",
+  content_manager: "Movie Server",
+  library_manager: "Movie Server",
+  media_uploader: "Movie Server",
+  media_support: "Movie Server",
 };
 
 function roleLabel(role: string): string {

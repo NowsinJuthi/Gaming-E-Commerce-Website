@@ -15,10 +15,7 @@ export const ADMIN_ROLE_ORDER = [
   "author",
   "blogger",
   "editor",
-  "content_manager",
-  "library_manager",
-  "media_uploader",
-  "media_support",
+  "movie_server",
   "administrator",
 ] as const;
 

@@ -24,10 +24,7 @@ export const ADMIN_ROLE_IDS = [
   'author',
   'blogger',
   'editor',
-  'content_manager',
-  'library_manager',
-  'media_uploader',
-  'media_support',
+  'movie_server',
   'administrator',
 ] as const;
 
@@ -517,47 +514,16 @@ export const ROLE_DEFINITIONS: Array<{
     ],
   },
   {
-    id: 'content_manager',
-    label: 'Content manager',
-    description: 'Movies, series, collections, and media homepage curation.',
+    id: 'movie_server',
+    label: 'Movie Server',
+    description:
+      'Full Movie Server staff — catalog, libraries, uploads, playback, and subscriptions.',
     locked: false,
     summary: [
-      'View and manage the media catalog and collections.',
-      'Curate genres and /media homepage rows.',
-      'No library uploads, billing, or shop settings.',
-    ],
-  },
-  {
-    id: 'library_manager',
-    label: 'Library manager',
-    description: 'Media libraries, uploads, files, and playback monitoring.',
-    locked: false,
-    summary: [
-      'Manage libraries and media file storage.',
-      'Upload videos and use the full file manager.',
-      'Monitor playback and stream sessions.',
-      'No catalog metadata editing or subscriptions.',
-    ],
-  },
-  {
-    id: 'media_uploader',
-    label: 'Media uploader',
-    description: 'Upload videos only — no delete or catalog access.',
-    locked: false,
-    summary: [
-      'Upload media files to configured storage.',
-      'Cannot manage libraries, catalog titles, or subscriptions.',
-    ],
-  },
-  {
-    id: 'media_support',
-    label: 'Media support',
-    description: 'Read-only media access for troubleshooting.',
-    locked: false,
-    summary: [
-      'View catalog titles and playback sessions.',
-      'View media subscriptions on customer accounts.',
-      'Cannot upload, edit catalog, or change plans.',
+      'Manage movies, series, collections, genres, and /media homepage.',
+      'Configure libraries, upload files, and manage media storage.',
+      'Monitor playback streams and media subscription accounts.',
+      'No shop catalog, orders, or site-wide security settings by default.',
     ],
   },
   {
@@ -651,7 +617,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     delete_blog_posts: true,
     manage_blog_categories: true,
   },
-  content_manager: {
+  movie_server: {
     ...allPermissions(false),
     admin_panel_access: true,
     dashboard_analytics: true,
@@ -660,27 +626,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     manage_media_collections: true,
     manage_media_genres: true,
     manage_media_home: true,
-  },
-  library_manager: {
-    ...allPermissions(false),
-    admin_panel_access: true,
-    dashboard_analytics: true,
     manage_media_libraries: true,
     upload_media_files: true,
     manage_media_files: true,
     view_media_playback: true,
-  },
-  media_uploader: {
-    ...allPermissions(false),
-    admin_panel_access: true,
-    upload_media_files: true,
-  },
-  media_support: {
-    ...allPermissions(false),
-    admin_panel_access: true,
-    view_media_catalog: true,
-    view_media_playback: true,
     view_media_subscriptions: true,
+    manage_media_subscriptions: true,
   },
   administrator: allPermissions(true),
 };
@@ -696,10 +647,11 @@ export const USER_ROLE_TO_PERMISSION_ROLE: Record<string, AdminRoleId | undefine
     supplier: 'supplier',
     contributor: 'contributor',
     blogger: 'blogger',
-    content_manager: 'content_manager',
-    library_manager: 'library_manager',
-    media_uploader: 'media_uploader',
-    media_support: 'media_support',
+    movie_server: 'movie_server',
+    content_manager: 'movie_server',
+    library_manager: 'movie_server',
+    media_uploader: 'movie_server',
+    media_support: 'movie_server',
     admin: 'administrator',
     support: 'editor',
   };

@@ -1626,10 +1626,7 @@ export type CustomerRole =
   | "author"
   | "blogger"
   | "editor"
-  | "content_manager"
-  | "library_manager"
-  | "media_uploader"
-  | "media_support"
+  | "movie_server"
   | "administrator";
 
 /** All assignable roles — keep in sync with `ADMIN_ROLE_IDS` in the API. */
@@ -1662,24 +1659,9 @@ export const CUSTOMER_ROLE_OPTIONS: ReadonlyArray<{
   { value: "blogger", label: "Blogger", description: "Write blog posts" },
   { value: "editor", label: "Editor", description: "Catalog & moderation" },
   {
-    value: "content_manager",
-    label: "Content manager",
-    description: "Movies, series & media homepage",
-  },
-  {
-    value: "library_manager",
-    label: "Library manager",
-    description: "Libraries, uploads & streams",
-  },
-  {
-    value: "media_uploader",
-    label: "Media uploader",
-    description: "Upload videos only",
-  },
-  {
-    value: "media_support",
-    label: "Media support",
-    description: "View catalog, playback & subs",
+    value: "movie_server",
+    label: "Movie Server",
+    description: "Catalog, libraries, uploads & media subs",
   },
   {
     value: "administrator",
@@ -1692,10 +1674,22 @@ export const CUSTOMER_ROLES: CustomerRole[] = CUSTOMER_ROLE_OPTIONS.map(
   (option) => option.value,
 );
 
+const LEGACY_MOVIE_SERVER_ROLES = [
+  "content_manager",
+  "library_manager",
+  "media_uploader",
+  "media_support",
+] as const;
+
 export function normalizeCustomerRoles(roles: string[]): CustomerRole[] {
   const normalized = roles.map((role) => {
     if (role === "admin") return "administrator";
     if (role === "support") return "editor";
+    if (
+      (LEGACY_MOVIE_SERVER_ROLES as readonly string[]).includes(role)
+    ) {
+      return "movie_server";
+    }
     return role;
   });
   const assignable = normalized.filter((role): role is CustomerRole =>

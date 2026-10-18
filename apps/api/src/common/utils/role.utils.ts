@@ -22,10 +22,7 @@ export const ADMIN_PANEL_ROLES: readonly Role[] = [
   Role.ShopManager,
   Role.Author,
   Role.Editor,
-  Role.ContentManager,
-  Role.LibraryManager,
-  Role.MediaUploader,
-  Role.MediaSupport,
+  Role.MovieServer,
   Role.Support,
   Role.Administrator,
   Role.Admin,
@@ -43,6 +40,15 @@ export function normalizeAssignedRoles(roles: string[]): Role[] {
       continue;
     }
     if (role === Role.Guest) {
+      continue;
+    }
+    if (
+      role === 'content_manager' ||
+      role === 'library_manager' ||
+      role === 'media_uploader' ||
+      role === 'media_support'
+    ) {
+      out.add(Role.MovieServer);
       continue;
     }
     if (ASSIGNABLE_USER_ROLE_SET.has(role)) {
