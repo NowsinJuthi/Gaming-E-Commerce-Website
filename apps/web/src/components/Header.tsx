@@ -564,7 +564,7 @@ export function Header({
                     setMenuOpen(false);
                     setUserOpen((o) => !o);
                   }}
-                  className="flex items-center gap-2 overflow-visible rounded-xl border border-transparent py-1 pl-1 pr-2 transition hover:border-border hover:bg-muted/60"
+                  className="site-header-desktop-profile-btn flex items-center gap-2 overflow-visible rounded-xl border border-transparent py-1 pl-0 pr-2 transition"
                   aria-expanded={userOpen}
                   aria-haspopup="menu"
                 >
