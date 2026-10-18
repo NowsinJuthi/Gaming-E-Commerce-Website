@@ -38191,6 +38191,31 @@ html.media-catalog-route .media-page-root :where(
   animation: siteHeaderIconOrbit 5.5s linear infinite;
 }
 
+.site-header.site-header--storefront .site-header-icon-search.shell-icon-btn,
+.site-header.site-header--storefront .site-header-icon-cart.shell-icon-btn {
+  color: rgb(var(--brand));
+  animation: siteHeaderIconGlow 3.2s ease-in-out infinite;
+}
+
+.site-header.site-header--storefront .site-header-icon-search.shell-icon-btn::before,
+.site-header.site-header--storefront .site-header-icon-cart.shell-icon-btn::before {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 62%,
+    rgb(var(--brand)) 78%,
+    rgb(var(--brand) / 0.55) 82%,
+    transparent 92%
+  );
+}
+
+.site-header.site-header--storefront .site-header-icon-search.shell-icon-btn:hover,
+.site-header.site-header--storefront .site-header-icon-search.shell-icon-btn:active,
+.site-header.site-header--storefront .site-header-icon-cart.shell-icon-btn:hover,
+.site-header.site-header--storefront .site-header-icon-cart.shell-icon-btn:active {
+  color: rgb(var(--brand));
+  filter: brightness(1.1);
+}
+
 .site-header.site-header--storefront .site-header-profile-ring > *,
 .site-header.site-header--storefront .shell-icon-btn > * {
   position: relative;
