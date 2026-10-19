@@ -1,4 +1,5 @@
 import type { CustomerPanelConfig } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
 
 export type GuestStorefrontPermissions = {
   guest_browse_storefront: boolean;
@@ -45,4 +46,46 @@ export function isGuestCartEnabled(
 ): boolean {
   const p = guestPermissionsFromConfig(config);
   return p.guest_browse_storefront && p.guest_use_cart;
+}
+
+let guestPolicyCache: GuestStorefrontPermissions | null = null;
+let guestPolicyInflight: Promise<GuestStorefrontPermissions | null> | null =
+  null;
+
+/** Authoritative guest limits from Roles → Guest (public API). */
+export async function fetchGuestStorefrontPermissions(): Promise<GuestStorefrontPermissions | null> {
+  if (guestPolicyCache) return guestPolicyCache;
+  if (guestPolicyInflight) return guestPolicyInflight;
+
+  guestPolicyInflight = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/role-permissions/guest`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as GuestStorefrontPermissions;
+      guestPolicyCache = data;
+      return data;
+    } catch {
+      return null;
+    } finally {
+      guestPolicyInflight = null;
+    }
+  })();
+
+  return guestPolicyInflight;
+}
+
+export function invalidateGuestStorefrontPolicyCache(): void {
+  guestPolicyCache = null;
+  guestPolicyInflight = null;
+}
+
+export async function resolveGuestStorefrontPermissions(
+  config?: Pick<CustomerPanelConfig, "checkout" | "guestPermissions"> | null,
+): Promise<GuestStorefrontPermissions> {
+  const live = await fetchGuestStorefrontPermissions();
+  if (live) return live;
+  if (config) return guestPermissionsFromConfig(config);
+  return DEFAULT_GUEST_PERMISSIONS;
 }

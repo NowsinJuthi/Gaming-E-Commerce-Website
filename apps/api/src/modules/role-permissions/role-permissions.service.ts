@@ -12,6 +12,8 @@ import {
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CacheKeys } from '../../shared/cache/cache-keys';
 import { CacheService } from '../../shared/cache/cache.service';
+import { AppEvent } from '../../shared/events/events.types';
+import { EventsService } from '../../shared/events/events.service';
 import {
   ADMIN_ROLE_IDS,
   DEFAULT_ROLE_PERMISSIONS,
@@ -39,6 +41,7 @@ export class RolePermissionsService {
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
     private readonly cacheService: CacheService,
+    private readonly events: EventsService,
   ) {}
 
   async getOverview() {
@@ -168,10 +171,11 @@ export class RolePermissionsService {
       role.permissions.live_chat_without_login ??
         role.permissions.guest_live_chat,
     );
+    const shop = this.guestShopAllowed(role.permissions);
     const raw: GuestStorefrontPermissions = {
       guest_browse_storefront: Boolean(role.permissions.guest_browse_storefront),
-      guest_use_cart: Boolean(role.permissions.guest_checkout),
-      guest_checkout: Boolean(role.permissions.guest_checkout),
+      guest_use_cart: shop,
+      guest_checkout: shop,
       guest_live_chat: guestLiveChat,
       guest_view_media: Boolean(role.permissions.play_media_catalog),
     };
@@ -258,6 +262,7 @@ export class RolePermissionsService {
       const withoutLogin = Boolean(
         permissions.live_chat_without_login ?? permissions.guest_live_chat,
       );
+      const checkout = this.resolveGuestCheckoutStored(stored, permissions);
       const storedPlay = stored?.play_media_catalog;
       const legacyBrowse = Boolean(stored?.guest_view_media);
       const playMedia =
@@ -266,7 +271,8 @@ export class RolePermissionsService {
           : legacyBrowse || Boolean(permissions.play_media_catalog);
       permissions = {
         ...permissions,
-        guest_use_cart: permissions.guest_checkout,
+        guest_checkout: checkout,
+        guest_use_cart: checkout,
         live_chat_without_login: withoutLogin,
         guest_live_chat: withoutLogin,
         play_media_catalog: playMedia,
@@ -291,7 +297,28 @@ export class RolePermissionsService {
   private async invalidateGuestPolicyCaches(roleId: string): Promise<void> {
     if (roleId === 'guest') {
       await this.cacheService.del(CacheKeys.settings.panel);
+      this.events.emit(AppEvent.SettingsUpdated, { section: 'guestPermissions' });
     }
+  }
+
+  private resolveGuestCheckoutStored(
+    stored: Record<string, boolean> | undefined,
+    merged: Record<string, boolean>,
+  ): boolean {
+    if (typeof stored?.guest_checkout === 'boolean') {
+      return stored.guest_checkout;
+    }
+    if (typeof stored?.guest_use_cart === 'boolean') {
+      return stored.guest_use_cart;
+    }
+    return Boolean(merged.guest_checkout);
+  }
+
+  private guestShopAllowed(permissions: Record<string, boolean>): boolean {
+    return Boolean(
+      permissions.guest_browse_storefront &&
+        (permissions.guest_checkout || permissions.guest_use_cart),
+    );
   }
 
   private sanitizePermissions(
@@ -314,6 +341,9 @@ export class RolePermissionsService {
         if (!guestAllowed.has(key)) {
           out[key] = false;
         }
+      }
+      if (!out.guest_browse_storefront) {
+        out.guest_checkout = false;
       }
       out.guest_use_cart = out.guest_checkout;
       out.guest_view_media = false;

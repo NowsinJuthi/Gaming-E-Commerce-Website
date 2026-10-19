@@ -10,10 +10,12 @@ import { RolePermissionsController } from './role-permissions.controller';
 import { RolePermissionsService } from './role-permissions.service';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RedisModule } from '../../shared/cache/redis.module';
+import { EventsModule } from '../../shared/events/events.module';
 
 @Module({
   imports: [
     RedisModule,
+    EventsModule,
     MongooseModule.forFeature([
       { name: RolePermissions.name, schema: RolePermissionsSchema },
       { name: User.name, schema: UserSchema },

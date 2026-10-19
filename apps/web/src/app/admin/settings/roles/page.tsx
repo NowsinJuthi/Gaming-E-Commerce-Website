@@ -19,6 +19,7 @@ import {
   getRolePermissionsOverview,
   resetAllRolePermissions,
   resetRolePermissions,
+  revalidateStorefront,
   updateRolePermissions,
   type RolePermissionProfile,
 } from "@/lib/api";
@@ -281,6 +282,13 @@ export default function AdminRolesPage() {
       const next = { ...current, [key]: !current[key] };
       if (key === "guest_checkout") {
         next.guest_use_cart = next.guest_checkout === true;
+        if (next.guest_checkout === true) {
+          next.guest_browse_storefront = true;
+        }
+      }
+      if (key === "guest_browse_storefront" && next.guest_browse_storefront !== true) {
+        next.guest_checkout = false;
+        next.guest_use_cart = false;
       }
       if (key === "live_chat_without_login") {
         next.guest_live_chat = next.live_chat_without_login === true;
@@ -311,6 +319,7 @@ export default function AdminRolesPage() {
       setDraft({ ...updated.permissions });
       if (roleId === "guest") {
         notifyPanelConfigChanged();
+        void revalidateStorefront();
       }
       adminToast("Role saved.", true);
     } catch (err) {
@@ -340,6 +349,10 @@ export default function AdminRolesPage() {
         current ? patchOverviewRole(current, updated) : current,
       );
       setDraft({ ...updated.permissions });
+      if (roleId === "guest") {
+        notifyPanelConfigChanged();
+        void revalidateStorefront();
+      }
       adminToast("Role reset to defaults.", true);
     } catch (err) {
       adminToast(err instanceof Error ? err.message : "Reset failed.", false);

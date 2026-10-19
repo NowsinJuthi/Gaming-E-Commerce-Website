@@ -224,7 +224,7 @@ export function permissionGroupSubtitle(
 ): string {
   if (groupKey === "guest_storefront") {
     if (roleId === "guest") {
-      return "Site-wide limits for visitors without an account. Turn off cart & checkout to block guest ordering.";
+      return "Site-wide limits for visitors without an account. Cart & checkout require Browse storefront to be on.";
     }
     return "Read-only — edit these on the Guest role. Only Guest profile saves apply to the storefront.";
   }

@@ -343,6 +343,9 @@ export const PANEL_CONFIG_CHANGED_EVENT = "panel-config-changed";
 export function notifyPanelConfigChanged(): void {
   invalidatePanelConfig();
   if (typeof window !== "undefined") {
+    void import("@/lib/guest-permissions").then(({ invalidateGuestStorefrontPolicyCache }) => {
+      invalidateGuestStorefrontPolicyCache();
+    });
     window.dispatchEvent(new Event(PANEL_CONFIG_CHANGED_EVENT));
   }
 }
